@@ -36,29 +36,6 @@ class OperationsController extends Controller {
   });
   return back()->with('status','EVE verified courier delivery. Runner reward recorded in the internal ledger; ISK payment remains manual.');
  }
- public function createFinanceRequest(Request $r):RedirectResponse {
-  $d=$r->validate(['character_id'=>['required','integer',Rule::exists('eve_characters','id')->where('user_id',$r->user()->id)],'request_type'=>'required|in:funding,withdrawal','amount_isk'=>'required|numeric|min:1|max:1000000000000','external_reference'=>'nullable|string|max:190','notes'=>'nullable|string|max:2000']);
-  $characterId=(int)$d['character_id'];unset($d['character_id']);
-  $id=DB::table('financier_requests')->insertGetId($d+['user_id'=>$r->user()->id,'financier_character_id'=>$characterId,'status'=>'pending','created_at'=>now(),'updated_at'=>now()]);
-  $this->audit($r,'financier_request.created','financier_request',$id,$d);return back()->with('status','Finance request submitted for admin review.');
- }
- public function reviewFinanceRequest(Request $r,int $id):RedirectResponse {
-  abort_unless($r->user()->isAdmin(),403);
-  $d=$r->validate(['decision'=>'required|in:approved,rejected','notes'=>'nullable|string|max:2000']);
-  $row=DB::table('financier_requests')->where('id',$id)->first();abort_unless($row&&$row->status==='pending',409,'Request already reviewed.');
-  DB::transaction(function()use($r,$row,$d,$id){
-   if($d['decision']==='approved'&&$row->request_type==='withdrawal'&&$row->financier_character_id){
-    DB::table('eve_characters')->where('id',$row->financier_character_id)->lockForUpdate()->first();
-    $balance=(float)DB::table('ledger_entries')->where('eve_character_id',$row->financier_character_id)->sum('amount_isk');
-    abort_unless($balance >= (float)$row->amount_isk,422,'Insufficient internal ledger balance for this withdrawal.');
-   }
-   $n=DB::table('financier_requests')->where('id',$id)->where('status','pending')->update(['status'=>$d['decision'],'reviewed_by'=>$r->user()->id,'reviewed_at'=>now(),'notes'=>$d['notes']??null,'updated_at'=>now()]);
-   abort_unless($n===1,409);
-   if($d['decision']==='approved'&&$row->financier_character_id)DB::table('ledger_entries')->insertOrIgnore(['eve_character_id'=>$row->financier_character_id,'entry_type'=>'finance_'.$row->request_type,'source_type'=>'financier_request','source_id'=>$id,'amount_isk'=>$row->request_type==='withdrawal'?-abs($row->amount_isk):abs($row->amount_isk),'idempotency_key'=>'financier-request-'.$id,'metadata'=>json_encode(['reviewed_by'=>$r->user()->id]),'posted_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
-   $this->audit($r,'financier_request.'.$d['decision'],'financier_request',$id,$d);
-  });
-  return back()->with('status','Finance request reviewed. Complete any actual wallet transfer separately.');
- }
  private function audit(Request $r,string $action,string $type,int $id,array $details):void {
   DB::table('audit_logs')->insert(['user_id'=>$r->user()->id,'action'=>$action,'subject_type'=>$type,'subject_id'=>$id,'details'=>json_encode($details),'ip_address'=>$r->ip(),'created_at'=>now(),'updated_at'=>now()]);
  }
