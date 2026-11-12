@@ -21,7 +21,8 @@ class EveSsoController extends Controller {
   $identity=Http::get("https://esi.evetech.net/latest/characters/{$id}/")->throw()->json();
   $user=DB::transaction(function()use($id,$verify,$tokens,$identity){
    $character=EveCharacter::where('eve_character_id',$id)->lockForUpdate()->first();
-   $user=Auth::user() ?? $character?->user;\n   if($character && $user && $character->user_id && $character->user_id !== $user->id) abort(409,'This EVE character is already linked to another Buyback account.');
+   $user=Auth::user() ?? $character?->user;
+   if($character && $user && $character->user_id && $character->user_id !== $user->id) abort(409,'This EVE character is already linked to another Buyback account.');
    if(!$user)$user=User::create(['name'=>$identity['name']??'EVE Pilot','role'=>in_array($id,config('services.eve.admin_character_ids',[]),true)?'admin':'member','active'=>true]);
    if(in_array($id,config('services.eve.admin_character_ids',[]),true)&&$user->role!=='admin')$user->forceFill(['role'=>'admin'])->save();
    $character??=new EveCharacter(['eve_character_id'=>$id]);
