@@ -60,6 +60,8 @@ class AppraisalController extends Controller
                     'source_data' => json_encode([
                         'source' => $line['source'],
                         'observed_at' => $line['observed_at'],
+                        'payout_percent' => $line['payout_percent'],
+                        'payout_value' => $line['payout_value'],
                     ], JSON_THROW_ON_ERROR),
                     'created_at' => now(),
                     'updated_at' => now(),
