@@ -12,7 +12,7 @@ class OperationsController extends Controller {
  }
  public function deliverJob(Request $r,int $job):RedirectResponse {
   $row=DB::table('runner_jobs')->where('id',$job)->first();abort_unless($row&&($row->assigned_user_id===$r->user()->id||$r->user()->isAdmin()),403);abort_unless($row->status==='accepted',409,'Only accepted jobs can be delivered.');
-  DB::transaction(function()use($row,$r,$job){DB::table('runner_jobs')->where('id',$job)->where('status','accepted')->update(['status'=>'delivered','delivered_at'=>now(),'updated_at'=>now()]);
+  DB::transaction(function()use($row,$r,$job){$changed=DB::table('runner_jobs')->where('id',$job)->where('status','accepted')->update(['status'=>'delivered','delivered_at'=>now(),'updated_at'=>now()]);abort_unless($changed===1,409,'Job status changed before delivery could be recorded.');
    if((float)$row->reward_isk>0&&$row->runner_character_id)DB::table('ledger_entries')->insertOrIgnore(['eve_character_id'=>$row->runner_character_id,'entry_type'=>'runner_reward','source_type'=>'runner_job','source_id'=>$job,'amount_isk'=>$row->reward_isk,'idempotency_key'=>'runner-job-'.$job,'metadata'=>json_encode(['status'=>'delivered']),'posted_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
    $this->audit($r,'runner_job.delivered','runner_job',$job,[]);});
   return back()->with('status','Delivery recorded. The reward is in the internal ledger pending manual ISK payment.');
@@ -23,7 +23,7 @@ class OperationsController extends Controller {
  }
  public function reviewFinanceRequest(Request $r,int $id):RedirectResponse {
   abort_unless($r->user()->isAdmin(),403);$d=$r->validate(['decision'=>'required|in:approved,rejected','notes'=>'nullable|string|max:2000']);$row=DB::table('financier_requests')->where('id',$id)->first();abort_unless($row&&$row->status==='pending',409,'Request already reviewed.');
-  DB::transaction(function()use($r,$row,$d,$id){$n=DB::table('financier_requests')->where('id',$id)->where('status','pending')->update(['status'=>$d['decision'],'reviewed_by'=>$r->user()->id,'reviewed_at'=>now(),'notes'=>$d['notes']??null,'updated_at'=>now()]);abort_unless($n===1,409);
+  DB::transaction(function()use($r,$row,$d,$id){if($d['decision']==='approved' && $row->request_type==='withdrawal' && $row->financier_character_id){$balance=(float)DB::table('ledger_entries')->where('eve_character_id',$row->financier_character_id)->lockForUpdate()->sum('amount_isk');abort_unless($balance >= (float)$row->amount_isk,422,'Insufficient internal ledger balance for this withdrawal.');}$n=DB::table('financier_requests')->where('id',$id)->where('status','pending')->update(['status'=>$d['decision'],'reviewed_by'=>$r->user()->id,'reviewed_at'=>now(),'notes'=>$d['notes']??null,'updated_at'=>now()]);abort_unless($n===1,409);
    if($d['decision']==='approved'&&$row->financier_character_id)DB::table('ledger_entries')->insertOrIgnore(['eve_character_id'=>$row->financier_character_id,'entry_type'=>'finance_'.$row->request_type,'source_type'=>'financier_request','source_id'=>$id,'amount_isk'=>$row->request_type==='withdrawal'?-abs($row->amount_isk):abs($row->amount_isk),'idempotency_key'=>'financier-request-'.$id,'metadata'=>json_encode(['reviewed_by'=>$r->user()->id]),'posted_at'=>now(),'created_at'=>now(),'updated_at'=>now()]);
    $this->audit($r,'financier_request.'.$d['decision'],'financier_request',$id,$d);});
   return back()->with('status','Finance request reviewed. Complete any actual wallet transfer separately.');
