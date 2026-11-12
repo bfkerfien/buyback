@@ -1,10 +1,10 @@
 # Triglavian Buyback
 
-Standalone EVE Online buyback, hauling, and financing platform inspired by the public workflows of JitaRun. This project is an independent implementation; it does not reuse JitaRun proprietary source code, branding, or private data.
+Standalone EVE Online buyback, runner, and financier platform inspired by publicly observable JitaRun workflows. This is an independent implementation and does not reuse JitaRun proprietary source code, branding, or private data.
 
 ## Initial scope
 
-- Buyback appraisal: paste inventory lists/cargo scans, resolve EVE item types, quantities, origin, valuation, fees, and payout.
+- Buyback appraisal: paste EVE inventory lists/cargo scans, resolve item names, value using recorded Jita prices, and create shareable quotes.
 - Runner operations: contract board, acceptance, delivery workflow, status tracking, runner earnings.
 - Financier operations: liquidity/claim workflow, withdrawal requests, payout ledger, balances.
 - EVE SSO and character linking.
@@ -14,17 +14,34 @@ Standalone EVE Online buyback, hauling, and financing platform inspired by the p
 
 **Not in initial scope:** LP Exchange.
 
+## Stack
+
+- PHP 8.3 / Laravel 12
+- MariaDB 11.4
+- Redis 7
+- Docker Compose and Traefik
+
 ## Deployment goals
 
 - Independent Docker Compose application under `/opt/buyback`.
 - Dedicated database and application services.
 - Independent configuration and secrets.
-- Traefik reverse-proxy integration on its own hostname.
+- Own Traefik hostname.
 - No runtime dependency on SeAT or `/opt/rigauth`.
 
-## Architecture
+## Current implementation
 
-The implementation will be organized as a modular web application with clear boundaries for identity/ESI, appraisal, runner operations, financier operations, payouts, and administration. Market prices and EVE Static Data must be cached and refreshed through background jobs; appraisal results must record the price source and timestamp used so historical quotes remain explainable.
+The `feature/appraisal-engine` branch contains the first working application milestone:
+
+- Laravel application entrypoint, health endpoint, and dark-themed appraisal interface.
+- Inventory paste parser supporting tab-separated, CSV, and quantity-prefix/suffix formats.
+- Local EVE item type catalog and streaming CCP SDE JSONL importer.
+- Timestamped market-price snapshot table and CSV importer.
+- Jita buy-side valuation by default, configurable payout percentage, and immutable quote item/price snapshots.
+- Shareable appraisal result page.
+- Unit tests for inventory parsing.
+
+See [Appraisal Engine documentation](docs/APPRAISAL_ENGINE.md) for import and setup instructions.
 
 ## Security and correctness
 
@@ -34,6 +51,6 @@ The implementation will be organized as a modular web application with clear bou
 - Make payout and balance changes auditable and transaction-safe.
 - Treat ESI cache expiry and rate limits explicitly; never assume data is real-time.
 
-## Project status
+## Current limitations
 
-Repository bootstrap and scope definition. No production application or ESI credentials are included yet.
+Market prices are imported from CSV in this milestone; automatic ESI price refresh is next. EVE SSO, buyback acceptance, runner/financier operations, payout processing, and production access controls are not implemented yet. Do not expose this initial milestone publicly until authentication and authorization are added.
