@@ -13,43 +13,29 @@ class PayoutRuleController extends Controller
     {
         abort_unless($request->user()->isAdmin(), 403);
         $data = $request->validate([
-            'item_name' => ['required', 'string', 'max:255'],
+            'category_id' => ['required', 'integer', 'min:1'],
             'payout_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
         ]);
-
-        $item = DB::table('eve_item_types')->where('published', true)
-            ->whereRaw('LOWER(type_name) = ?', [mb_strtolower(trim($data['item_name']))])
-            ->first(['type_id', 'type_name']);
-
-        if (!$item) {
-            throw ValidationException::withMessages([
-                'item_name' => ['That exact published EVE item name was not found. Check the spelling and try again.'],
-            ]);
-        }
+        $category = DB::table('eve_item_groups')->where('category_id', $data['category_id'])->orderBy('category_name')->first(['category_id','category_name']);
+        if (!$category) throw ValidationException::withMessages(['category_id'=>['That EVE category was not found. Import the CCP SDE categories and groups first.']]);
 
         DB::table('appraisal_payout_rules')->updateOrInsert(
-            ['type_id' => $item->type_id],
-            ['payout_percent' => $data['payout_percent'], 'updated_at' => now(), 'created_at' => now()]
+            ['category_id'=>$category->category_id],
+            ['category_name'=>$category->category_name,'payout_percent'=>$data['payout_percent'],'updated_at'=>now(),'created_at'=>now()]
         );
-
         DB::table('audit_logs')->insert([
-            'user_id' => $request->user()->id,
-            'action' => 'appraisal_payout_rule.saved',
-            'subject_type' => 'eve_item_type',
-            'subject_id' => $item->type_id,
-            'details' => json_encode(['item' => $item->type_name, 'payout_percent' => (float) $data['payout_percent']]),
-            'ip_address' => $request->ip(),
-            'created_at' => now(),
-            'updated_at' => now(),
+            'user_id'=>$request->user()->id,'action'=>'appraisal_category_rate.saved',
+            'subject_type'=>'eve_item_category','subject_id'=>$category->category_id,
+            'details'=>json_encode(['category'=>$category->category_name,'payout_percent'=>(float)$data['payout_percent']]),
+            'ip_address'=>$request->ip(),'created_at'=>now(),'updated_at'=>now(),
         ]);
-
-        return back()->with('status', 'Buyback rate saved for ' . $item->type_name . '.');
+        return back()->with('status','Buyback rate saved for the '.$category->category_name.' category.');
     }
 
-    public function destroy(Request $request, int $typeId): RedirectResponse
+    public function destroy(Request $request, int $categoryId): RedirectResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
-        DB::table('appraisal_payout_rules')->where('type_id', $typeId)->delete();
-        return back()->with('status', 'Item rate removed. The default buyback rate will apply.');
+        DB::table('appraisal_payout_rules')->where('category_id',$categoryId)->delete();
+        return back()->with('status','Category rate removed. The default buyback rate will apply.');
     }
 }
