@@ -1,56 +1,34 @@
 # Triglavian Buyback
 
-Standalone EVE Online buyback, runner, and financier platform inspired by publicly observable JitaRun workflows. This is an independent implementation and does not reuse JitaRun proprietary source code, branding, or private data.
+Standalone EVE Online buyback, runner, and financier platform. Independent of SeAT and /opt/rigauth. LP Exchange is explicitly excluded from this release.
 
-## Initial scope
+## Implemented
 
-- Buyback appraisal: paste EVE inventory lists/cargo scans, resolve item names, value using recorded Jita prices, and create shareable quotes.
-- Runner operations: contract board, acceptance, delivery workflow, status tracking, runner earnings.
-- Financier operations: liquidity/claim workflow, withdrawal requests, payout ledger, balances.
-- EVE SSO and character linking.
-- ESI-backed contract and corporation asset verification.
-- Administration: pricing, fees, service regions, role permissions, audit logs.
-- Public activity and payout feed.
+- EVE SSO login and multi-character linking; encrypted access and refresh tokens at rest.
+- Role-based member/admin access, active-account enforcement, and first-admin bootstrap from EVE character IDs.
+- Public inventory appraisal with shareable quotes and price snapshots.
+- Admin-managed runner job board, runner acceptance and delivery status, and idempotent reward ledger entries.
+- Financier liquidity and withdrawal requests, admin review, ledger postings, and audit records.
+- PHP 8.3 / Laravel 12, MariaDB 11.4, Redis 7, Docker Compose, and Traefik.
 
-**Not in initial scope:** LP Exchange.
+## EVE SSO configuration
 
-## Stack
+Create an EVE application with the callback URL exactly matching EVE_CALLBACK_URL. Set EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_CALLBACK_URL, EVE_SCOPES=publicData esi-contracts.read_character_contracts.v1, and EVE_USER_AGENT. Set BUYBACK_ADMIN_CHARACTER_IDS to a comma-separated list of EVE character IDs you control. Those characters receive the admin role when they sign in. A signed-in user can link additional characters by visiting the EVE sign-in link again. A character already linked to another account cannot be claimed.
 
-- PHP 8.3 / Laravel 12
-- MariaDB 11.4
-- Redis 7
-- Docker Compose and Traefik
+## Deployment
 
-## Deployment goals
+1. Clone the repository into /opt/buyback and copy .env.example to .env.
+2. Set a unique APP_KEY, APP_URL, BUYBACK_DOMAIN, strong unique DB_PASSWORD and DB_ROOT_PASSWORD, EVE SSO credentials, callback URL, admin character ID, and a real EVE_USER_AGENT contact.
+3. Ensure DNS points the hostname to the server and Docker network traefik exists.
+4. Run docker compose up -d --build.
+5. Run docker compose exec app php artisan migrate --force.
+6. Import CCP SDE type data and seed Jita prices:
+   - docker compose exec app php artisan buyback:import-types /path/to/types.jsonl
+   - docker compose exec app php artisan buyback:refresh-jita-prices TYPE_ID ...
+7. Sign in with the configured admin character and use the dashboard.
 
-- Independent Docker Compose application under `/opt/buyback`.
-- Dedicated database and application services.
-- Independent configuration and secrets.
-- Own Traefik hostname.
-- No runtime dependency on SeAT or `/opt/rigauth`.
+## Operational boundaries
 
-## Current implementation
+Runner jobs require an EVE courier contract ID. Delivery is verified against the runner character's ESI contract record (completed status and accepting character) before the reward is recorded in the internal ledger. The app does not create contracts or transfer ISK. Financier approval changes the internal ledger only; actual wallet transfers remain manual and must be reconciled by an administrator. Corporation asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Runners must authorize the character-contract read scope; existing users need to sign in again after the scope is added. Never represent an internal ledger entry as a completed in-game payment.
 
-The `feature/appraisal-engine` branch contains the first working application milestone:
-
-- Laravel application entrypoint, health endpoint, and dark-themed appraisal interface.
-- Inventory paste parser supporting tab-separated, CSV, and quantity-prefix/suffix formats.
-- Local EVE item type catalog and streaming CCP SDE JSONL importer.
-- Timestamped market-price snapshot table and CSV importer.
-- Jita buy-side valuation by default, configurable payout percentage, and immutable quote item/price snapshots.
-- Shareable appraisal result page.
-- Unit tests for inventory parsing.
-
-See [Appraisal Engine documentation](docs/APPRAISAL_ENGINE.md) for import and setup instructions.
-
-## Security and correctness
-
-- Never commit EVE client secrets, session secrets, database passwords, or access tokens.
-- Keep EVE SSO state validation and token storage server-side.
-- Verify contracts and item ownership against ESI before marking deliveries complete.
-- Make payout and balance changes auditable and transaction-safe.
-- Treat ESI cache expiry and rate limits explicitly; never assume data is real-time.
-
-## Current limitations
-
-Market prices are imported from CSV in this milestone; automatic ESI price refresh is next. EVE SSO, buyback acceptance, runner/financier operations, payout processing, and production access controls are not implemented yet. Do not expose this initial milestone publicly until authentication and authorization are added.
+All OAuth tokens are encrypted with Laravel APP_KEY. Never commit .env, EVE client secrets, database passwords, or tokens. The repository may be public.
