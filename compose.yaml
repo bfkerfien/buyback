@@ -35,7 +35,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
-      - "traefik.http.routers.buyback.rule=Host(${BUYBACK_DOMAIN:?Set BUYBACK_DOMAIN in .env})"
+      - "traefik.http.routers.buyback.rule=Host(`${BUYBACK_DOMAIN:?Set BUYBACK_DOMAIN in .env}`)"
       - "traefik.http.routers.buyback.entrypoints=websecure"
       - "traefik.http.routers.buyback.tls=true"
       - "traefik.http.routers.buyback.tls.certresolver=letsencrypt"
