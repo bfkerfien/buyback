@@ -18,15 +18,18 @@ class EveSsoController extends Controller {
    ->post('https://login.eveonline.com/v2/oauth/token',['grant_type'=>'authorization_code','code'=>$request->query('code')])->throw()->json();
   $verify=Http::withToken($tokens['access_token'])->get('https://login.eveonline.com/oauth/verify')->throw()->json();
   $id=(int)($verify['CharacterID']??0);abort_unless($id>0,403,'EVE did not return a valid character identity.');
-  $identity=Http::get("https://esi.evetech.net/latest/characters/{$id}/")->throw()->json();
-  $user=DB::transaction(function()use($id,$verify,$tokens,$identity){
+  $identity=Http::withHeaders(['User-Agent'=>config('buyback.eve_user_agent'),'X-Compatibility-Date'=>config('buyback.esi_compatibility_date')])->timeout(20)->get("https://esi.evetech.net/latest/characters/{$id}/")->throw()->json();
+  $ownerHash=(string)($verify['CharacterOwnerHash']??'');
+  abort_unless($ownerHash !== '',403,'EVE did not return character ownership proof.');
+  $user=DB::transaction(function()use($id,$verify,$tokens,$identity,$ownerHash){
    $character=EveCharacter::where('eve_character_id',$id)->lockForUpdate()->first();
+   if($character && $character->owner_hash && $ownerHash && !hash_equals($character->owner_hash,$ownerHash)) abort(403,'EVE ownership of this character has changed. Contact a Buyback administrator to review the existing account link.');
    $user=Auth::user() ?? $character?->user;
    if($character && $user && $character->user_id && $character->user_id !== $user->id) abort(409,'This EVE character is already linked to another Buyback account.');
    if(!$user)$user=User::create(['name'=>$identity['name']??'EVE Pilot','role'=>in_array($id,config('services.eve.admin_character_ids',[]),true)?'admin':'member','active'=>true]);
    if(in_array($id,config('services.eve.admin_character_ids',[]),true)&&$user->role!=='admin')$user->forceFill(['role'=>'admin'])->save();
    $character??=new EveCharacter(['eve_character_id'=>$id]);
-   $character->fill(['user_id'=>$user->id,'name'=>$identity['name']??'EVE Pilot','owner_hash'=>$verify['CharacterOwnerHash']??null,
+   $character->fill(['user_id'=>$user->id,'name'=>$identity['name']??'EVE Pilot','owner_hash'=>$ownerHash ?: null,
     'access_token'=>$tokens['access_token'],'refresh_token'=>$tokens['refresh_token']??null,
     'token_expires_at'=>now()->addSeconds((int)($tokens['expires_in']??1200)),'scopes'=>$verify['Scopes']??[],
     'last_authenticated_at'=>now()])->save();

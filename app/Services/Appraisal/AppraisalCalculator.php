@@ -15,6 +15,7 @@ final class AppraisalCalculator
     {
         $names = array_column($parsedItems, 'name');
         $types = DB::table('eve_item_types')
+            ->where('published', true)
             ->whereIn('type_name', $names)
             ->get(['type_id', 'type_name'])
             ->keyBy(fn ($type) => mb_strtolower($type->type_name));

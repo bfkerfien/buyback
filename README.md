@@ -1,34 +1,82 @@
 # Triglavian Buyback
 
-Standalone EVE Online buyback, runner, and financier platform. Independent of SeAT and /opt/rigauth. LP Exchange is explicitly excluded from this release.
+Standalone EVE Online buyback, runner, and financier platform. Independent of SeAT and /opt/rigauth. LP Exchange is explicitly excluded.
 
-## Implemented
+## Included in this release
 
-- EVE SSO login and multi-character linking; encrypted access and refresh tokens at rest.
-- Role-based member/admin access, active-account enforcement, and first-admin bootstrap from EVE character IDs.
-- Public inventory appraisal with shareable quotes and price snapshots.
-- Admin-managed runner job board, runner acceptance and delivery status, and idempotent reward ledger entries.
-- Financier liquidity and withdrawal requests, admin review, ledger postings, and audit records.
-- PHP 8.3 / Laravel 12, MariaDB 11.4, Redis 7, Docker Compose, and Traefik.
+- EVE SSO login, secure state validation, multi-character linking, and encrypted access/refresh tokens.
+- Member/admin roles, active-account enforcement, and administrator bootstrap by EVE character ID.
+- Public inventory appraisal with shareable quotes and immutable price snapshots.
+- Admin-published runner jobs, runner acceptance, ESI verification of completed courier contracts, and internal reward ledger entries.
+- Financier liquidity/withdrawal requests, administrator review, balance checks, and idempotent ledger postings.
+- Audit log, PHP-FPM, Nginx, MariaDB 11.4, Redis 7, Docker Compose, and Traefik deployment.
 
-## EVE SSO configuration
+## Configure EVE SSO
 
-Create an EVE application with the callback URL exactly matching EVE_CALLBACK_URL. Set EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_CALLBACK_URL, EVE_SCOPES=publicData esi-contracts.read_character_contracts.v1, and EVE_USER_AGENT. Set BUYBACK_ADMIN_CHARACTER_IDS to a comma-separated list of EVE character IDs you control. Those characters receive the admin role when they sign in. A signed-in user can link additional characters by visiting the EVE sign-in link again. A character already linked to another account cannot be claimed.
+Create an EVE application and register this exact callback URL:
 
-## Deployment
+`https://YOUR-BUYBACK-HOST/auth/eve/callback`
 
-1. Clone the repository into /opt/buyback and copy .env.example to .env.
-2. Set a unique APP_KEY, APP_URL, BUYBACK_DOMAIN, strong unique DB_PASSWORD and DB_ROOT_PASSWORD, EVE SSO credentials, callback URL, admin character ID, and a real EVE_USER_AGENT contact.
-3. Ensure DNS points the hostname to the server and Docker network traefik exists.
-4. Run docker compose up -d --build.
-5. Run docker compose exec app php artisan migrate --force.
-6. Import CCP SDE type data and seed Jita prices:
-   - docker compose exec app php artisan buyback:import-types /path/to/types.jsonl
-   - docker compose exec app php artisan buyback:refresh-jita-prices TYPE_ID ...
-7. Sign in with the configured admin character and use the dashboard.
+Configure these values in `.env`:
+- `EVE_CLIENT_ID` and `EVE_CLIENT_SECRET`
+- `EVE_CALLBACK_URL` matching the registered callback exactly
+- `EVE_SCOPES="publicData esi-contracts.read_character_contracts.v1"`
+- `BUYBACK_ADMIN_CHARACTER_IDS` as comma-separated EVE character IDs that you control
+- `EVE_USER_AGENT` with a real contact address
+
+The configured administrator character receives the admin role when it first signs in. A signed-in user can link additional characters by selecting **Link another character** on the dashboard. A character already linked to a different account cannot be claimed.
+
+## Server deployment
+
+Prerequisites: Docker Engine with Compose v2, an existing external Docker network named `traefik`, DNS pointing your hostname at the server, and a Traefik HTTPS entrypoint named `websecure` with certificate resolver `letsencrypt`.
+
+1. Clone `https://github.com/bfkerfien/buyback.git` into `/opt/buyback`.
+2. Copy `.env.example` to `.env`.
+3. Set `APP_URL`, `BUYBACK_DOMAIN`, `DB_PASSWORD`, `DB_ROOT_PASSWORD`, EVE SSO values, admin character ID, and EVE User-Agent contact. Use unique random database passwords. Leave `APP_KEY=` blank; the deployment script generates and saves it.
+4. Ensure the EVE developer application callback matches `EVE_CALLBACK_URL`.
+5. Run the deployment script:
+
+```bash
+cd /opt/buyback
+bash deploy.sh
+```
+
+The script validates required production settings, checks the Traefik network, builds the PHP-FPM and Nginx images, starts MariaDB and Redis, generates an APP_KEY if missing, starts the services, applies migrations, and caches Laravel config and views. It does not delete volumes or reset the database.
+
+## Load EVE item types and Jita prices
+
+Place the CCP SDE JSONL `types.jsonl` file at `/opt/buyback/data/types.jsonl` on the server. The `data/` directory is deliberately excluded from Git and Docker build context. Then run:
+
+```bash
+cd /opt/buyback
+docker compose exec app php artisan buyback:import-types /var/www/html/data/types.jsonl
+docker compose exec app php artisan buyback:refresh-jita-prices --all
+```
+
+All ESI calls send the configured `X-Compatibility-Date` and `User-Agent` headers. Update the compatibility date only after reviewing and testing ESI changes.
+
+The bulk market refresh reads The Forge market order pages and only uses orders located at Jita IV - Moon 4 - Caldari Navy Assembly Plant (station ID 60003760). It stores the best buy and sell observations for each item found there. You can refresh prices again with the same command when needed. The app will report an item as unpriced if there is no current Jita 4-4 buy/sell order for it.
+
+To refresh only selected types instead:
+
+```bash
+docker compose exec app php artisan buyback:refresh-jita-prices 34 35 36
+```
+
+Check the service at `https://YOUR-BUYBACK-HOST/health`. Sign in using the configured admin EVE character, then manage runner jobs and financier requests from the dashboard.
+
+For code updates after initial deployment:
+
+```bash
+cd /opt/buyback
+git pull origin main
+bash deploy.sh
+```
 
 ## Operational boundaries
 
-Runner jobs require an EVE courier contract ID. Delivery is verified against the runner character's ESI contract record (completed status and accepting character) before the reward is recorded in the internal ledger. The app does not create contracts or transfer ISK. Financier approval changes the internal ledger only; actual wallet transfers remain manual and must be reconciled by an administrator. Corporation asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Runners must authorize the character-contract read scope; existing users need to sign in again after the scope is added. Never represent an internal ledger entry as a completed in-game payment.
+Create the EVE courier contract first and assign it to the corporation (recommended for a shared runner board) or intended runner. Publish that existing contract ID in the admin dashboard. The runner accepts the job on the website, accepts the contract in EVE, completes it in-game, then submits it for ESI verification. Buyback checks the runner character's ESI contract record (courier type, finished status, and matching accepting character) before posting the reward to the internal ledger. The app does not create EVE contracts or transfer ISK.
 
-All OAuth tokens are encrypted with Laravel APP_KEY. Never commit .env, EVE client secrets, database passwords, or tokens. The repository may be public.
+Financier approvals update the internal ledger only; actual wallet transfers remain manual and must be reconciled by an administrator. Corporation asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Never represent an internal ledger entry as a completed in-game payment.
+
+All OAuth tokens are encrypted at rest using Laravel `APP_KEY`. Keep `.env`, EVE client secrets, database passwords, and tokens off GitHub. The repository may be public.

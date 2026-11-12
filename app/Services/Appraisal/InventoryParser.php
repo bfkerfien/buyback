@@ -23,7 +23,10 @@ final class InventoryParser
             $name = null;
             $quantity = null;
 
-            if (str_contains($line, "\t")) {
+            if (preg_match('/^([0-9][0-9,]*)\\s*[x×]\\s*(.+)$/i', $line, $m)) {
+                $quantity = (int) str_replace(',', '', $m[1]);
+                $name = trim($m[2]);
+            } elseif (str_contains($line, "\t")) {
                 $parts = array_map('trim', explode("\t", $line));
                 if (count($parts) >= 2) {
                     if (is_numeric($parts[0])) {
