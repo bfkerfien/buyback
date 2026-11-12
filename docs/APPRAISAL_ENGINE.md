@@ -39,6 +39,16 @@ docker compose exec app php artisan buyback:import-prices /path/inside/container
 
 The importer defaults to region `10000002` (The Forge/Jita). Optional `source` and `observed_at` columns are retained. Each import adds timestamped observations; it does not overwrite historical prices.
 
+## Refresh directly from EVE ESI
+
+Set `EVE_USER_AGENT` in `.env`, then refresh selected item type IDs from The Forge/Jita:
+
+```bash
+docker compose exec app php artisan buyback:refresh-jita-prices 34 35 36
+```
+
+The command requests ESI market orders, calculates the best buy and sell prices across the returned pages (up to 20), and stores a new timestamped observation for each type. Refresh only the type IDs needed; do not request every SDE type in one run.
+
 ## Important limitations
 
 - Market observations must currently be supplied by CSV; automatic ESI market refresh is a subsequent milestone.
