@@ -20,6 +20,8 @@ jobs:
           coverage: none
       - name: Resolve Composer dependencies
         run: composer update --no-interaction --prefer-dist --no-progress
+      - name: Check deployment script syntax
+        run: bash -n deploy.sh
       - name: Check PHP syntax
         run: |
           find app bootstrap config database routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
