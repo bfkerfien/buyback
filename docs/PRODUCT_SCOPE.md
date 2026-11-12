@@ -4,7 +4,6 @@
 
 - Customer: creates appraisals and submits items for buyback.
 - Runner: accepts logistics jobs, moves contracts/items, records delivery.
-- Financier: supplies liquidity and processes eligible claims/withdrawals.
 - Administrator: configures service policy, pricing, access, and reconciliations.
 
 ## Initial modules
@@ -15,7 +14,6 @@
 4. Price sourcing and appraisal calculation
 5. Buyback quote lifecycle
 6. Runner job/contract workflow
-7. Financier balances and claims
 8. Payout ledger and audit trail
 9. Administration and public activity feed
 
