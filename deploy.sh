@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 fail() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 
 [[ -f .env ]] || fail "Missing .env. Copy .env.example to .env and configure it first."
+chmod 600 .env
 command -v docker >/dev/null 2>&1 || fail "Docker is not installed or not on PATH."
 docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is required."
 docker network inspect traefik >/dev/null 2>&1 || fail "The external Docker network 'traefik' does not exist."
