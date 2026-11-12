@@ -53,6 +53,8 @@ docker compose exec app php artisan buyback:import-types /var/www/html/data/type
 docker compose exec app php artisan buyback:refresh-jita-prices --all
 ```
 
+All ESI calls send the configured `X-Compatibility-Date` and `User-Agent` headers. Update the compatibility date only after reviewing and testing ESI changes.
+
 The bulk market refresh reads The Forge market order pages and only uses orders located at Jita IV - Moon 4 - Caldari Navy Assembly Plant (station ID 60003760). It stores the best buy and sell observations for each item found there. You can refresh prices again with the same command when needed. The app will report an item as unpriced if there is no current Jita 4-4 buy/sell order for it.
 
 To refresh only selected types instead:
