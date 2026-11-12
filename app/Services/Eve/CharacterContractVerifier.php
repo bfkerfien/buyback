@@ -18,7 +18,7 @@ class CharacterContractVerifier {
   if($response->status()===404)abort(422,'The specified EVE contract was not found for this character.');
   $contract=$response->throw()->json();
   abort_unless(($contract['type']??null)==='courier',422,'Only courier contracts can complete runner jobs.');
-  abort_unless(($contract['status']??null)==='finished',422,'EVE does not report this courier contract as completed.');
+  abort_unless(in_array(($contract['status']??null),['finished_contractor','finished'],true),422,'EVE does not report this courier contract as completed by the runner.');
   abort_unless((int)($contract['acceptor_id']??0)===$id,403,'The authenticated runner character did not accept this contract.');
   return ['verified'=>true,'contract_id'=>$contractId,'character_id'=>$id,'type'=>$contract['type'],'status'=>$contract['status'],'acceptor_id'=>$contract['acceptor_id'],'date_completed'=>$contract['date_completed']??null,'verified_at'=>now()->toIso8601String()];
  }
