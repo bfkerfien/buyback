@@ -9,9 +9,9 @@ return new class extends Migration {
     {
         Schema::create('appraisal_payout_rules', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('type_id')->unique();
+            $table->unsignedBigInteger('category_id')->unique();
+            $table->string('category_name', 120);
             $table->decimal('payout_percent', 5, 2);
-            $table->foreign('type_id')->references('type_id')->on('eve_item_types')->cascadeOnDelete();
             $table->timestamps();
         });
     }
