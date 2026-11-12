@@ -31,6 +31,22 @@ class ImportEveTypes extends Command
         }
         fclose($handle);
         if ($batch) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','updated_at']); $imported += count($batch); }
+        // Ensure the explicitly requested Mercoxit rule exists after the SDE types are loaded.
+        $mercoxit = DB::table('eve_item_types')->where('type_name', 'Compressed Mercoxit')->first(['type_id', 'type_name']);
+        $morphite = DB::table('eve_item_types')->where('type_id', 11399)->first(['type_id', 'type_name']);
+        if ($mercoxit && $morphite && DB::getSchemaBuilder()->hasTable('appraisal_ore_valuation_rules')) {
+            DB::table('appraisal_ore_valuation_rules')->insertOrIgnore([
+                'ore_type_id' => $mercoxit->type_id,
+                'ore_name' => $mercoxit->type_name,
+                'valuation_mode' => 'reprocessed',
+                'output_type_id' => $morphite->type_id,
+                'output_name' => $morphite->type_name,
+                'output_quantity_per_input' => 1.2688,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
         $this->newLine(); $this->info("Imported or updated {$imported} published EVE item types.");
         return self::SUCCESS;
     }
