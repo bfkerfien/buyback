@@ -33,7 +33,7 @@ class CharacterContractVerifier
 
         $characterId = (int) $character->eve_character_id;
         $http = Http::withToken($token)
-            ->withHeaders(['User-Agent' => config('buyback.eve_user_agent')])
+            ->withHeaders(['User-Agent' => config('buyback.eve_user_agent'), 'X-Compatibility-Date' => config('buyback.esi_compatibility_date')])
             ->acceptJson()
             ->timeout(30)
             ->retry(3, 500);
