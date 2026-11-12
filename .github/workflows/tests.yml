@@ -20,6 +20,12 @@ jobs:
           coverage: none
       - name: Resolve Composer dependencies
         run: composer update --no-interaction --prefer-dist --no-progress --no-scripts
+      - name: Upload resolved Composer lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: composer-lockfile
+          path: composer.lock
+          if-no-files-found: error
       - name: Prepare Laravel runtime directories
         run: |
           mkdir -p bootstrap/cache storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs
