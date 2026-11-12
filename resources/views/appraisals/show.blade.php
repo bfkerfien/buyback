@@ -4,27 +4,25 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Appraisal {{ $quote->public_token }} · Triglavian Buyback</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#0b1018;color:#e8edf5}*{box-sizing:border-box}body{margin:0;padding:28px}main{max-width:1000px;margin:auto}.panel{background:#111a27;border:1px solid #29374a;border-radius:16px;padding:24px;margin:18px 0}h1{font-size:32px;margin:6px 0 22px}.muted{color:#9aabc0}.money{font-size:32px;font-weight:750}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{background:#0b1420;padding:16px;border-radius:12px}.stat strong{display:block;font-size:20px;margin-top:8px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px 8px;border-bottom:1px solid #29374a}td:last-child,th:last-child{text-align:right}.right{text-align:right}@media(max-width:650px){.grid{grid-template-columns:1fr}body{padding:14px}.panel{padding:16px}}
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#0b1018;color:#e8edf5}*{box-sizing:border-box}body{margin:0;padding:24px}main{max-width:1050px;margin:auto}.muted{color:#9aabc0}.panel{background:#111a27;border:1px solid #29374a;border-radius:14px;padding:20px;margin:18px 0}h1{font-size:30px;margin:8px 0 20px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{background:#0b1420;padding:16px;border-radius:10px}.stat strong{display:block;font-size:21px;margin-top:8px}.money{font-size:27px!important;color:#e9c477}table{width:100%;border-collapse:separate;border-spacing:0 7px}th{color:#9aabc0;font-size:12px;text-align:left;padding:8px 12px}td{background:#1a2635;padding:12px;font-size:13px}td:first-child{border-radius:8px 0 0 8px}td:last-child{border-radius:0 8px 8px 0}.right{text-align:right}.item{font-weight:700}.sub{display:block;color:#91a3b9;font-size:11px;margin-top:4px}.why{background:#34465e;color:#e8edf5;border:0;border-radius:6px;padding:7px 10px;cursor:pointer}.details{display:none;color:#aebdd0;font-size:12px;padding:10px 12px;background:#101925;border-radius:7px;margin-top:6px}.details.open{display:block}.rate{font-weight:700;color:#e9c477}@media(max-width:700px){body{padding:12px}.panel{padding:14px}.grid{grid-template-columns:1fr}.table-wrap{overflow-x:auto}table{min-width:720px}}
 </style>
 </head>
 <body><main>
-<p class="muted">TRIGLAVIAN CONSORTIUM · BUYBACK APPRAISAL</p>
-<h1>Appraisal result</h1>
-<section class="panel">
-<div class="grid">
+<p class="muted">TRIGLAVIAN CONSORTIUM · BUYBACK APPRAISAL</p><h1>Appraisal result</h1>
+<section class="panel"><div class="grid">
 <div class="stat"><span class="muted">Gross market value</span><strong>{{ number_format((float)$quote->gross_value, 2) }} ISK</strong></div>
-<div class="stat"><span class="muted">Service fee</span><strong>{{ number_format((float)$quote->fees, 2) }} ISK</strong></div>
-<div class="stat"><span class="muted">Estimated payout</span><strong class="money">{{ number_format((float)$quote->payout_value, 2) }} ISK</strong></div>
-</div>
-<p class="muted">Origin: {{ $quote->origin_system ?: 'Not specified' }} · Priced {{ $quote->priced_at }}</p>
-</section>
-<section class="panel">
-<h2>Items</h2>
-<table><thead><tr><th>Item</th><th class="right">Quantity</th><th class="right">Unit price</th><th class="right">Total</th></tr></thead><tbody>
+<div class="stat"><span class="muted">Service fees</span><strong>{{ number_format((float)$quote->fees, 2) }} ISK</strong></div>
+<div class="stat"><span class="muted">Estimated buyback</span><strong class="money">{{ number_format((float)$quote->payout_value, 2) }} ISK</strong></div>
+</div><p class="muted">Origin: {{ $quote->origin_system ?: 'Not specified' }} · Priced {{ $quote->priced_at }}</p></section>
+<section class="panel"><h2>Appraised items</h2><div class="table-wrap"><table><thead><tr><th>Item</th><th class="right">Quantity</th><th class="right">Buyback price</th><th class="right">Effective rate</th><th class="right">Calculation</th></tr></thead><tbody>
 @foreach($items as $item)
-<tr><td>{{ $item->type_name }}</td><td class="right">{{ number_format($item->quantity) }}</td><td class="right">{{ number_format((float)$item->unit_price, 2) }}</td><td class="right">{{ number_format((float)$item->line_value, 2) }}</td></tr>
+@php($source = json_decode($item->source_data ?? '{}', true) ?: [])
+<tr><td><span class="item">{{ $item->type_name }}</span><span class="sub">Jita {{ ucfirst($source['price_side'] ?? 'buy') }} price · {{ $source['source'] ?? 'Market snapshot' }}</span></td>
+<td class="right">{{ number_format($item->quantity) }}</td><td class="right">{{ number_format((float)$item->line_value * ((float)($source['payout_percent'] ?? 90) / 100), 2) }} ISK</td>
+<td class="right"><span class="rate">{{ number_format((float)($source['payout_percent'] ?? 90), 2) }}%</span></td>
+<td class="right"><button class="why" type="button" onclick="const d=document.getElementById('why-{{ $item->id }}');d.classList.toggle('open')">Why?</button></td></tr>
+<tr><td colspan="5"><div class="details" id="why-{{ $item->id }}">Jita unit price: {{ number_format((float)$item->unit_price, 2) }} ISK × {{ number_format($item->quantity) }} = {{ number_format((float)$item->line_value, 2) }} ISK market value. Buyback rate: {{ number_format((float)($source['payout_percent'] ?? 90), 2) }}%. Offer: {{ number_format((float)$item->line_value * ((float)($source['payout_percent'] ?? 90) / 100), 2) }} ISK. Price observed: {{ $source['observed_at'] ?? 'Not recorded' }}.</div></td></tr>
 @endforeach
-</tbody></table>
-</section>
-<p class="muted">Quote reference: {{ $quote->public_token }} · This is an estimate, not a completed purchase or payout.</p>
+</tbody></table></div></section>
+<p class="muted">Quote reference: {{ $quote->public_token }} · Estimate only; this is not a completed purchase or payout.</p>
 </main></body></html>
