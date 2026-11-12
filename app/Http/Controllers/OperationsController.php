@@ -2,7 +2,6 @@
 namespace App\Http\Controllers;
 use App\Models\EveCharacter;
 use App\Services\Eve\CharacterContractVerifier;
-use App\Services\Eve\CharacterContractVerifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +46,7 @@ class OperationsController extends Controller {
   $row=DB::table('financier_requests')->where('id',$id)->first();abort_unless($row&&$row->status==='pending',409,'Request already reviewed.');
   DB::transaction(function()use($r,$row,$d,$id){
    if($d['decision']==='approved'&&$row->request_type==='withdrawal'&&$row->financier_character_id){
+    DB::table('eve_characters')->where('id',$row->financier_character_id)->lockForUpdate()->first();
     $balance=(float)DB::table('ledger_entries')->where('eve_character_id',$row->financier_character_id)->lockForUpdate()->get(['amount_isk'])->sum('amount_isk');
     abort_unless($balance >= (float)$row->amount_isk,422,'Insufficient internal ledger balance for this withdrawal.');
    }
