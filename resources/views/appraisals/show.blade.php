@@ -8,7 +8,7 @@
 </style>
 </head>
 <body><main>
-<p class="muted">TRIGLAVIAN CONSORTIUM · BUYBACK APPRAISAL</p><h1>Appraisal result</h1>
+<nav style="display:flex;justify-content:space-between;align-items:center;gap:12px"><p class="muted">TRIGLAVIAN CONSORTIUM · BUYBACK APPRAISAL</p><a href="{{ route('home') }}" style="color:#d5a84f;text-decoration:none;border:1px solid #43536a;border-radius:8px;padding:9px 13px">Home</a></nav><h1>Appraisal result</h1>
 <section class="panel"><div class="grid">
 <div class="stat"><span class="muted">Gross market value</span><strong>{{ number_format((float)$quote->gross_value, 2) }} ISK</strong></div>
 <div class="stat"><span class="muted">Service fees</span><strong>{{ number_format((float)$quote->fees, 2) }} ISK</strong></div>
