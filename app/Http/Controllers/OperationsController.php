@@ -49,7 +49,7 @@ class OperationsController extends Controller {
   DB::transaction(function()use($r,$row,$d,$id){
    if($d['decision']==='approved'&&$row->request_type==='withdrawal'&&$row->financier_character_id){
     DB::table('eve_characters')->where('id',$row->financier_character_id)->lockForUpdate()->first();
-    $balance=(float)DB::table('ledger_entries')->where('eve_character_id',$row->financier_character_id)->lockForUpdate()->get(['amount_isk'])->sum('amount_isk');
+    $balance=(float)DB::table('ledger_entries')->where('eve_character_id',$row->financier_character_id)->sum('amount_isk');
     abort_unless($balance >= (float)$row->amount_isk,422,'Insufficient internal ledger balance for this withdrawal.');
    }
    $n=DB::table('financier_requests')->where('id',$id)->where('status','pending')->update(['status'=>$d['decision'],'reviewed_by'=>$r->user()->id,'reviewed_at'=>now(),'notes'=>$d['notes']??null,'updated_at'=>now()]);
