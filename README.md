@@ -77,6 +77,6 @@ bash deploy.sh
 ## Operational boundaries
 
 Create the EVE courier contract first and assign it to the corporation (recommended for a shared runner board) or intended runner. Publish that existing contract ID in the admin dashboard. The runner accepts the job on the website, accepts the contract in EVE, completes it in-game, then submits it for ESI verification. Buyback checks the runner character's ESI contract record (courier type, finished status, and matching accepting character) before posting the reward to the internal ledger. The app does not create EVE contracts or transfer ISK.
- Corporation asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Never represent an internal ledger entry as a completed in-game payment.
+ Corporation asset verification, automated wallet transfers, and public payout publication are not implemented. Never represent an internal ledger entry as a completed in-game payment.
 
 All OAuth tokens are encrypted at rest using Laravel \`APP_KEY\`. Keep \`.env\`, EVE client secrets, database passwords, and tokens off GitHub. The repository may be public.
