@@ -73,7 +73,7 @@ bash deploy.sh
 
 ## Operational boundaries
 
-Runner jobs are linked to EVE courier contract IDs. The runner must accept the web job, accept the assigned courier contract in EVE, and complete it in-game. Buyback checks the runner character's ESI contract record (courier type, finished status, and matching accepting character) before posting the reward to the internal ledger. The app does not create EVE contracts or transfer ISK.
+Create the EVE courier contract first and assign it to the corporation (recommended for a shared runner board) or intended runner. Publish that existing contract ID in the admin dashboard. The runner accepts the job on the website, accepts the contract in EVE, completes it in-game, then submits it for ESI verification. Buyback checks the runner character's ESI contract record (courier type, finished status, and matching accepting character) before posting the reward to the internal ledger. The app does not create EVE contracts or transfer ISK.
 
 Financier approvals update the internal ledger only; actual wallet transfers remain manual and must be reconciled by an administrator. Corporation asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Never represent an internal ledger entry as a completed in-game payment.
 
