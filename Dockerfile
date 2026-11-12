@@ -1,7 +1,7 @@
 FROM composer:2 AS vendor
 WORKDIR /app
 COPY . .
-RUN composer update --no-dev --no-interaction --prefer-dist --no-progress --no-scripts --optimize-autoloader
+RUN composer install --no-dev --no-interaction --prefer-dist --no-progress --no-scripts --optimize-autoloader
 RUN composer dump-autoload --no-dev --classmap-authoritative --no-scripts
 
 FROM php:8.3-fpm-alpine
