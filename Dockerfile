@@ -5,9 +5,9 @@ RUN composer install --no-dev --no-interaction --prefer-dist --no-progress --no-
 
 FROM php:8.3-cli-alpine
 WORKDIR /var/www/html
-RUN apk add --no-cache icu-libs libzip \
-    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev libzip-dev \
-    && docker-php-ext-install intl opcache pdo_mysql zip \
+RUN apk add --no-cache icu-libs libzip oniguruma \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev libzip-dev oniguruma-dev \
+    && docker-php-ext-install intl mbstring opcache pdo_mysql zip \
     && apk del .build-deps
 COPY . .
 COPY --from=vendor /app/vendor ./vendor
