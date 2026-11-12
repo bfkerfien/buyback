@@ -46,11 +46,11 @@ if grep -Eq '^APP_KEY=$' .env; then
     sed -i "s|^APP_KEY=.*|APP_KEY=$key|" .env
 fi
 
+printf '\nApplying database migrations before starting application traffic...\n'
+docker compose run --rm --no-deps app php artisan migrate --force
+
 printf '\nStarting application, web server, and queue worker...\n'
 docker compose up -d --wait
-
-printf '\nApplying database migrations...\n'
-docker compose exec -T app php artisan migrate --force
 
 printf '\nCaching production configuration and views...\n'
 docker compose exec -T app php artisan config:cache
