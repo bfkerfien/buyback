@@ -47,7 +47,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
-    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90"]
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=80"]
     depends_on:
       db:
         condition: service_healthy
