@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 class OperationsController extends Controller {
  public function createJob(Request $r):RedirectResponse {
   abort_unless($r->user()->isAdmin(),403);
-  $d=$r->validate(['origin'=>'required|string|max:100','destination'=>'required|string|max:100','reward_isk'=>'required|numeric|min:0.01|max:1000000000000','appraisal_quote_id'=>'nullable|integer|exists:appraisal_quotes,id','contract_id'=>'required|integer|min:1','notes'=>'nullable|string|max:2000']);
+  $d=$r->validate(['origin'=>'required|string|max:100','destination'=>'required|string|max:100','reward_isk'=>'required|numeric|min:0.01|max:1000000000000','appraisal_quote_id'=>'nullable|integer|exists:appraisal_quotes,id','contract_id'=>'required|integer|min:1|unique:runner_jobs,contract_id','notes'=>'nullable|string|max:2000']);
   $id=DB::table('runner_jobs')->insertGetId($d+['created_by'=>$r->user()->id,'status'=>'open','created_at'=>now(),'updated_at'=>now()]);
   $this->audit($r,'runner_job.created','runner_job',$id,$d);return back()->with('status','Runner job published.');
  }
