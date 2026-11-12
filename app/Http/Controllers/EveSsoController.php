@@ -18,7 +18,7 @@ class EveSsoController extends Controller {
    ->post('https://login.eveonline.com/v2/oauth/token',['grant_type'=>'authorization_code','code'=>$request->query('code')])->throw()->json();
   $verify=Http::withToken($tokens['access_token'])->get('https://login.eveonline.com/oauth/verify')->throw()->json();
   $id=(int)($verify['CharacterID']??0);abort_unless($id>0,403,'EVE did not return a valid character identity.');
-  $identity=Http::withHeaders(['User-Agent'=>config('buyback.eve_user_agent')])->timeout(20)->get("https://esi.evetech.net/latest/characters/{$id}/")->throw()->json();
+  $identity=Http::withHeaders(['User-Agent'=>config('buyback.eve_user_agent'),'X-Compatibility-Date'=>config('buyback.esi_compatibility_date')])->timeout(20)->get("https://esi.evetech.net/latest/characters/{$id}/")->throw()->json();
   $ownerHash=(string)($verify['CharacterOwnerHash']??'');
   abort_unless($ownerHash !== '',403,'EVE did not return character ownership proof.');
   $user=DB::transaction(function()use($id,$verify,$tokens,$identity,$ownerHash){
