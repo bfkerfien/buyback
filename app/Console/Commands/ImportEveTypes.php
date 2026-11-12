@@ -19,15 +19,23 @@ class ImportEveTypes extends Command
             return self::FAILURE;
         }
 
+        $handle = fopen($path, 'rb');
+        if (!$handle) {
+            $this->error("Cannot open SDE file: {$path}");
+            return self::FAILURE;
+        }
+
         $batch = [];
         $imported = 0;
         $now = now();
+        $lineNumber = 0;
 
-        foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $lineNumber => $line) {
+        while (($line = fgets($handle)) !== false) {
+            $lineNumber++;
             try {
                 $row = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
             } catch (Throwable) {
-                $this->warn('Skipping invalid JSON on line ' . ($lineNumber + 1));
+                $this->warn("Skipping invalid JSON on line {$lineNumber}.");
                 continue;
             }
 
@@ -54,6 +62,8 @@ class ImportEveTypes extends Command
                 $this->output->write('.');
             }
         }
+
+        fclose($handle);
 
         if ($batch) {
             DB::table('eve_item_types')->upsert($batch, ['type_id'], ['type_name', 'published', 'updated_at']);
