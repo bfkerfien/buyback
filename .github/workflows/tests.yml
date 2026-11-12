@@ -36,11 +36,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate Compose configuration
+      - name: Configure CI environment
         run: |
           cp .env.example .env
-          docker compose config --quiet
-      - name: Build PHP-FPM application image
-        run: docker build --pull -t triglavian-buyback:ci .
-      - name: Build Nginx frontend image
-        run: docker build --pull -f docker/nginx/Dockerfile -t triglavian-buyback-web:ci .
+          sed -i 's/^APP_KEY=$/APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=/' .env
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build all deployment images
+        run: docker compose build --pull app web worker
+      - name: Start database and Redis
+        run: docker compose up -d --wait db cache
+      - name: Apply migrations against MariaDB
+        run: docker compose run --rm --no-deps app php artisan migrate --force
+      - name: Verify Laravel route registration
+        run: docker compose run --rm --no-deps app php artisan route:list --except-vendor
+      - name: Clean up CI containers
+        if: always()
+        run: docker compose down -v
