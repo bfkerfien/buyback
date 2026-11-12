@@ -1,14 +1,14 @@
 <?php
 
-namespace App\\Http\\Controllers;
+namespace App\Http\Controllers;
 
-use App\\Services\\Appraisal\\AppraisalCalculator;
-use App\\Services\\Appraisal\\InventoryParser;
-use Illuminate\\Http\\RedirectResponse;
-use Illuminate\\Http\\Request;
-use Illuminate\\Support\\Facades\\DB;
-use Illuminate\\Support\\Str;
-use Illuminate\\View\\View;
+use App\Services\Appraisal\AppraisalCalculator;
+use App\Services\Appraisal\InventoryParser;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\View\View;
 
 class AppraisalController extends Controller
 {
