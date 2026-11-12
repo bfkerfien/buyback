@@ -23,6 +23,5 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/runner/jobs', [OperationsController::class, 'createJob'])->middleware('admin')->name('runner.jobs.create');
     Route::post('/runner/jobs/{job}/accept', [OperationsController::class, 'acceptJob'])->whereNumber('job')->name('runner.jobs.accept');
     Route::post('/runner/jobs/{job}/deliver', [OperationsController::class, 'deliverJob'])->whereNumber('job')->name('runner.jobs.deliver');
-    Route::post('/financier/requests', [OperationsController::class, 'createFinanceRequest'])->name('financier.requests.create');
     Route::post('/admin/financier/requests/{id}/review', [OperationsController::class, 'reviewFinanceRequest'])->middleware('admin')->whereNumber('id')->name('financier.requests.review');
 });
