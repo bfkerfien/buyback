@@ -9,7 +9,7 @@ use Throwable;
 
 class RefreshJitaPrices extends Command
 {
-    protected $signature = 'buyback:refresh-jita-prices {type_ids* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4}';
+    protected $signature = 'buyback:refresh-jita-prices {type_ids?* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4}';
     protected $description = 'Fetch best buy and sell orders at Jita IV - Moon 4 from EVE ESI.';
 
     public function handle(): int
