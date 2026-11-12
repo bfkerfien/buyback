@@ -1,6 +1,6 @@
 # Triglavian Buyback
 
-Standalone EVE Online buyback, runner, and financier platform. Independent of SeAT and /opt/rigauth. LP Exchange is explicitly excluded.
+Standalone EVE Online buyback platform with an optional courier runner board. Independent of SeAT and /opt/rigauth. LP Exchange is explicitly excluded.
 
 ## Included in this release
 
@@ -8,7 +8,6 @@ Standalone EVE Online buyback, runner, and financier platform. Independent of Se
 - Member/admin roles, active-account enforcement, and administrator bootstrap by EVE character ID.
 - Public inventory appraisal with shareable quotes and immutable price snapshots.
 - Admin-published runner jobs, runner acceptance, ESI verification of completed courier contracts, and internal reward ledger entries.
-- Financier liquidity/withdrawal requests, administrator review, balance checks, and idempotent ledger postings.
 - Audit log, PHP-FPM, Nginx, MariaDB 11.4, Redis 7, Docker Compose, and Traefik deployment.
 
 ## Configure EVE SSO
@@ -63,7 +62,7 @@ To refresh only selected types instead:
 docker compose exec app php artisan buyback:refresh-jita-prices 34 35 36
 ```
 
-Check the service at `https://YOUR-BUYBACK-HOST/health`. Sign in using the configured admin EVE character, then manage runner jobs and financier requests from the dashboard.
+Check the service at `https://YOUR-BUYBACK-HOST/health`. Sign in using the configured admin EVE character, then manage buyback settings and (if used) courier runner jobs from the dashboard.
 
 For code updates after initial deployment:
 
@@ -76,7 +75,6 @@ bash deploy.sh
 ## Operational boundaries
 
 Create the EVE courier contract first and assign it to the corporation (recommended for a shared runner board) or intended runner. Publish that existing contract ID in the admin dashboard. The runner accepts the job on the website, accepts the contract in EVE, completes it in-game, then submits it for ESI verification. Buyback checks the runner character's ESI contract record (courier type, finished status, and matching accepting character) before posting the reward to the internal ledger. The app does not create EVE contracts or transfer ISK.
-
-Financier approvals update the internal ledger only; actual wallet transfers remain manual and must be reconciled by an administrator. Corporation asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Never represent an internal ledger entry as a completed in-game payment.
+ Corporation asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Never represent an internal ledger entry as a completed in-game payment.
 
 All OAuth tokens are encrypted at rest using Laravel `APP_KEY`. Keep `.env`, EVE client secrets, database passwords, and tokens off GitHub. The repository may be public.
