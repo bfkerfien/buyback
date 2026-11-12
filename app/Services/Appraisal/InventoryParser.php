@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Services\Appraisal;
+namespace App\\Services\\Appraisal;
 
 final class InventoryParser
 {
     /**
      * Accepts common EVE inventory exports:
-     * Item Name<TAB>Quantity, Item Name,Quantity, and Quantity x Item Name.
+     * Item Name<TAB>Quantity, Item Name,Quantity, Quantity x Item Name,
+     * Quantity Item Name, and Item Name x Quantity.
      *
      * @return array<int, array{name:string, quantity:int}>
      */
@@ -14,23 +15,27 @@ final class InventoryParser
     {
         $items = [];
 
-        foreach (preg_split('/\r\n|\n|\r/', trim($input)) ?: [] as $line) {
+        foreach (preg_split('/\\r\\n|\\n|\\r/', trim($input)) ?: [] as $line) {
             $line = trim($line);
-            if ($line === '' || preg_match('/^(item|type name|name)\s*[,\t]/i', $line)) {
+            if ($line === '' || preg_match('/^(item|type name|name)\\s*[,\\t]/i', $line)) {
                 continue;
             }
 
             $name = null;
             $quantity = null;
 
+            // Quantity prefix, with or without an explicit "x": 10000 x Tritanium / 10000 Tritanium.
             if (preg_match('/^([0-9][0-9,]*)\\s*[x×]\\s*(.+)$/i', $line, $m)) {
                 $quantity = (int) str_replace(',', '', $m[1]);
                 $name = trim($m[2]);
-            } elseif (str_contains($line, "\t")) {
-                $parts = array_map('trim', explode("\t", $line));
+            } elseif (preg_match('/^([0-9][0-9,]*)\\s+(.+)$/', $line, $m)) {
+                $quantity = (int) str_replace(',', '', $m[1]);
+                $name = trim($m[2]);
+            } elseif (str_contains($line, "\\t")) {
+                $parts = array_map('trim', explode("\\t", $line));
                 if (count($parts) >= 2) {
                     if (is_numeric($parts[0])) {
-                        $quantity = (int) $parts[0];
+                        $quantity = (int) str_replace(',', '', $parts[0]);
                         $name = $parts[1];
                     } else {
                         $name = $parts[0];
@@ -40,8 +45,8 @@ final class InventoryParser
             } elseif (str_contains($line, ',')) {
                 $parts = array_map('trim', str_getcsv($line));
                 if (count($parts) >= 2) {
-                    if (is_numeric($parts[0])) {
-                        $quantity = (int) $parts[0];
+                    if (is_numeric(str_replace(',', '', $parts[0]))) {
+                        $quantity = (int) str_replace(',', '', $parts[0]);
                         $name = $parts[1];
                     } else {
                         $name = $parts[0];
@@ -50,12 +55,7 @@ final class InventoryParser
                 }
             }
 
-            if ($name === null && preg_match('/^([0-9][0-9,]*)\s*[x×]\s*(.+)$/i', $line, $m)) {
-                $quantity = (int) str_replace(',', '', $m[1]);
-                $name = trim($m[2]);
-            }
-
-            if ($name === null && preg_match('/^(.+?)\s+[x×]\s*([0-9][0-9,]*)$/i', $line, $m)) {
+            if ($name === null && preg_match('/^(.+?)\\s+[x×]\\s*([0-9][0-9,]*)$/i', $line, $m)) {
                 $name = trim($m[1]);
                 $quantity = (int) str_replace(',', '', $m[2]);
             }
