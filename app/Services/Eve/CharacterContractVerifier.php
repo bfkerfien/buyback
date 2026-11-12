@@ -7,7 +7,8 @@ class CharacterContractVerifier {
  public function verifyCourierDelivery(EveCharacter $character,int $contractId):array {
   $required='esi-contracts.read_character_contracts.v1';
   $scopes=$character->scopes??[];
-  if(is_string($scopes))$scopes=preg_split('/\s+/',$scopes,-1,PREG_SPLIT_NO_EMPTY);\n  if(!is_array($scopes))$scopes=[];
+  if(is_string($scopes))$scopes=preg_split('/\s+/',$scopes,-1,PREG_SPLIT_NO_EMPTY);
+  if(!is_array($scopes))$scopes=[];
   abort_unless(in_array($required,$scopes,true),403,'Runner must re-authorize EVE SSO with the character-contract read scope.');
   $token=$character->access_token;
   if(!$token || !$character->token_expires_at || $character->token_expires_at->isPast())$token=$this->refresh($character);
