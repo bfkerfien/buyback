@@ -28,7 +28,148 @@ grep -Eq '^BUYBACK_ADMIN_CHARACTER_IDS=[0-9]+(,[0-9]+)*$' .env || fail "Set comm
 grep -Eq '^EVE_USER_AGENT=.+$' .env || fail "Set EVE_USER_AGENT with a real contact address."
 grep -q 'contact@example.com' .env && fail "Replace the placeholder EVE_USER_AGENT contact address."
 grep -Eq '^EVE_ESI_COMPATIBILITY_DATE=[0-9]{4}-[0-9]{2}-[0-9]{2}\.read_character_contracts\.v1' .env || fail "EVE_SCOPES must include esi-contracts.read_character_contracts.v1."
+grep -Eq '^SESSION_DRIVER=redis
+
+mkdir -p data
+docker compose config --quiet
+
+printf '\nBuilding Buyback containers...\n'
+docker compose build --pull
+
+printf '\nStarting database and Redis...\n'
+docker compose up -d --wait db cache
+
+if grep -Eq '^APP_KEY=$' .env; then
+    printf '\nGenerating Laravel encryption key...\n'
+    key="$(docker compose run --rm --no-deps app php artisan key:generate --show | awk '/^base64:/{print; exit}')"
+    [[ "$key" == base64:* ]] || fail "Laravel did not return a valid APP_KEY."
+    sed -i "s|^APP_KEY=.*|APP_KEY=$key|" .env
+fi
+
+printf '\nStarting application, web server, and queue worker...\n'
+docker compose up -d --wait
+
+printf '\nApplying database migrations...\n'
+docker compose exec -T app php artisan migrate --force
+
+printf '\nCaching production configuration and views...\n'
+docker compose exec -T app php artisan config:cache
+docker compose exec -T app php artisan view:cache
+
+printf '\nDeployment containers:\n'
+docker compose ps
+
+printf '\nBuyback is running. Place CCP SDE types.jsonl into ./data, then run:\n'
+printf '  docker compose exec app php artisan buyback:import-types /var/www/html/data/types.jsonl\n'
+printf '  docker compose exec app php artisan buyback:refresh-jita-prices --all\n'
+ .env || fail "Set EVE_ESI_COMPATIBILITY_DATE in YYYY-MM-DD format."
+grep -Eq '^EVE_SCOPES=.*esi-contracts\.read_character_contracts\.v1' .env || fail "EVE_SCOPES must include esi-contracts.read_character_contracts.v1."
 grep -Eq '^SESSION_DRIVER=redis$' .env || fail "Set SESSION_DRIVER=redis."
+
+mkdir -p data
+docker compose config --quiet
+
+printf '\nBuilding Buyback containers...\n'
+docker compose build --pull
+
+printf '\nStarting database and Redis...\n'
+docker compose up -d --wait db cache
+
+if grep -Eq '^APP_KEY=$' .env; then
+    printf '\nGenerating Laravel encryption key...\n'
+    key="$(docker compose run --rm --no-deps app php artisan key:generate --show | awk '/^base64:/{print; exit}')"
+    [[ "$key" == base64:* ]] || fail "Laravel did not return a valid APP_KEY."
+    sed -i "s|^APP_KEY=.*|APP_KEY=$key|" .env
+fi
+
+printf '\nStarting application, web server, and queue worker...\n'
+docker compose up -d --wait
+
+printf '\nApplying database migrations...\n'
+docker compose exec -T app php artisan migrate --force
+
+printf '\nCaching production configuration and views...\n'
+docker compose exec -T app php artisan config:cache
+docker compose exec -T app php artisan view:cache
+
+printf '\nDeployment containers:\n'
+docker compose ps
+
+printf '\nBuyback is running. Place CCP SDE types.jsonl into ./data, then run:\n'
+printf '  docker compose exec app php artisan buyback:import-types /var/www/html/data/types.jsonl\n'
+printf '  docker compose exec app php artisan buyback:refresh-jita-prices --all\n'
+ .env || fail "Set SESSION_DRIVER=redis."
+grep -Eq '^SESSION_SECURE_COOKIE=true
+
+mkdir -p data
+docker compose config --quiet
+
+printf '\nBuilding Buyback containers...\n'
+docker compose build --pull
+
+printf '\nStarting database and Redis...\n'
+docker compose up -d --wait db cache
+
+if grep -Eq '^APP_KEY=$' .env; then
+    printf '\nGenerating Laravel encryption key...\n'
+    key="$(docker compose run --rm --no-deps app php artisan key:generate --show | awk '/^base64:/{print; exit}')"
+    [[ "$key" == base64:* ]] || fail "Laravel did not return a valid APP_KEY."
+    sed -i "s|^APP_KEY=.*|APP_KEY=$key|" .env
+fi
+
+printf '\nStarting application, web server, and queue worker...\n'
+docker compose up -d --wait
+
+printf '\nApplying database migrations...\n'
+docker compose exec -T app php artisan migrate --force
+
+printf '\nCaching production configuration and views...\n'
+docker compose exec -T app php artisan config:cache
+docker compose exec -T app php artisan view:cache
+
+printf '\nDeployment containers:\n'
+docker compose ps
+
+printf '\nBuyback is running. Place CCP SDE types.jsonl into ./data, then run:\n'
+printf '  docker compose exec app php artisan buyback:import-types /var/www/html/data/types.jsonl\n'
+printf '  docker compose exec app php artisan buyback:refresh-jita-prices --all\n'
+ .env || fail "Set EVE_ESI_COMPATIBILITY_DATE in YYYY-MM-DD format."
+grep -Eq '^EVE_SCOPES=.*esi-contracts\.read_character_contracts\.v1' .env || fail "EVE_SCOPES must include esi-contracts.read_character_contracts.v1."
+grep -Eq '^SESSION_DRIVER=redis$' .env || fail "Set SESSION_DRIVER=redis."
+
+mkdir -p data
+docker compose config --quiet
+
+printf '\nBuilding Buyback containers...\n'
+docker compose build --pull
+
+printf '\nStarting database and Redis...\n'
+docker compose up -d --wait db cache
+
+if grep -Eq '^APP_KEY=$' .env; then
+    printf '\nGenerating Laravel encryption key...\n'
+    key="$(docker compose run --rm --no-deps app php artisan key:generate --show | awk '/^base64:/{print; exit}')"
+    [[ "$key" == base64:* ]] || fail "Laravel did not return a valid APP_KEY."
+    sed -i "s|^APP_KEY=.*|APP_KEY=$key|" .env
+fi
+
+printf '\nStarting application, web server, and queue worker...\n'
+docker compose up -d --wait
+
+printf '\nApplying database migrations...\n'
+docker compose exec -T app php artisan migrate --force
+
+printf '\nCaching production configuration and views...\n'
+docker compose exec -T app php artisan config:cache
+docker compose exec -T app php artisan view:cache
+
+printf '\nDeployment containers:\n'
+docker compose ps
+
+printf '\nBuyback is running. Place CCP SDE types.jsonl into ./data, then run:\n'
+printf '  docker compose exec app php artisan buyback:import-types /var/www/html/data/types.jsonl\n'
+printf '  docker compose exec app php artisan buyback:refresh-jita-prices --all\n'
+ .env || fail "Set SESSION_SECURE_COOKIE=true for HTTPS-only sessions."
 
 mkdir -p data
 docker compose config --quiet
