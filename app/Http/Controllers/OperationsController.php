@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 use App\Models\EveCharacter;
 use App\Services\Eve\CharacterContractVerifier;
+use App\Services\Eve\CharacterContractVerifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
