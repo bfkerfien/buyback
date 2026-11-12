@@ -10,7 +10,6 @@ Laravel 12 on PHP 8.3 is the application foundation. MariaDB is the system of re
 - EVE data: Static Data import, type resolution, ESI client, market observations.
 - Appraisal: paste parser, item normalization, price snapshot, fee policy, immutable quote.
 - Runner: job board, assignment, contract verification, delivery lifecycle.
-- Financier: liquidity requests, claim locks, withdrawal workflow.
 - Ledger: append-only postings, idempotency keys, reconciliation.
 - Administration: policies, pricing rules, service locations, access and audit.
 
