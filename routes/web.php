@@ -1,11 +1,11 @@
 <?php
 
-use App\\Http\\Controllers\\AppraisalController;
-use App\\Http\\Controllers\\DashboardController;
-use App\\Http\\Controllers\\EveSsoController;
-use App\\Http\\Controllers\\OperationsController;
-use App\\Http\\Controllers\\PayoutRuleController;
-use Illuminate\\Support\\Facades\\Route;
+use App\Http\Controllers\AppraisalController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EveSsoController;
+use App\Http\Controllers\OperationsController;
+use App\Http\Controllers\PayoutRuleController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('welcome', ['appName' => 'Lentivirus Buyback']))->name('home');
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'service' => 'buyback', 'timestamp' => now()->toIso8601String()]))->name('health');
@@ -23,5 +23,4 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/runner/jobs', [OperationsController::class, 'createJob'])->middleware('admin')->name('runner.jobs.create');
     Route::post('/runner/jobs/{job}/accept', [OperationsController::class, 'acceptJob'])->whereNumber('job')->name('runner.jobs.accept');
     Route::post('/runner/jobs/{job}/deliver', [OperationsController::class, 'deliverJob'])->whereNumber('job')->name('runner.jobs.deliver');
-    Route::post('/admin/financier/requests/{id}/review', [OperationsController::class, 'reviewFinanceRequest'])->middleware('admin')->whereNumber('id')->name('financier.requests.review');
 });
