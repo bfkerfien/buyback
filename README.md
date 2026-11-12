@@ -13,7 +13,7 @@ Standalone EVE Online buyback, runner, and financier platform. Independent of Se
 
 ## EVE SSO configuration
 
-Create an EVE application with the callback URL exactly matching EVE_CALLBACK_URL. Set EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_CALLBACK_URL, EVE_SCOPES=publicData, and EVE_USER_AGENT. Set BUYBACK_ADMIN_CHARACTER_IDS to a comma-separated list of EVE character IDs you control. Those characters receive the admin role when they sign in. A signed-in user can link additional characters by visiting the EVE sign-in link again. A character already linked to another account cannot be claimed.
+Create an EVE application with the callback URL exactly matching EVE_CALLBACK_URL. Set EVE_CLIENT_ID, EVE_CLIENT_SECRET, EVE_CALLBACK_URL, EVE_SCOPES=publicData esi-contracts.read_character_contracts.v1, and EVE_USER_AGENT. Set BUYBACK_ADMIN_CHARACTER_IDS to a comma-separated list of EVE character IDs you control. Those characters receive the admin role when they sign in. A signed-in user can link additional characters by visiting the EVE sign-in link again. A character already linked to another account cannot be claimed.
 
 ## Deployment
 
@@ -29,6 +29,6 @@ Create an EVE application with the callback URL exactly matching EVE_CALLBACK_UR
 
 ## Operational boundaries
 
-Runner delivery creates an internal earned-reward ledger entry; it does not create or verify an EVE contract or transfer ISK. Financier approval changes the internal ledger only; actual wallet transfers remain manual and must be reconciled by an administrator. ESI contract/asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Never represent an internal ledger entry as a completed in-game payment.
+Runner jobs require an EVE courier contract ID. Delivery is verified against the runner character's ESI contract record (completed status and accepting character) before the reward is recorded in the internal ledger. The app does not create contracts or transfer ISK. Financier approval changes the internal ledger only; actual wallet transfers remain manual and must be reconciled by an administrator. Corporation asset verification, automated wallet transfers, scheduled price refresh, and public payout publication are not implemented. Runners must authorize the character-contract read scope; existing users need to sign in again after the scope is added. Never represent an internal ledger entry as a completed in-game payment.
 
 All OAuth tokens are encrypted with Laravel APP_KEY. Never commit .env, EVE client secrets, database passwords, or tokens. The repository may be public.
