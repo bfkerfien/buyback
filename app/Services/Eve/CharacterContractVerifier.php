@@ -74,7 +74,7 @@ class CharacterContractVerifier
         abort_unless(
             in_array(($contract['status'] ?? null), ['finished_contractor', 'finished'], true),
             422,
-            'EVE does not report this courier contract as completed by the runner.'
+            'EVE does not report this courier contract as completed by the runner. If you just delivered it, wait a few minutes for ESI's contract cache to update and retry.'
         );
 
         abort_unless(
