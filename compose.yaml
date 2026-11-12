@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
+    command: ["sh", "-lc", "php artisan package:discover --ansi && php artisan serve --host=0.0.0.0 --port=8080"]
     depends_on:
       db:
         condition: service_healthy
@@ -21,12 +22,11 @@ services:
       - "traefik.http.routers.buyback.tls=true"
       - "traefik.http.routers.buyback.tls.certresolver=letsencrypt"
       - "traefik.http.services.buyback.loadbalancer.server.port=8080"
-
   worker:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["./bin/worker"]
+    command: ["php", "artisan", "queue:work", "--tries=3", "--timeout=90"]
     restart: unless-stopped
     env_file: .env
     depends_on:
@@ -36,13 +36,12 @@ services:
         condition: service_healthy
     networks:
       - internal
-
   db:
     image: mariadb:11.4
     restart: unless-stopped
     environment:
-      MARIADB_DATABASE: buyback
-      MARIADB_USER: buyback
+      MARIADB_DATABASE: ${DB_DATABASE:-buyback}
+      MARIADB_USER: ${DB_USERNAME:-buyback}
       MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
     volumes:
@@ -54,7 +53,6 @@ services:
       retries: 12
     networks:
       - internal
-
   cache:
     image: redis:7-alpine
     restart: unless-stopped
@@ -68,11 +66,9 @@ services:
       retries: 10
     networks:
       - internal
-
 volumes:
   buyback-db:
   buyback-cache:
-
 networks:
   internal:
     driver: bridge
