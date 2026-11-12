@@ -71,19 +71,6 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        Schema::create('financier_requests', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('financier_character_id')->nullable()->constrained('eve_characters')->nullOnDelete();
-            $table->string('request_type', 24)->index();
-            $table->string('status', 24)->default('pending')->index();
-            $table->decimal('amount_isk', 20, 2);
-            $table->string('external_reference')->nullable()->index();
-            $table->timestamp('claimed_at')->nullable();
-            $table->timestamp('expires_at')->nullable();
-            $table->json('verification_data')->nullable();
-            $table->timestamps();
-        });
-
         Schema::create('ledger_entries', function (Blueprint $table) {
             $table->id();
             $table->foreignId('eve_character_id')->nullable()->constrained('eve_characters')->nullOnDelete();
@@ -101,7 +88,6 @@ return new class extends Migration {
     public function down(): void
     {
         Schema::dropIfExists('ledger_entries');
-        Schema::dropIfExists('financier_requests');
         Schema::dropIfExists('runner_jobs');
         Schema::dropIfExists('market_price_snapshots');
         Schema::dropIfExists('appraisal_quote_items');
