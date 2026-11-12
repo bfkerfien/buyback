@@ -8,7 +8,7 @@
 </style>
 </head>
 <body><div class="wrap">
-<header class="top"><div class="brand">TRIGLAVIAN CONSORTIUM</div><div class="tag">Independent EVE logistics</div></header>
+<header class="top"><div class="brand">TRIGLAVIAN CONSORTIUM</div><div class="tag">Independent EVE logistics</div><a href="{{ route('login.eve') }}" style="color:#e8edf5;border:1px solid #43536a;border-radius:9px;padding:9px 13px;text-decoration:none">Sign in with EVE</a></header>
 <section class="hero"><div class="tag">Buyback · Hauling · Finance</div><h1>Turn your inventory<br>into ISK.</h1><p>Paste an EVE inventory export to calculate an indicative buyback value using recorded Jita market prices. Your quote keeps the prices and calculation settings used.</p></section>
 <section class="panel">
 <h2 style="margin:0 0 4px">Create an appraisal</h2><p class="muted">Paste item names and quantities from your inventory. Supported formats include EVE tab-separated exports, CSV, and “quantity x item name”.</p>
@@ -25,5 +25,5 @@
 <div class="feature"><strong>Shareable quotes</strong><span>Every appraisal receives a unique reference link.</span></div>
 <div class="feature"><strong>Independent platform</strong><span>Standalone service, separate from SeAT.</span></div>
 </section>
-<p class="muted" style="text-align:center">LP Exchange is not part of this release.</p>
+<p class="muted" style="text-align:center"><a href="{{ route('login.eve') }}" style="color:#d5a84f">Sign in with EVE SSO</a> to access runner and financier operations. · LP Exchange is not part of this release.</p>
 </div></body></html>
