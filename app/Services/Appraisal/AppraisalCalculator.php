@@ -1,9 +1,9 @@
 <?php
 
-namespace App\\Services\\Appraisal;
+namespace App\Services\Appraisal;
 
-use Illuminate\\Support\\Facades\\DB;
-use Illuminate\\Validation\\ValidationException;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 final class AppraisalCalculator
 {
