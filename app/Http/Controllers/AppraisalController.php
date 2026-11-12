@@ -44,6 +44,9 @@ class AppraisalController extends Controller
                         'payout_percent'=>$line['payout_percent'],'payout_value'=>$line['payout_value'],
                         'category_id'=>$line['category_id'],'category_name'=>$line['category_name'],
                         'rate_source'=>$line['rate_source'],'price_side'=>$result['price_side'],
+                        'valuation_mode'=>$line['valuation_mode'],'output_type_id'=>$line['output_type_id'],
+                        'output_name'=>$line['output_name'],'output_quantity'=>$line['output_quantity'],
+                        'conversion_ratio'=>$line['conversion_ratio'],'output_unit_price'=>$line['output_unit_price'],
                     ],JSON_THROW_ON_ERROR),
                     'created_at'=>now(),'updated_at'=>now(),
                 ]);
