@@ -23,13 +23,11 @@ class DashboardController extends Controller
         $quotes = DB::table('appraisal_quotes')
             ->when(!$admin, fn ($q) => $q->where('created_by', $user->id))
             ->whereNull('archived_at')
-            ->whereNotExists(function ($q) use ($user, $admin) {
-                if (!$admin) {
-                    $q->select(DB::raw(1))->from('appraisal_quote_hidden')
-                        ->whereColumn('appraisal_quote_hidden.appraisal_quote_id', 'appraisal_quotes.id')
-                        ->where('appraisal_quote_hidden.user_id', $user->id);
-                }
-            })
+            ->when(!$admin, fn ($q) => $q->whereNotExists(function ($hidden) use ($user) {
+                $hidden->select(DB::raw(1))->from('appraisal_quote_hidden')
+                    ->whereColumn('appraisal_quote_hidden.appraisal_quote_id', 'appraisal_quotes.id')
+                    ->where('appraisal_quote_hidden.user_id', $user->id);
+            }))
             ->orderByDesc('created_at')->limit(100)->get();
 
         $archivedQuotes = $admin
