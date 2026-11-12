@@ -54,6 +54,10 @@ jobs:
         run: docker compose up -d --wait db cache
       - name: Apply migrations against MariaDB
         run: docker compose run --rm --no-deps app php artisan migrate --force
+      - name: Cache production configuration and views
+        run: |
+          docker compose run --rm --no-deps app php artisan config:cache
+          docker compose run --rm --no-deps app php artisan view:cache
       - name: Verify Laravel route registration
         run: docker compose run --rm --no-deps app php artisan route:list --except-vendor
       - name: Clean up CI containers
