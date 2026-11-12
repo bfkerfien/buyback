@@ -1,0 +1,77 @@
+<?php
+
+namespace App\Services\Appraisal;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+final class AppraisalCalculator
+{
+    /**
+     * Resolve item names and calculate using the latest recorded Jita prices.
+     * A quote always stores the unit prices actually used.
+     */
+    public function calculate(array $parsedItems): array
+    {
+        $names = array_column($parsedItems, 'name');
+        $types = DB::table('eve_item_types')
+            ->whereIn('type_name', $names)
+            ->get(['type_id', 'type_name'])
+            ->keyBy(fn ($type) => mb_strtolower($type->type_name));
+
+        $unresolved = [];
+        $lines = [];
+        $side = config('buyback.price_side', 'buy');
+        $rate = (float) config('buyback.payout_percent', 90);
+
+        foreach ($parsedItems as $item) {
+            $type = $types->get(mb_strtolower($item['name']));
+            if (!$type) {
+                $unresolved[] = $item['name'];
+                continue;
+            }
+
+            $price = DB::table('market_price_snapshots')
+                ->where('type_id', $type->type_id)
+                ->where('region_id', (string) config('buyback.region_id', '10000002'))
+                ->orderByDesc('observed_at')
+                ->first(['buy_price', 'sell_price', 'source', 'observed_at']);
+
+            $unitPrice = $price ? (float) ($side === 'sell' ? $price->sell_price : $price->buy_price) : 0.0;
+            if ($unitPrice <= 0) {
+                $unresolved[] = $item['name'] . ' (no Jita ' . $side . ' price)';
+                continue;
+            }
+
+            $lineValue = round($unitPrice * $item['quantity'], 2);
+            $lines[] = [
+                'type_id' => (int) $type->type_id,
+                'type_name' => $type->type_name,
+                'quantity' => (int) $item['quantity'],
+                'unit_price' => $unitPrice,
+                'line_value' => $lineValue,
+                'source' => $price->source,
+                'observed_at' => $price->observed_at,
+            ];
+        }
+
+        if ($unresolved) {
+            throw ValidationException::withMessages([
+                'inventory' => ['Could not price these items: ' . implode(', ', array_unique($unresolved)) . '. Import EVE item data and refresh Jita prices before appraising.'],
+            ]);
+        }
+
+        $gross = round(array_sum(array_column($lines, 'line_value')), 2);
+        $payout = round($gross * ($rate / 100), 2);
+
+        return [
+            'lines' => $lines,
+            'gross_value' => $gross,
+            'fees' => round($gross - $payout, 2),
+            'payout_value' => $payout,
+            'price_side' => $side,
+            'payout_percent' => $rate,
+            'region_id' => (string) config('buyback.region_id', '10000002'),
+        ];
+    }
+}
