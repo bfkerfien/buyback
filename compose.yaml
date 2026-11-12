@@ -15,11 +15,13 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    volumes:
+      - buyback-storage:/var/www/html/storage
     networks:
       - internal
 
   web:
-    image: nginx:1.27-alpine
+    image: nginx:stable-alpine
     restart: unless-stopped
     depends_on:
       app:
@@ -51,6 +53,8 @@ services:
         condition: service_healthy
       cache:
         condition: service_healthy
+    volumes:
+      - buyback-storage:/var/www/html/storage
     networks:
       - internal
 
@@ -89,6 +93,7 @@ services:
 volumes:
   buyback-db:
   buyback-cache:
+  buyback-storage:
 
 networks:
   internal:
