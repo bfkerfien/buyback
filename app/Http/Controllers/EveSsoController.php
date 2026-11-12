@@ -20,6 +20,7 @@ class EveSsoController extends Controller {
   $id=(int)($verify['CharacterID']??0);abort_unless($id>0,403,'EVE did not return a valid character identity.');
   $identity=Http::withHeaders(['User-Agent'=>config('buyback.eve_user_agent')])->timeout(20)->get("https://esi.evetech.net/latest/characters/{$id}/")->throw()->json();
   $ownerHash=(string)($verify['CharacterOwnerHash']??'');
+  abort_unless($ownerHash !== '',403,'EVE did not return character ownership proof.');
   $user=DB::transaction(function()use($id,$verify,$tokens,$identity,$ownerHash){
    $character=EveCharacter::where('eve_character_id',$id)->lockForUpdate()->first();
    if($character && $character->owner_hash && $ownerHash && !hash_equals($character->owner_hash,$ownerHash)) abort(403,'EVE ownership of this character has changed. Contact a Buyback administrator to review the existing account link.');
