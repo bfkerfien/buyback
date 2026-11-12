@@ -27,9 +27,11 @@ class AppraisalController extends Controller
         $result = $calculator->calculate($items);
         $token = Str::random(48);
 
-        DB::transaction(function () use ($result, $validated, $token) {
+        DB::transaction(function () use ($result, $validated, $token, $request) {
             $quoteId = DB::table('appraisal_quotes')->insertGetId([
                 'public_token' => $token,
+                'eve_character_id' => $request->user()?->characters()->value('id'),
+                'created_by' => $request->user()?->id,
                 'origin_system' => $validated['origin_system'] ?? null,
                 'status' => 'priced',
                 'price_source' => 'market_price_snapshots',
