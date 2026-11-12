@@ -9,7 +9,8 @@ class DashboardController extends Controller {
   $quotes=DB::table('appraisal_quotes')->where('created_by',$user->id)->orderByDesc('created_at')->limit(20)->get();
   $balance=(float)DB::table('ledger_entries')->whereIn('eve_character_id',$characterIds)->sum('amount_isk');
   $adminMetrics=$admin?['open_jobs'=>DB::table('runner_jobs')->where('status','open')->count(),'pending_finance'=>DB::table('financier_requests')->where('status','pending')->count(),'users'=>DB::table('users')->count()]:[];
-  $payoutRules=$admin?DB::table('appraisal_payout_rules')->orderBy('category_name')->get():collect();\n  $eveCategories=$admin?DB::table('eve_item_groups')->select('category_id','category_name')->distinct()->orderBy('category_name')->get():collect();
+  $payoutRules=$admin?DB::table('appraisal_payout_rules')->orderBy('category_name')->get():collect();
+  $eveCategories=$admin?DB::table('eve_item_groups')->select('category_id','category_name')->distinct()->orderBy('category_name')->get():collect();
   return view('dashboard',compact('user','jobs','requests','quotes','balance','admin','adminMetrics','payoutRules','eveCategories'));
  }
 }
