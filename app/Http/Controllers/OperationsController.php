@@ -5,6 +5,7 @@ use App\Services\Eve\CharacterContractVerifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class OperationsController extends Controller {
  public function createJob(Request $r):RedirectResponse {
@@ -14,7 +15,8 @@ class OperationsController extends Controller {
   $this->audit($r,'runner_job.created','runner_job',$id,$d);return back()->with('status','Runner job published.');
  }
  public function acceptJob(Request $r,int $job):RedirectResponse {
-  $character=$r->user()->characters()->firstOrFail();
+  $validated=$r->validate(['character_id'=>['required','integer',Rule::exists('eve_characters','id')->where('user_id',$r->user()->id)]]);
+  $character=$r->user()->characters()->findOrFail($validated['character_id']);
   $n=DB::table('runner_jobs')->where('id',$job)->where('status','open')->whereNull('assigned_user_id')->update(['status'=>'accepted','runner_character_id'=>$character->id,'assigned_user_id'=>$r->user()->id,'accepted_at'=>now(),'updated_at'=>now()]);
   abort_unless($n===1,409,'This job is no longer available.');
   $this->audit($r,'runner_job.accepted','runner_job',$job,['character_id'=>$character->id]);return back()->with('status','Runner job accepted.');
@@ -35,9 +37,9 @@ class OperationsController extends Controller {
   return back()->with('status','EVE verified courier delivery. Runner reward recorded in the internal ledger; ISK payment remains manual.');
  }
  public function createFinanceRequest(Request $r):RedirectResponse {
-  $character=$r->user()->characters()->firstOrFail();
-  $d=$r->validate(['request_type'=>'required|in:funding,withdrawal','amount_isk'=>'required|numeric|min:1|max:1000000000000','external_reference'=>'nullable|string|max:190','notes'=>'nullable|string|max:2000']);
-  $id=DB::table('financier_requests')->insertGetId($d+['user_id'=>$r->user()->id,'financier_character_id'=>$character->id,'status'=>'pending','created_at'=>now(),'updated_at'=>now()]);
+  $d=$r->validate(['character_id'=>['required','integer',Rule::exists('eve_characters','id')->where('user_id',$r->user()->id)],'request_type'=>'required|in:funding,withdrawal','amount_isk'=>'required|numeric|min:1|max:1000000000000','external_reference'=>'nullable|string|max:190','notes'=>'nullable|string|max:2000']);
+  $characterId=(int)$d['character_id'];unset($d['character_id']);
+  $id=DB::table('financier_requests')->insertGetId($d+['user_id'=>$r->user()->id,'financier_character_id'=>$characterId,'status'=>'pending','created_at'=>now(),'updated_at'=>now()]);
   $this->audit($r,'financier_request.created','financier_request',$id,$d);return back()->with('status','Finance request submitted for admin review.');
  }
  public function reviewFinanceRequest(Request $r,int $id):RedirectResponse {
