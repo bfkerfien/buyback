@@ -5,10 +5,12 @@ use App\Http\Controllers\AppraisalVisibilityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EveSsoController;
 use App\Http\Controllers\OperationsController;
+use App\Http\Controllers\OreValueController;
 use App\Http\Controllers\PayoutRuleController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => view('welcome', ['appName' => 'Lentivirus Buyback']))->name('home');
+Route::get('/ore-values', [OreValueController::class, 'index'])->name('ore-values.index');
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'service' => 'buyback', 'timestamp' => now()->toIso8601String()]))->name('health');
 Route::get('/login/eve', [EveSsoController::class, 'redirect'])->name('login.eve');
 Route::get('/auth/eve/callback', [EveSsoController::class, 'callback'])->name('auth.eve.callback');

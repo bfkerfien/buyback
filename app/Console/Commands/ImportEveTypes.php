@@ -26,8 +26,8 @@ class ImportEveTypes extends Command
             $name = $row['name']['en'] ?? $row['name'] ?? $row['typeName'] ?? null;
             $published = $row['published'] ?? true;
             if (!$id || !is_numeric($id) || !is_string($name) || trim($name) === '' || !$published) continue;
-            $batch[] = ['type_id'=>(int)$id,'type_name'=>trim($name),'published'=>true,'group_id'=>isset($row['groupID'])?(int)$row['groupID']:(isset($row['group_id'])?(int)$row['group_id']:null),'created_at'=>$now,'updated_at'=>$now];
-            if (count($batch) >= 1000) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','updated_at']); $imported += count($batch); $batch=[]; $this->output->write('.'); }
+            $batch[] = ['type_id'=>(int)$id,'type_name'=>trim($name),'published'=>true,'group_id'=>isset($row['groupID'])?(int)$row['groupID']:(isset($row['group_id'])?(int)$row['group_id']:null),'portion_size'=>max(1,(int)($row['portionSize'] ?? $row['portion_size'] ?? 1)),'created_at'=>$now,'updated_at'=>$now];
+            if (count($batch) >= 1000) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','portion_size','updated_at']); $imported += count($batch); $batch=[]; $this->output->write('.'); }
         }
         fclose($handle);
         if ($batch) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','updated_at']); $imported += count($batch); }
