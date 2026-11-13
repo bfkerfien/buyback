@@ -81,7 +81,7 @@ class ImportEveTypeMaterials extends Command
 
         $this->newLine();
         $this->info("Imported or updated {$count} material rows across {$typeCount} SDE type records.");
-        $this->comment('Run this with the complete CCP typeMaterials.jsonl file. Existing rows are retained.');
+        $this->comment('This replaces the previous recipe table contents. Always use the complete CCP typeMaterials.jsonl file.');
         return self::SUCCESS;
     }
 }
