@@ -1,9 +1,9 @@
 <?php
 
-namespace App\\Http\\Controllers;
+namespace App\Http\Controllers;
 
-use Illuminate\\Support\\Facades\\DB;
-use Illuminate\\View\\View;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class OreValueController extends Controller
 {
