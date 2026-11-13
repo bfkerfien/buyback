@@ -28,7 +28,7 @@
 <li>Review the item list and estimated buyback total on the result page. The quote is the amount to use when creating your contract.</li>
 <li>In EVE, open <strong>Contracts</strong> and choose <strong>Create Contract</strong>.</li>
 <li>Select <strong>Item Exchange</strong>, then set the contract to <strong>Private</strong> and choose the buyback corporation as the recipient. Do not make it a public contract.</li>
-<li>Add the appraised items, set the <strong>Want ISK</strong> amount to the estimated buyback total shown on your quote, and leave <strong>Want Items</strong> and collateral empty.</li>
+<li>Add the appraised items as the items you are offering, then set the ISK you are requesting to the estimated buyback total shown on your quote. Do not request any additional items.</li>
 <li>Review the contract carefully and submit it. The buyback team will review the contract and arrange payment according to the buyback process.</li>
 </ol>
 <p class="hint">Only create a contract for the items included in your appraisal. If the item quantities change, create a new appraisal first. An appraisal is an estimate, not a submitted contract or a completed payment.</p>
