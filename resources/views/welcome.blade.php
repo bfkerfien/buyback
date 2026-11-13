@@ -9,7 +9,13 @@
 </head>
 <body><div class="wrap">
 <header class="top"><div class="brand">LENTIVIRUS BUYBACK</div><div class="tag">EVE ONLINE · BUYBACK OPERATIONS</div><a href="{{ route('login.eve') }}" style="color:#f0eaff;border:1px solid #654b8b;border-radius:9px;padding:9px 13px;text-decoration:none">Sign in with EVE</a></header>
-<section class="hero"><h1>Buyback appraisal</h1><p>Enter your inventory below to receive an estimated buyback offer.</p></section>
+<section class="hero" style="max-width:850px;text-align:left;background:#171126;border:1px solid #49366b;border-radius:18px;padding:26px;box-shadow:0 25px 90px #0005">
+<h1 style="font-size:30px;letter-spacing:0;text-align:center;margin:0 0 18px">Buyback instructions</h1>
+<ol style="color:#d9cbea;line-height:1.9;padding-left:24px;margin:0">
+<li><strong>Currently accepting:</strong> Ore, Ice, PI Goods, and Exploration Loot only.</li>
+<li><strong>Appraisals only — do not create a contract.</strong> Buyback price settings are fluctuating. Submit your appraisal form and wait for us to review it and confirm whether the quoted values are approved before taking any further action. This is a temporary process.</li>
+</ol>
+</section>
 <section class="panel">
 <h2 style="margin:0 0 4px">Create an appraisal</h2><p class="muted">Paste item names and quantities from your inventory. Supported formats include EVE tab-separated exports, CSV, and “quantity x item name”.</p>
 @if($errors->any())<div class="error">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif
@@ -19,19 +25,6 @@
 <button type="submit">Calculate appraisal</button>
 </form>
 <p class="hint">Quotes are estimates, not accepted contracts or completed payouts. Unrecognized or unpriced items are reported rather than silently valued at zero.</p>
-</section>
-<section class="panel">
-<h2 style="margin:0 0 8px">How to complete your buyback</h2>
-<ol style="color:#d9cbea;line-height:1.8;padding-left:22px;margin:8px 0">
-<li>In EVE, move the items you want to sell to the agreed buyback location. Check that the item names and quantities match the inventory you are appraising.</li>
-<li>Paste your inventory into the appraisal form above and select <strong>Calculate appraisal</strong>.</li>
-<li>Review the item list and estimated buyback total on the result page. The quote is the amount to use when creating your contract.</li>
-<li>In EVE, open <strong>Contracts</strong> and choose <strong>Create Contract</strong>.</li>
-<li>Select <strong>Item Exchange</strong>, then set the contract to <strong>Private</strong> and choose the buyback corporation as the recipient. Do not make it a public contract.</li>
-<li>Add the appraised items as the items you are offering, then set the ISK you are requesting to the estimated buyback total shown on your quote. Do not request any additional items.</li>
-<li>Review the contract carefully and submit it. The buyback team will review the contract and arrange payment according to the buyback process.</li>
-</ol>
-<p class="hint">Only create a contract for the items included in your appraisal. If the item quantities change, create a new appraisal first. An appraisal is an estimate, not a submitted contract or a completed payment.</p>
 </section>
 <p class="muted" style="text-align:center"><a href="{{ route('login.eve') }}" style="color:#c6a4ff">Sign in with EVE SSO</a> to access your Lentivirus Buyback dashboard.</p>
 </div></body></html>
