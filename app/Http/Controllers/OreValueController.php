@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\\Http\\Controllers;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\View\View;
+use Illuminate\\Support\\Facades\\DB;
+use Illuminate\\View\\View;
 
 class OreValueController extends Controller
 {
@@ -45,25 +45,27 @@ class OreValueController extends Controller
         foreach ($records as $record) {
             $id = (int) $record->ore_type_id;
             if (!isset($ores[$id])) {
+                $portionSize = max(1, (int) $record->portion_size);
                 $ores[$id] = [
                     'type_id' => $id,
                     'name' => $record->ore_name,
-                    'portion_size' => max(1, (int) $record->portion_size),
+                    'portion_size' => $portionSize,
                     'ore_buy_price' => $record->ore_buy_price !== null ? (float) $record->ore_buy_price : null,
-                    'ore_market_value' => $record->ore_buy_price !== null ? (float) $record->ore_buy_price * max(1, (int) $record->portion_size) : null,
+                    'ore_market_value' => $record->ore_buy_price !== null ? (float) $record->ore_buy_price * $portionSize : null,
                     'ore_price_at' => $record->ore_price_at,
                     'materials' => [],
                     'refined_gross' => 0.0,
                     'refined_net' => 0.0,
                     'has_complete_mineral_prices' => true,
+                    'has_recipe' => false,
                 ];
             }
 
             if ($record->material_type_id === null) {
-                $ores[$id]['has_complete_mineral_prices'] = false;
                 continue;
             }
 
+            $ores[$id]['has_recipe'] = true;
             $yieldedQuantity = (int) floor((int) $record->material_quantity * $yieldPercent / 100);
             $mineralPrice = $record->mineral_buy_price !== null ? (float) $record->mineral_buy_price : null;
             $lineValue = $mineralPrice !== null ? $yieldedQuantity * $mineralPrice : null;
@@ -84,6 +86,9 @@ class OreValueController extends Controller
         }
 
         foreach ($ores as &$ore) {
+            if (!$ore['has_recipe']) {
+                $ore['has_complete_mineral_prices'] = false;
+            }
             $ore['refined_gross'] = round($ore['refined_gross'], 2);
             $ore['refined_tax'] = round($ore['refined_gross'] * $taxPercent / 100, 2);
             $ore['refined_net'] = round($ore['refined_gross'] - $ore['refined_tax'], 2);
@@ -101,13 +106,18 @@ class OreValueController extends Controller
         unset($ore);
 
         $rows = collect(array_values($ores))->sortBy('name')->values();
+        $chartRows = $rows->sortByDesc(fn ($row) => max($row['ore_market_value'] ?? 0, $row['refined_net'] ?? 0))->values();
+        $chartMaxValue = (float) $rows->flatMap(fn ($row) => [
+            $row['ore_market_value'] ?? 0,
+            $row['refined_net'] ?? 0,
+        ])->max();
         $pricedCount = $rows->filter(fn ($row) => $row['difference'] !== null)->count();
         $sellCompressedCount = $rows->where('winner', 'sell compressed')->count();
         $reprocessCount = $rows->where('winner', 'reprocess')->count();
         $latestObservedAt = $rows->pluck('ore_price_at')->filter()->max();
 
         return view('ore-values.index', compact(
-            'rows', 'yieldPercent', 'taxPercent', 'pricedCount',
+            'rows', 'chartRows', 'chartMaxValue', 'yieldPercent', 'taxPercent', 'pricedCount',
             'sellCompressedCount', 'reprocessCount', 'latestObservedAt'
         ));
     }

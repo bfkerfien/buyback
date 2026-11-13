@@ -1,13 +1,13 @@
 <?php
 
-namespace App\Services\Appraisal;
+namespace App\\Services\\Appraisal;
 
 final class InventoryParser
 {
     /**
      * Accepts common EVE inventory exports:
      * Item Name<TAB>Quantity, Item Name,Quantity, Quantity x Item Name,
-     * Quantity Item Name, and Item Name x Quantity.
+     * Quantity Item Name, and Item Name x Quantity / Item Name Quantity.
      *
      * @return array<int, array{name:string, quantity:int}>
      */
@@ -15,9 +15,9 @@ final class InventoryParser
     {
         $items = [];
 
-        foreach (preg_split('/\r\n|\n|\r/', trim($input)) ?: [] as $line) {
+        foreach (preg_split('/\\r\\n|\\n|\\r/', trim($input)) ?: [] as $line) {
             $line = trim($line);
-            if ($line === '' || preg_match('/^(item|type name|name)\s*[,\t]/i', $line)) {
+            if ($line === '' || preg_match('/^(item|type name|name)\\s*[,\\t]/i', $line)) {
                 continue;
             }
 
@@ -25,16 +25,24 @@ final class InventoryParser
             $quantity = null;
 
             // Quantity prefix, with or without an explicit "x": 10000 x Tritanium / 10000 Tritanium.
-            if (preg_match('/^([0-9][0-9,]*)\s*[x×]\s*(.+)$/i', $line, $m)) {
+            if (preg_match('/^([0-9][0-9,]*)\\s*[x×]\\s*(.+)$/i', $line, $m)) {
                 $quantity = (int) str_replace(',', '', $m[1]);
                 $name = trim($m[2]);
-            } elseif (preg_match('/^([0-9][0-9,]*)\s+(.+)$/', $line, $m)) {
+            } elseif (preg_match('/^([0-9][0-9,]*)\\s+(.+)$/', $line, $m)) {
                 $quantity = (int) str_replace(',', '', $m[1]);
                 $name = trim($m[2]);
-            } elseif (str_contains($line, "\t")) {
-                $parts = array_map('trim', explode("\t", $line));
+            } elseif (preg_match('/^(.+?)\\s+[x×]\\s*([0-9][0-9,]*)$/i', $line, $m)) {
+                // Item name suffix: Tritanium x 10000.
+                $name = trim($m[1]);
+                $quantity = (int) str_replace(',', '', $m[2]);
+            } elseif (preg_match('/^(.+?)\\s+([0-9][0-9,]*)$/', $line, $m)) {
+                // EVE inventory text is also commonly pasted as "Compressed Mercoxit 100000".
+                $name = trim($m[1]);
+                $quantity = (int) str_replace(',', '', $m[2]);
+            } elseif (str_contains($line, "\\t")) {
+                $parts = array_map('trim', explode("\\t", $line));
                 if (count($parts) >= 2) {
-                    if (is_numeric($parts[0])) {
+                    if (is_numeric(str_replace(',', '', $parts[0]))) {
                         $quantity = (int) str_replace(',', '', $parts[0]);
                         $name = $parts[1];
                     } else {
@@ -53,11 +61,6 @@ final class InventoryParser
                         $quantity = (int) preg_replace('/[^0-9]/', '', $parts[1]);
                     }
                 }
-            }
-
-            if ($name === null && preg_match('/^(.+?)\s+[x×]\s*([0-9][0-9,]*)$/i', $line, $m)) {
-                $name = trim($m[1]);
-                $quantity = (int) str_replace(',', '', $m[2]);
             }
 
             if ($name === null) {
