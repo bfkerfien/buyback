@@ -25,6 +25,9 @@ class ImportEveTypeMaterials extends Command
             return self::FAILURE;
         }
 
+        // This command expects the complete CCP file; remove stale recipe rows before importing it.
+        DB::table('eve_type_materials')->delete();
+
         $batch = [];
         $typeCount = 0;
         $count = 0;

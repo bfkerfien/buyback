@@ -31,13 +31,13 @@
 <h2 style="margin:0 0 6px">Compressed asteroid ore: sell or reprocess?</h2>
 <p class="muted">Values are per one SDE portion of the compressed type. Compare the compressed ore's immediate Jita buy value against the minerals produced at your configured refining yield, less the Tatara tax. Expand a row to inspect the mineral breakdown.</p>
 <div class="table-wrap"><table>
-<thead><tr><th>Compressed ore</th><th>Portion size</th><th>Jita buy · ore</th><th>Mineral value</th><th>Refining tax</th><th>Refined net</th><th>Difference</th><th>Better option</th><th>Breakdown</th></tr></thead>
+<thead><tr><th>Compressed ore</th><th>Portion size</th><th>Jita buy · portion</th><th>Mineral value</th><th>Refining tax</th><th>Refined net</th><th>Difference</th><th>Better option</th><th>Breakdown</th></tr></thead>
 <tbody>
 @forelse($rows as $row)
 <tr>
 <td class="ore">{{ $row['name'] }}</td>
 <td>{{ number_format($row['portion_size']) }}</td>
-<td>{{ $row['ore_buy_price'] !== null ? number_format($row['ore_buy_price'],2).' ISK' : '—' }}</td>
+<td>{{ $row['ore_market_value'] !== null ? number_format($row['ore_market_value'],2).' ISK / portion' : '—' }}</td>
 <td>{{ $row['has_complete_mineral_prices'] ? number_format($row['refined_gross'],2).' ISK' : 'Incomplete' }}</td>
 <td>{{ $row['has_complete_mineral_prices'] ? number_format($row['refined_tax'],2).' ISK' : '—' }}</td>
 <td>{{ $row['has_complete_mineral_prices'] ? number_format($row['refined_net'],2).' ISK' : '—' }}</td>

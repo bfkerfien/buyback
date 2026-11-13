@@ -30,7 +30,7 @@ class ImportEveTypes extends Command
             if (count($batch) >= 1000) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','portion_size','updated_at']); $imported += count($batch); $batch=[]; $this->output->write('.'); }
         }
         fclose($handle);
-        if ($batch) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','updated_at']); $imported += count($batch); }
+        if ($batch) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','portion_size','updated_at']); $imported += count($batch); }
         // Ensure the explicitly requested Mercoxit rule exists after the SDE types are loaded.
         $mercoxit = DB::table('eve_item_types')->where('type_name', 'Compressed Mercoxit')->first(['type_id', 'type_name']);
         $morphite = DB::table('eve_item_types')->where('type_id', 11399)->first(['type_id', 'type_name']);

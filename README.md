@@ -56,7 +56,9 @@ docker compose exec app php artisan buyback:refresh-jita-prices --all
 
 All ESI calls send the configured \`X-Compatibility-Date\` and \`User-Agent\` headers. Update the compatibility date only after reviewing and testing ESI changes.
 
-The Ore Refining page at `/ore-values` compares compressed asteroid ore Jita 4-4 buy prices against CCP SDE mineral outputs using the fixed Tatara profile shown on the page. Import `typeMaterials.jsonl` before using it.\n\nThe bulk market refresh reads The Forge market order pages and only uses orders located at Jita IV - Moon 4 - Caldari Navy Assembly Plant (station ID 60003760). It stores the best buy and sell observations for each item found there. You can refresh prices again with the same command when needed. The app will report an item as unpriced if there is no current Jita 4-4 buy/sell order for it.
+The Ore Refining page at `/ore-values` compares compressed asteroid ore Jita 4-4 buy prices against CCP SDE mineral outputs using the fixed Tatara profile shown on the page. Import `typeMaterials.jsonl` before using it.
+
+The bulk market refresh reads The Forge market order pages and only uses orders located at Jita IV - Moon 4 - Caldari Navy Assembly Plant (station ID 60003760). It stores the best buy and sell observations for each item found there. You can refresh prices again with the same command when needed. The app will report an item as unpriced if there is no current Jita 4-4 buy/sell order for it.
 
 **Automatic refresh:** the Buyback scheduler refreshes all Jita IV - Moon 4 prices every 30 minutes. A dedicated Docker Compose \`scheduler\` service runs Laravel's scheduler continuously, so no host cron entry is required. The task uses an overlap lock to prevent two full market refreshes from running at once. Confirm the \`scheduler\` container is running with \`docker compose ps\`.
 

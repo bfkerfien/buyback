@@ -50,6 +50,7 @@ class OreValueController extends Controller
                     'name' => $record->ore_name,
                     'portion_size' => max(1, (int) $record->portion_size),
                     'ore_buy_price' => $record->ore_buy_price !== null ? (float) $record->ore_buy_price : null,
+                    'ore_market_value' => $record->ore_buy_price !== null ? (float) $record->ore_buy_price * max(1, (int) $record->portion_size) : null,
                     'ore_price_at' => $record->ore_price_at,
                     'materials' => [],
                     'refined_gross' => 0.0,
@@ -87,13 +88,14 @@ class OreValueController extends Controller
             $ore['refined_tax'] = round($ore['refined_gross'] * $taxPercent / 100, 2);
             $ore['refined_net'] = round($ore['refined_gross'] - $ore['refined_tax'], 2);
             $ore['ore_buy_price'] = $ore['ore_buy_price'] !== null ? round($ore['ore_buy_price'], 2) : null;
-            $ore['difference'] = ($ore['ore_buy_price'] !== null && $ore['has_complete_mineral_prices'])
-                ? round($ore['refined_net'] - $ore['ore_buy_price'], 2)
+            $ore['ore_market_value'] = $ore['ore_market_value'] !== null ? round($ore['ore_market_value'], 2) : null;
+            $ore['difference'] = ($ore['ore_market_value'] !== null && $ore['has_complete_mineral_prices'])
+                ? round($ore['refined_net'] - $ore['ore_market_value'], 2)
                 : null;
             $ore['winner'] = $ore['difference'] === null ? 'insufficient data'
                 : ($ore['difference'] > 0 ? 'reprocess' : ($ore['difference'] < 0 ? 'sell compressed' : 'tie'));
-            $ore['advantage_percent'] = ($ore['ore_buy_price'] !== null && $ore['ore_buy_price'] > 0 && $ore['difference'] !== null)
-                ? round(abs($ore['difference']) / max($ore['ore_buy_price'], $ore['refined_net']) * 100, 2)
+            $ore['advantage_percent'] = ($ore['ore_market_value'] !== null && $ore['ore_market_value'] > 0 && $ore['difference'] !== null)
+                ? round(abs($ore['difference']) / max($ore['ore_market_value'], $ore['refined_net']) * 100, 2)
                 : null;
         }
         unset($ore);
