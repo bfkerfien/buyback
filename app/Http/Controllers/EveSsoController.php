@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -33,11 +34,12 @@ class EveSsoController extends Controller
         );
 
         $state = Str::random(48);
-        session([
-            'eve_sso_state' => $state,
-            'eve_sso_link_character' => $linkToCurrentAccount,
-            'url.intended' => $linkToCurrentAccount ? route('dashboard') : null,
-        ]);
+        // Keep OAuth state outside the browser session: the pre-auth session cookie
+        // can be discarded during the external EVE SSO redirect.
+        Cache::put('eve_sso:state:' . hash('sha256', $state), [
+            'link_character' => $linkToCurrentAccount,
+            'user_id' => $linkToCurrentAccount ? Auth::id() : null,
+        ], now()->addMinutes(10));
 
         $query = http_build_query([
             'response_type' => 'code',
@@ -52,12 +54,16 @@ class EveSsoController extends Controller
 
     public function callback(Request $request): RedirectResponse
     {
-        $expected = (string) session('eve_sso_state');
         $provided = (string) $request->query('state');
-        abort_unless($request->filled('code') && $expected !== '' && hash_equals($expected, $provided), 419, 'Invalid EVE SSO state.');
+        abort_unless($request->filled('code') && $provided !== '', 419, 'The EVE login response was incomplete. Please start sign-in again.');
 
-        $linkToCurrentAccount = (bool) session('eve_sso_link_character', false);
-        $request->session()->forget(['eve_sso_state', 'eve_sso_link_character']);
+        // Pull makes the state single-use without depending on the pre-auth session cookie.
+        $stateData = Cache::pull('eve_sso:state:' . hash('sha256', $provided));
+        abort_unless(is_array($stateData), 419, 'Your EVE sign-in expired or its security state could not be verified. Please start sign-in again.');
+
+        $linkToCurrentAccount = (bool) ($stateData['link_character'] ?? false);
+        $stateUserId = isset($stateData['user_id']) ? (int) $stateData['user_id'] : null;
+        abort_unless(!$linkToCurrentAccount || $stateUserId, 401, 'Your session expired while linking the EVE character. Sign in again and retry.');
 
         $tokens = Http::asForm()
             ->withBasicAuth((string) config('services.eve.client_id'), (string) config('services.eve.client_secret'))
@@ -80,8 +86,7 @@ class EveSsoController extends Controller
         $ownerHash = (string) ($verify['CharacterOwnerHash'] ?? '');
         abort_unless($ownerHash !== '', 403, 'EVE did not return character ownership proof.');
 
-        $currentUserId = Auth::id();
-        abort_unless(!$linkToCurrentAccount || $currentUserId, 401);
+        $currentUserId = $stateUserId;
 
         $user = DB::transaction(function () use ($characterId, $verify, $tokens, $identity, $ownerHash, $linkToCurrentAccount, $currentUserId) {
             $character = EveCharacter::where('eve_character_id', $characterId)->lockForUpdate()->first();
@@ -139,7 +144,7 @@ class EveSsoController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->route('dashboard');
     }
 
     public function logout(Request $request): RedirectResponse
