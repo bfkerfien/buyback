@@ -22,7 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('buyback:refresh-jita-prices --all')
-            ->everyThirtyMinutes()
+            ->everyFiveMinutes()
             ->withoutOverlapping(25);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
