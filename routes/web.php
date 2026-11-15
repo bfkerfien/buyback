@@ -24,6 +24,7 @@ Route::get('/q/{token}', [AppraisalController::class, 'show'])->whereAlphaNumeri
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/link-character/eve', [EveSsoController::class, 'linkCharacter'])->name('login.eve.link');
+    Route::delete('/appraisals/{quote}', [AppraisalVisibilityController::class, 'destroy'])->whereNumber('quote')->name('appraisals.destroy');
     Route::delete('/appraisals/{quote}/hide', [AppraisalVisibilityController::class, 'hide'])->whereNumber('quote')->name('appraisals.hide');
     Route::post('/admin/appraisal-comparison', [AppraisalComparisonController::class, 'compare'])->middleware('admin')->name('admin.appraisal-comparison');
     Route::post('/admin/appraisals/{quote}/contract', [AppraisalVisibilityController::class, 'markContracted'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.contract');
