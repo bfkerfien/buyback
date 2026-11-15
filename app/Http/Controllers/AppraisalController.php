@@ -19,47 +19,100 @@ class AppraisalController extends Controller
             'origin_system' => ['nullable', 'string', 'max:100'],
         ]);
         $items = $parser->parse($validated['inventory']);
-        if (!$items) return back()->withErrors(['inventory' => 'No inventory lines were recognized. Paste item names and quantities.'])->withInput();
+        if (!$items) {
+            return back()->withErrors(['inventory' => 'No inventory lines were recognized. Paste item names and quantities.'])->withInput();
+        }
 
         $result = $calculator->calculate($items);
+        return $this->saveQuote($request, $validated, $result, 'standard');
+    }
+
+    public function shipBuyback(): View
+    {
+        return view('ship-buyback');
+    }
+
+    public function storeShipBuyback(Request $request, InventoryParser $parser, AppraisalCalculator $calculator): RedirectResponse
+    {
+        $validated = $request->validate([
+            'inventory' => ['required', 'string', 'max:100000'],
+            'origin_system' => ['nullable', 'string', 'max:100'],
+        ]);
+        $items = $parser->parse($validated['inventory']);
+        if (!$items) {
+            return back()->withErrors(['inventory' => 'No ship hull lines were recognized. Non-ship entries are ignored.'])->withInput();
+        }
+
+        // EVE SDE category "Ship" is authoritative. Modules, rigs, cargo, and other
+        // non-hull entries are skipped; valid hulls are paid at a fixed 80% rate.
+        $result = $calculator->calculate($items, 'Ship', 80.0, true);
+        return $this->saveQuote($request, $validated, $result, 'ship');
+    }
+
+    private function saveQuote(Request $request, array $validated, array $result, string $kind): RedirectResponse
+    {
         $token = Str::random(48);
-        DB::transaction(function () use ($result, $validated, $token, $request) {
+        DB::transaction(function () use ($result, $validated, $token, $request, $kind) {
             $quoteId = DB::table('appraisal_quotes')->insertGetId([
-                'public_token'=>$token,
-                'eve_character_id'=>$request->user()?->characters()->value('id'),
-                'created_by'=>$request->user()?->id,
-                'origin_system'=>$validated['origin_system'] ?? null,
-                'status'=>'priced','price_source'=>'market_price_snapshots','priced_at'=>now(),
-                'calculation_version'=>1,'gross_value'=>$result['gross_value'],'fees'=>$result['fees'],
-                'payout_value'=>$result['payout_value'],
-                'pricing_snapshot'=>json_encode(['price_side'=>$result['price_side'],'default_payout_percent'=>$result['payout_percent'],'region_id'=>$result['region_id']],JSON_THROW_ON_ERROR),
-                'created_at'=>now(),'updated_at'=>now(),
+                'public_token' => $token,
+                'eve_character_id' => $request->user()?->characters()->value('id'),
+                'created_by' => $request->user()?->id,
+                'origin_system' => $validated['origin_system'] ?? null,
+                'status' => 'priced',
+                'appraisal_kind' => $kind,
+                'price_source' => 'market_price_snapshots',
+                'priced_at' => now(),
+                'calculation_version' => 1,
+                'gross_value' => $result['gross_value'],
+                'fees' => $result['fees'],
+                'payout_value' => $result['payout_value'],
+                'pricing_snapshot' => json_encode([
+                    'price_side' => $result['price_side'],
+                    'default_payout_percent' => $result['payout_percent'],
+                    'region_id' => $result['region_id'],
+                ], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
+
             foreach ($result['lines'] as $line) {
                 DB::table('appraisal_quote_items')->insert([
-                    'appraisal_quote_id'=>$quoteId,'type_id'=>$line['type_id'],'type_name'=>$line['type_name'],
-                    'quantity'=>$line['quantity'],'unit_price'=>$line['unit_price'],'line_value'=>$line['line_value'],
-                    'source_data'=>json_encode([
-                        'source'=>$line['source'],'observed_at'=>$line['observed_at'],
-                        'payout_percent'=>$line['payout_percent'],'payout_value'=>$line['payout_value'],
-                        'category_id'=>$line['category_id'],'category_name'=>$line['category_name'],
-                        'rate_source'=>$line['rate_source'],'price_side'=>$result['price_side'],
-                        'valuation_mode'=>$line['valuation_mode'],'output_type_id'=>$line['output_type_id'],
-                        'output_name'=>$line['output_name'],'output_quantity'=>$line['output_quantity'],
-                        'conversion_ratio'=>$line['conversion_ratio'],'output_unit_price'=>$line['output_unit_price'],
-                    ],JSON_THROW_ON_ERROR),
-                    'created_at'=>now(),'updated_at'=>now(),
+                    'appraisal_quote_id' => $quoteId,
+                    'type_id' => $line['type_id'],
+                    'type_name' => $line['type_name'],
+                    'quantity' => $line['quantity'],
+                    'unit_price' => $line['unit_price'],
+                    'line_value' => $line['line_value'],
+                    'source_data' => json_encode([
+                        'source' => $line['source'],
+                        'observed_at' => $line['observed_at'],
+                        'payout_percent' => $line['payout_percent'],
+                        'payout_value' => $line['payout_value'],
+                        'category_id' => $line['category_id'],
+                        'category_name' => $line['category_name'],
+                        'rate_source' => $line['rate_source'],
+                        'price_side' => $result['price_side'],
+                        'valuation_mode' => $line['valuation_mode'],
+                        'output_type_id' => $line['output_type_id'],
+                        'output_name' => $line['output_name'],
+                        'output_quantity' => $line['output_quantity'],
+                        'conversion_ratio' => $line['conversion_ratio'],
+                        'output_unit_price' => $line['output_unit_price'],
+                    ], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
             }
         });
-        return redirect()->route('appraisals.show',$token);
+
+        return redirect()->route('appraisals.show', $token);
     }
 
     public function show(string $token): View
     {
-        $quote=DB::table('appraisal_quotes')->where('public_token',$token)->first();
-        abort_unless($quote,404);
-        $items=DB::table('appraisal_quote_items')->where('appraisal_quote_id',$quote->id)->orderBy('type_name')->get();
-        return view('appraisals.show',compact('quote','items'));
+        $quote = DB::table('appraisal_quotes')->where('public_token', $token)->first();
+        abort_unless($quote, 404);
+        $items = DB::table('appraisal_quote_items')->where('appraisal_quote_id', $quote->id)->orderBy('type_name')->get();
+        return view('appraisals.show', compact('quote', 'items'));
     }
 }
