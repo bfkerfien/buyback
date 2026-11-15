@@ -1,22 +1,76 @@
 <?php
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Database\\Schema\\Blueprint;
+use Illuminate\\Support\\Facades\\Schema;
+
 return new class extends Migration {
- public function up(): void {
-  Schema::create('users', function(Blueprint $t){$t->id();$t->string('name');$t->string('email')->nullable()->unique();$t->string('role',24)->default('member')->index();$t->boolean('active')->default(true)->index();$t->timestamp('last_login_at')->nullable();$t->rememberToken();$t->timestamps();});
-  Schema::table('eve_characters', function(Blueprint $t){$t->foreignId('user_id')->nullable()->after('id')->constrained()->nullOnDelete();$t->text('access_token')->nullable();$t->text('refresh_token')->nullable();$t->timestamp('token_expires_at')->nullable();$t->json('scopes')->nullable();$t->index(['user_id','eve_character_id']);});
-  Schema::table('appraisal_quotes', function(Blueprint $t){$t->foreignId('created_by')->nullable()->after('eve_character_id')->constrained('users')->nullOnDelete();});
-  Schema::table('runner_jobs', function(Blueprint $t){$t->foreignId('created_by')->nullable()->after('id')->constrained('users')->nullOnDelete();$t->foreignId('assigned_user_id')->nullable()->after('runner_character_id')->constrained('users')->nullOnDelete();$t->text('notes')->nullable();});
-  Schema::table('financier_requests', function(Blueprint $t){$t->foreignId('user_id')->nullable()->after('id')->constrained()->nullOnDelete();$t->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();$t->text('notes')->nullable();$t->timestamp('reviewed_at')->nullable();});
-  Schema::create('audit_logs',function(Blueprint $t){$t->id();$t->foreignId('user_id')->nullable()->constrained()->nullOnDelete();$t->string('action',100)->index();$t->string('subject_type',100)->nullable();$t->unsignedBigInteger('subject_id')->nullable();$t->json('details')->nullable();$t->string('ip_address',45)->nullable();$t->timestamps();$t->index(['subject_type','subject_id']);});
- }
- public function down(): void {
-  Schema::dropIfExists('audit_logs');
-  Schema::table('financier_requests',function(Blueprint $t){$t->dropConstrainedForeignId('reviewed_by');$t->dropConstrainedForeignId('user_id');$t->dropColumn(['notes','reviewed_at']);});
-  Schema::table('runner_jobs',function(Blueprint $t){$t->dropConstrainedForeignId('assigned_user_id');$t->dropConstrainedForeignId('created_by');$t->dropColumn('notes');});
-  Schema::table('appraisal_quotes',function(Blueprint $t){$t->dropConstrainedForeignId('created_by');});
-  Schema::table('eve_characters',function(Blueprint $t){$t->dropConstrainedForeignId('user_id');$t->dropColumn(['access_token','refresh_token','token_expires_at','scopes']);});
-  Schema::dropIfExists('users');
- }
+    public function up(): void
+    {
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('email')->nullable()->unique();
+            $table->string('role', 24)->default('member')->index();
+            $table->boolean('active')->default(true)->index();
+            $table->timestamp('last_login_at')->nullable();
+            $table->rememberToken();
+            $table->timestamps();
+        });
+
+        Schema::table('eve_characters', function (Blueprint $table) {
+            $table->foreignId('user_id')->nullable()->after('id')->constrained()->nullOnDelete();
+            $table->text('access_token')->nullable();
+            $table->text('refresh_token')->nullable();
+            $table->timestamp('token_expires_at')->nullable();
+            $table->json('scopes')->nullable();
+            $table->index(['user_id', 'eve_character_id']);
+        });
+
+        Schema::table('appraisal_quotes', function (Blueprint $table) {
+            $table->foreignId('created_by')->nullable()->after('eve_character_id')->constrained('users')->nullOnDelete();
+        });
+
+        Schema::table('runner_jobs', function (Blueprint $table) {
+            $table->foreignId('created_by')->nullable()->after('id')->constrained('users')->nullOnDelete();
+            $table->foreignId('assigned_user_id')->nullable()->after('runner_character_id')->constrained('users')->nullOnDelete();
+            $table->text('notes')->nullable();
+        });
+
+        // Financier requests were removed from the product. Do not recreate or alter
+        // their retired table as part of a fresh Buyback installation.
+        Schema::create('audit_logs', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->string('action', 100)->index();
+            $table->string('subject_type', 100)->nullable();
+            $table->unsignedBigInteger('subject_id')->nullable();
+            $table->json('details')->nullable();
+            $table->string('ip_address', 45)->nullable();
+            $table->timestamps();
+            $table->index(['subject_type', 'subject_id']);
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('audit_logs');
+
+        Schema::table('runner_jobs', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('assigned_user_id');
+            $table->dropConstrainedForeignId('created_by');
+            $table->dropColumn('notes');
+        });
+
+        Schema::table('appraisal_quotes', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('created_by');
+        });
+
+        Schema::table('eve_characters', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('user_id');
+            $table->dropColumn(['access_token', 'refresh_token', 'token_expires_at', 'scopes']);
+        });
+
+        Schema::dropIfExists('users');
+    }
 };
