@@ -1,9 +1,9 @@
 <?php
 
-namespace App\\Services\\Eve;
+namespace App\Services\Eve;
 
-use App\\Models\\EveCharacter;
-use Illuminate\\Support\\Facades\\Http;
+use App\Models\EveCharacter;
+use Illuminate\Support\Facades\Http;
 use Throwable;
 
 class CharacterContracts
