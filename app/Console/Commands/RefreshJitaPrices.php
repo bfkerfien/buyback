@@ -123,7 +123,10 @@ class RefreshJitaPrices extends Command
 
     private function fetchTypePrices(int $typeId): array
     {
-        $http = Http::withHeaders(['User-Agent' => config('buyback.eve_user_agent')])
+        $http = Http::withHeaders([
+                'User-Agent' => config('buyback.eve_user_agent'),
+                'X-Compatibility-Date' => config('buyback.esi_compatibility_date'),
+            ])
             ->acceptJson()->timeout(30)->retry(3, 500);
         $regionId = (int) config('buyback.region_id', 10000002);
         $stationId = (int) config('buyback.jita_station_id', 60003760);
