@@ -34,6 +34,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <nav class="tabs" role="tablist" aria-label="Buyback sections">
 <button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="tab-appraisals" data-tab="tab-appraisals">New Appraisals</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-contracts" data-tab="tab-contracts">Appraisals &amp; Contracts</button>
+<a class="tab" href="{{ route('ship-buyback.index') }}" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;text-decoration:none">Ship Buyback · 80%</a>
 @if($admin)
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-marketbaiters" data-tab="tab-marketbaiters">Marketbaiters Comparison</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin" data-tab="tab-admin">Admin</button>
