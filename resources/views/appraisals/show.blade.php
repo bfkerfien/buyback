@@ -46,4 +46,4 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @endforeach
 </tbody></table></div></section>
 <p class="muted">Quote reference: {{ $quote->public_token }} · Estimate only; this is not a completed purchase or payout.</p>
-</main></body></html>
+</main><footer style="margin:28px auto 12px;text-align:center;color:#7f9ba5;font-size:12px">(c) 2027 My Eve Online</footer></body></html>
