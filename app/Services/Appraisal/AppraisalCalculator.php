@@ -7,7 +7,7 @@ use Illuminate\Validation\ValidationException;
 
 final class AppraisalCalculator
 {
-    public function calculate(array $parsedItems): array
+    public function calculate(array $parsedItems, ?string $requiredCategoryName = null, ?float $fixedPayoutPercent = null, bool $ignoreNonMatching = false): array
     {
         $names = array_column($parsedItems, 'name');
         $types = DB::table('eve_item_types as t')
@@ -34,7 +34,12 @@ final class AppraisalCalculator
         foreach ($parsedItems as $item) {
             $type = $types->get(mb_strtolower($item['name']));
             if (!$type) {
-                $unresolved[] = $item['name'];
+                if (!$ignoreNonMatching) $unresolved[] = $item['name'];
+                continue;
+            }
+
+            if ($requiredCategoryName !== null && mb_strtolower((string) $type->category_name) !== mb_strtolower($requiredCategoryName)) {
+                if (!$ignoreNonMatching) $unresolved[] = $item['name'] . ' (not in the ' . $requiredCategoryName . ' category)';
                 continue;
             }
 
@@ -78,7 +83,7 @@ final class AppraisalCalculator
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
             $payoutRule = $effectiveCategoryId ? $rules->get($effectiveCategoryId) : null;
-            $rate = (float) ($payoutRule->payout_percent ?? $defaultRate);
+            $rate = $fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($payoutRule->payout_percent ?? $defaultRate);
 
             $lines[] = [
                 'type_id' => (int) $type->type_id,
@@ -109,6 +114,13 @@ final class AppraisalCalculator
             ]]);
         }
 
+        if (!$lines) {
+            $message = $ignoreNonMatching
+                ? 'No priced ship hulls were found in that paste. Non-ship entries are ignored; paste one or more published ship hull names and quantities.'
+                : 'No recognized items were found to appraise.';
+            throw ValidationException::withMessages(['inventory' => [$message]]);
+        }
+
         $gross = round(array_sum(array_column($lines, 'line_value')), 2);
         $payout = round(array_sum(array_column($lines, 'payout_value')), 2);
 
@@ -118,7 +130,7 @@ final class AppraisalCalculator
             'fees' => round($gross - $payout, 2),
             'payout_value' => $payout,
             'price_side' => $side,
-            'payout_percent' => $defaultRate,
+            'payout_percent' => $fixedPayoutPercent !== null ? $fixedPayoutPercent : $defaultRate,
             'region_id' => $regionId,
         ];
     }
