@@ -185,7 +185,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </section>
 <script>
 const compressedCopy=document.getElementById('copy-compressed-ore');if(compressedCopy){compressedCopy.addEventListener('click',async()=>{const manifest=document.getElementById('compressed-ore-manifest').value;const status=document.getElementById('compressed-ore-copy-status');try{await navigator.clipboard.writeText(manifest);status.textContent='Copied '+manifest.trim().split(/\\r?\\n/).filter(Boolean).length+' compressed ore types.';}catch(e){status.textContent='Clipboard access was blocked. Select and copy the manifest below.';}});}const compareAppraisals=document.getElementById('compare-appraisal-links');if(compareAppraisals){compareAppraisals.addEventListener('click',async()=>{const status=document.getElementById('appraisal-compare-status');const output=document.getElementById('appraisal-compare-results');status.textContent='Comparing appraisal contents…';output.style.display='none';try{const response=await fetch('{{ route('admin.appraisal-comparison') }}',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json','X-CSRF-TOKEN':document.getElementById('dashboard-csrf').value},body:JSON.stringify({marketbaiters_input:document.getElementById('marketbaiters-input').value,buyback_input:document.getElementById('buyback-input').value})});const payload=await response.json();if(!response.ok)throw new Error(Object.values(payload.errors||{}).flat().join(' ')||payload.message||'Comparison failed.');const safe=s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));status.textContent=payload.matched+' exact matches · '+payload.differences+' differences';output.style.display='block';output.innerHTML='<div class="stat">Marketbaiters item types: <strong>'+payload.marketbaiters_items+'</strong><br>EveBuyback item types: <strong>'+payload.buyback_items+'</strong><br>Exact matches: <strong>'+payload.matched+'</strong> · Differences: <strong>'+payload.differences+'</strong></div><div style="overflow-x:auto"><table class="comparison-table"><thead><tr><th>Item</th><th>Marketbaiters qty</th><th>EveBuyback qty</th><th>Difference</th><th>Result</th></tr></thead><tbody>'+payload.rows.map(row=>{const cls=row.status==='match'?'match':row.status==='quantity_mismatch'?'diff':'missing';const label=row.status==='match'?'Match':row.status==='quantity_mismatch'?'Quantity mismatch':row.status==='missing_marketbaiters'?'Missing from Marketbaiters':'Missing from EveBuyback';return '<tr><td>'+safe(row.name)+'</td><td>'+row.marketbaiters_quantity.toLocaleString()+'</td><td>'+row.buyback_quantity.toLocaleString()+'</td><td>'+row.difference.toLocaleString()+'</td><td class="comparison-status '+cls+'">'+label+'</td></tr>';}).join('')+'</tbody></table></div>'; }catch(e){status.textContent=e.message;}});}
-(()=>{const tabs=[...document.querySelectorAll('[data-tab]')];const panels=[...document.querySelectorAll('.tab-panel')];tabs.forEach(tab=>tab.addEventListener('click',()=>{const target=tab.dataset.tab;tabs.forEach(item=>{const active=item===tab;item.classList.toggle('active',active);item.setAttribute('aria-selected',active?'true':'false');});panels.forEach(panel=>{const active=panel.id===target;panel.classList.toggle('active',active);panel.hidden=!active;});}));})();
+(()=>{const tabs=[...document.querySelectorAll('[data-tab]')];const panels=[...document.querySelectorAll('.tab-panel')];tabs.forEach(tab=>tab.addEventListener('click',()=>{const target=tab.dataset.tab;tabs.forEach(item=>{const active=item===tab;item.classList.toggle('active',active);item.setAttribute('aria-selected',active?'true':'false');});panels.forEach(panel=>{const active=panel.id===target;panel.classList.toggle('active',active);panel.hidden=!active;});}));const initial=new URLSearchParams(window.location.search).get('tab');if(initial){const tab=tabs.find(item=>item.dataset.tab===initial);if(tab)tab.click();}})();
 </script>
 <p class="muted">Internal ledger values are not confirmation of an in-game ISK transfer. Payments must be reconciled manually.</p><dialog id="contract-compare-dialog" class="compare-dialog">
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 id="contract-compare-title">Compare appraisal with contract</h2><button type="button" id="close-contract-compare" class="icon-action" aria-label="Close comparison">×</button></div>
@@ -208,12 +208,21 @@ const compressedCopy=document.getElementById('copy-compressed-ore');if(compresse
  const key=s=>String(s||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
  function parseList(raw){
    const merged=new Map();
+   let headerNameColumn=0,headerQuantityColumn=-1;
    for(const sourceLine of String(raw||'').split(/\\r?\\n/)){
      const line=sourceLine.trim();if(!line)continue;
+     const cols=line.split(/\\t|,/).map(x=>x.trim());
+     if(cols.some(x=>/^(quantity|qty)$/i.test(x))){
+       headerQuantityColumn=cols.findIndex(x=>/^(quantity|qty)$/i.test(x));
+       const nameIndex=cols.findIndex(x=>/^(item|item name|type|type name|name)$/i.test(x));
+       headerNameColumn=nameIndex>=0?nameIndex:0;
+       continue;
+     }
      if(/^(item|type|type name|name|quantity|qty|volume|price|total)\\b/i.test(line))continue;
      let name='',qty=null;
-     const cols=line.split(/\\t|,/).map(x=>x.trim());
-     if(cols.length>=2){
+     if(headerQuantityColumn>=0&&cols.length>headerQuantityColumn&&cols.length>headerNameColumn&&/^\\d[\\d,]*$/.test(cols[headerQuantityColumn])){
+       name=cols[headerNameColumn];qty=Number(cols[headerQuantityColumn].replace(/,/g,''));
+     } else if(cols.length>=2){
        if(/^\\d[\\d,]*$/.test(cols[0])){qty=Number(cols[0].replace(/,/g,''));name=cols.slice(1).join(' ');}
        else if(/^\\d[\\d,]*$/.test(cols[1])){name=cols[0];qty=Number(cols[1].replace(/,/g,''));}
      }
