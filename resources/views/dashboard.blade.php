@@ -38,6 +38,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @if($admin)
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-marketbaiters" data-tab="tab-marketbaiters">Marketbaiters Comparison</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin" data-tab="tab-admin">Admin</button>
+<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin-tools" data-tab="tab-admin-tools">Admin Tools</button>
 
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-ore-refining" data-tab="tab-ore-refining">Ore Refining</button>
 @endif
@@ -112,7 +113,10 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </section>
 <section class="panel"><h2>Archived appraisals</h2><p class="muted">Archived records remain stored and can be restored at any time.</p><table><thead><tr><th>Quote</th><th>Owner ID</th><th>Origin</th><th>Payout</th><th>Archived</th><th>Action</th></tr></thead><tbody>@forelse($archivedQuotes as $quote)<tr><td><a href="{{ route('appraisals.show',$quote->public_token) }}">{{ substr($quote->public_token,0,14) }}</a></td><td>{{ $quote->created_by ?? '—' }}</td><td>{{ $quote->origin_system ?: '—' }}</td><td>{{ number_format((float)$quote->payout_value,2) }} ISK</td><td>{{ $quote->archived_at }}</td><td><form class="inline" method="post" action="{{ route('admin.appraisals.restore',$quote->id) }}">@csrf<button>Restore</button></form></td></tr>@empty<tr><td colspan="6">No archived appraisals.</td></tr>@endforelse</tbody></table></section>
 
-@if($admin)<section class="panel"><h2>Administration</h2><div class="grid"><div class="stat">Open jobs<strong>{{ $adminMetrics['open_jobs'] }}</strong></div><div class="stat">Registered users<strong>{{ $adminMetrics['users'] }}</strong></div></div>
+
+</section>
+<section class="tab-panel" id="tab-admin-tools" role="tabpanel" hidden>
+<section class="panel"><h2>Administration</h2><div class="grid"><div class="stat">Open jobs<strong>{{ $adminMetrics['open_jobs'] }}</strong></div><div class="stat">Registered users<strong>{{ $adminMetrics['users'] }}</strong></div></div>
 <h2 style="margin-top:24px">Category buyback rates</h2>
 <p class="muted">Set the percentage of Jita value paid for each EVE item category. Items inherit their category rate; categories without a rule use the default rate from BUYBACK_PAYOUT_PERCENT (currently {{ number_format((float)config('buyback.payout_percent'),2) }}%).</p>
 <form method="post" action="{{ route('admin.appraisal-rates.store') }}">@csrf
@@ -135,7 +139,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <script>
 (()=>{const mode=document.getElementById('ore-valuation-mode');const output=document.getElementById('ore-output-type');const ratio=document.getElementById('ore-output-ratio');const sync=()=>{const active=mode.value==='reprocessed';output.required=active;ratio.required=active;output.disabled=!active;ratio.disabled=!active;};mode.addEventListener('change',sync);sync();})();
 </script>
-<h2 style="margin-top:24px">Publish runner contract</h2><form method="post" action="{{ route('runner.jobs.create') }}">@csrf<div class="row"><label>Origin<input name="origin" required maxlength="100"></label><label>Destination<input name="destination" required maxlength="100"></label><label>EVE courier contract ID<input name="contract_id" type="number" min="1" required></label><label>Runner reward (ISK)<input name="reward_isk" type="number" min="0.01" step="0.01" required></label><label>Appraisal quote ID (optional)<input name="appraisal_quote_id" type="number"></label></div><label>Notes<textarea name="notes"></textarea></label><button>Publish job</button></form></section>@endif
+<h2 style="margin-top:24px">Publish runner contract</h2><form method="post" action="{{ route('runner.jobs.create') }}">@csrf<div class="row"><label>Origin<input name="origin" required maxlength="100"></label><label>Destination<input name="destination" required maxlength="100"></label><label>EVE courier contract ID<input name="contract_id" type="number" min="1" required></label><label>Runner reward (ISK)<input name="reward_isk" type="number" min="0.01" step="0.01" required></label><label>Appraisal quote ID (optional)<input name="appraisal_quote_id" type="number"></label></div><label>Notes<textarea name="notes"></textarea></label><button>Publish job</button></form></section>
 </section>
 <section class="tab-panel" id="tab-ore-refining" role="tabpanel" hidden>
 <iframe title="Ore Refining Comparison" src="{{ route('ore-values.index') }}" loading="lazy" style="display:block;width:100%;height:1900px;border:0;border-radius:12px;background:#060d13"></iframe>
