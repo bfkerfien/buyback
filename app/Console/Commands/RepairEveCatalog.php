@@ -1,10 +1,10 @@
 <?php
 
-namespace App\\Console\\Commands;
+namespace App\Console\Commands;
 
-use Illuminate\\Console\\Command;
-use Illuminate\\Support\\Facades\\Artisan;
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 
 class RepairEveCatalog extends Command
 {
