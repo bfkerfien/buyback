@@ -1,4 +1,4 @@
-# Triglavian Buyback
+# EveBuyback
 
 Standalone EVE Online buyback platform with an optional courier runner board. Independent of SeAT and /opt/rigauth. LP Exchange is explicitly excluded.
 
@@ -14,7 +14,7 @@ Standalone EVE Online buyback platform with an optional courier runner board. In
 
 Create an EVE application and register this exact callback URL:
 
-\`https://YOUR-BUYBACK-HOST/auth/eve/callback\`
+\`https://evebb.icu/auth/eve/callback\`
 
 Configure these values in \`.env\`:
 - \`EVE_CLIENT_ID\` and \`EVE_CLIENT_SECRET\`
