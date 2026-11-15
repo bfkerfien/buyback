@@ -25,7 +25,8 @@ final class AppraisalCalculator
             ->keyBy('type_id');
 
         $rules = DB::table('appraisal_payout_rules')->get()->keyBy('category_id');
-        $unresolved = [];
+        $unresolvedTypes = [];
+        $unpricedTypes = [];
         $lines = [];
         $side = config('buyback.price_side', 'buy');
         $defaultRate = (float) config('buyback.payout_percent', 90);
@@ -34,7 +35,7 @@ final class AppraisalCalculator
         foreach ($parsedItems as $item) {
             $type = $types->get(mb_strtolower($item['name']));
             if (!$type) {
-                if (!$ignoreNonMatching) $unresolved[] = $item['name'];
+                if (!$ignoreNonMatching) $unresolvedTypes[] = $item['name'];
                 continue;
             }
 
@@ -68,14 +69,22 @@ final class AppraisalCalculator
                 $valuationMode = 'reprocessed';
             }
 
-            $price = DB::table('market_price_snapshots')->where('type_id', $pricingType->type_id)
+            // A newer market snapshot can legitimately contain a null buy or sell
+            // side. Select the newest positive price for the configured side instead
+            // of letting a null latest snapshot hide an older valid Jita quote.
+            $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
+            $price = DB::table('market_price_snapshots')
+                ->where('type_id', $pricingType->type_id)
                 ->where('region_id', $regionId)
-                ->orderByDesc('observed_at')->first(['buy_price','sell_price','source','observed_at']);
-            $unitPrice = $price ? (float) ($side === 'sell' ? $price->sell_price : $price->buy_price) : 0.0;
+                ->whereNotNull($priceColumn)
+                ->where($priceColumn, '>', 0)
+                ->orderByDesc('observed_at')
+                ->first(['buy_price','sell_price','source','observed_at']);
+            $unitPrice = $price ? (float) $price->{$priceColumn} : 0.0;
             if ($unitPrice <= 0) {
-                $unresolved[] = $valuationMode === 'reprocessed'
-                    ? $item['name'] . ' (no Jita ' . $side . ' price for ' . $pricingType->type_name . ')'
-                    : $item['name'] . ' (no Jita ' . $side . ' price)';
+                $unpricedTypes[] = $valuationMode === 'reprocessed'
+                    ? $item['name'] . ' (type ID ' . $pricingType->type_id . ': no Jita ' . $side . ' price; refresh market prices)'
+                    : $item['name'] . ' (type ID ' . $type->type_id . ': no Jita ' . $side . ' price; refresh market prices)';
                 continue;
             }
 
@@ -108,10 +117,15 @@ final class AppraisalCalculator
             ];
         }
 
-        if ($unresolved) {
-            throw ValidationException::withMessages(['inventory' => [
-                'Could not price these items: ' . implode(', ', array_unique($unresolved)) . '. Import EVE item data and refresh Jita prices before appraising.'
-            ]]);
+        $priceErrors = [];
+        if ($unresolvedTypes) {
+            $priceErrors[] = 'These item types are missing from the imported published EVE SDE: ' . implode(', ', array_unique($unresolvedTypes)) . '. Re-import CCP types.jsonl and taxonomy.';
+        }
+        if ($unpricedTypes) {
+            $priceErrors[] = 'These item types exist in the SDE but have no stored positive Jita ' . $side . ' price: ' . implode(', ', array_unique($unpricedTypes)) . '. Refresh their Jita prices before appraising.';
+        }
+        if ($priceErrors) {
+            throw ValidationException::withMessages(['inventory' => $priceErrors]);
         }
 
         if (!$lines) {
