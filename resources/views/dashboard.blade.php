@@ -91,7 +91,7 @@
 <select id="marketbaiters-quote">
 <option value="">Select a Lentivirus appraisal</option>
 @foreach($quotes->concat($expiredQuotes)->sortByDesc('created_at') as $quote)
-<option value="{{ $quote->id }}" data-value="{{ (float)$quote->payout_value }}" data-url="{{ route('appraisals.show',$quote->public_token) }}">#{{ substr($quote->public_token,0,12) }} · {{ $quote->created_at }} · {{ number_format((float)$quote->payout_value,2) }} ISK{{ $quote->created_at < now()->subHours(6) ? ' · Expired' : '' }}</option>
+<option value="{{ $quote->id }}" data-value="{{ (float)$quote->payout_value }}" data-url="{{ route('appraisals.show',$quote->public_token) }}">#{{ substr($quote->public_token,0,12) }} · {{ $quote->created_at }} · {{ number_format((float)$quote->payout_value,2) }} ISK</option>
 @endforeach
 </select>
 <p><a id="marketbaiters-open-quote" href="#" target="_blank" rel="noopener" style="display:none;color:#c6a4ff">Open selected appraisal details to copy the item list ↗</a></p>
