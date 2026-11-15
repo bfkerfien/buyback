@@ -26,6 +26,36 @@ class AppraisalVisibilityController extends Controller
         return back()->with('status', 'Appraisal hidden from your dashboard. The appraisal data remains available to administrators.');
     }
 
+    public function markContracted(Request $request, int $quote): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $changed = DB::table('appraisal_quotes')
+            ->where('id', $quote)
+            ->whereNull('archived_at')
+            ->whereNull('contracted_at')
+            ->update([
+                'contracted_at' => now(),
+                'contracted_by' => $request->user()->id,
+                'updated_at' => now(),
+            ]);
+
+        abort_unless($changed === 1, 409, 'This appraisal is already flagged as contracted or is archived.');
+
+        DB::table('audit_logs')->insert([
+            'user_id' => $request->user()->id,
+            'action' => 'appraisal.marked_contracted',
+            'subject_type' => 'appraisal_quote',
+            'subject_id' => $quote,
+            'details' => json_encode(['contracted_at' => now()->toIso8601String()]),
+            'ip_address' => $request->ip(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Appraisal flagged as contracted.');
+    }
+
     public function archive(Request $request, int $quote): RedirectResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
