@@ -20,14 +20,22 @@ class DashboardController extends Controller
             }))
             ->orderByDesc('created_at')->limit(50)->get();
 
-        $quotes = DB::table('appraisal_quotes')
+        $visibleQuotes = DB::table('appraisal_quotes')
             ->when(!$admin, fn ($q) => $q->where('created_by', $user->id))
             ->whereNull('archived_at')
             ->when(!$admin, fn ($q) => $q->whereNotExists(function ($hidden) use ($user) {
                 $hidden->select(DB::raw(1))->from('appraisal_quote_hidden')
                     ->whereColumn('appraisal_quote_hidden.appraisal_quote_id', 'appraisal_quotes.id')
                     ->where('appraisal_quote_hidden.user_id', $user->id);
-            }))
+            }));
+
+        $expiryCutoff = now()->subHours(6);
+        $quotes = (clone $visibleQuotes)
+            ->where('created_at', '>=', $expiryCutoff)
+            ->orderByDesc('created_at')->limit(100)->get();
+
+        $expiredQuotes = (clone $visibleQuotes)
+            ->where('created_at', '<', $expiryCutoff)
             ->orderByDesc('created_at')->limit(100)->get();
 
         $archivedQuotes = $admin
@@ -51,6 +59,6 @@ class DashboardController extends Controller
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
         $oreValuationRules = $admin ? DB::table('appraisal_ore_valuation_rules')->orderBy('ore_name')->get() : collect();
 
-        return view('dashboard', compact('user', 'jobs', 'quotes', 'archivedQuotes', 'balance', 'admin', 'adminMetrics', 'payoutRules', 'eveCategories', 'oreTypes', 'mineralTypes', 'oreValuationRules'));
+        return view('dashboard', compact('user', 'jobs', 'quotes', 'expiredQuotes', 'archivedQuotes', 'balance', 'admin', 'adminMetrics', 'payoutRules', 'eveCategories', 'oreTypes', 'mineralTypes', 'oreValuationRules'));
     }
 }
