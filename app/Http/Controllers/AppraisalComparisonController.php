@@ -60,7 +60,7 @@ class AppraisalComparisonController extends Controller
 
             if ($source === 'EveBuyback') {
                 $allowedHost = strtolower((string) (parse_url(config('app.url'), PHP_URL_HOST) ?: $request->getHost()));
-                abort_unless($host === $allowedHost, 422, 'The EveBuyback link must point to this EveBuyback site.');
+                abort_unless($host === $allowedHost && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'The EveBuyback link must point to this EveBuyback site.');
                 if (!preg_match('~/q/([A-Za-z0-9]+)~', $path, $match)) {
                     throw ValidationException::withMessages(['buyback_input' => 'Use an EveBuyback appraisal link in the form /q/{quote-token}.']);
                 }
@@ -71,11 +71,12 @@ class AppraisalComparisonController extends Controller
                     ->map(fn ($row) => ['name' => $row->type_name, 'quantity' => (int) $row->quantity])->all();
             }
 
-            abort_unless(in_array($host, ['marketbaiters.com', 'www.marketbaiters.com'], true), 422, 'Marketbaiters links must use https://marketbaiters.com/.');
+            abort_unless(in_array($host, ['marketbaiters.com', 'www.marketbaiters.com'], true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'Marketbaiters links must use https://marketbaiters.com/.');
             abort_unless(($parts['scheme'] ?? '') === 'https', 422, 'Marketbaiters appraisal links must use HTTPS.');
 
             try {
-                $response = Http::withHeaders(['User-Agent' => 'EveBuyback Appraisal Comparator'])
+                $response = Http::withOptions(['allow_redirects' => false])
+                    ->withHeaders(['User-Agent' => 'EveBuyback Appraisal Comparator'])
                     ->accept('text/html')
                     ->timeout(15)
                     ->get($input);
@@ -118,9 +119,19 @@ class AppraisalComparisonController extends Controller
         }
 
         if ($items) return $this->mergeItems($items);
-        $plain = html_entity_decode(strip_tags(preg_replace('/<(script|style)\\b[^>]*>.*?<\\/\\1>/is', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $plain = preg_replace('/[ \\t]+/', ' ', $plain);
-        return $parser->parse($plain);
+        // Only parse explicit name/quantity lines from page text. Passing an entire
+        // generic app page to InventoryParser would treat navigation labels as qty=1.
+        $plain = html_entity_decode(strip_tags(preg_replace('/<(script|style)\\b[^>]*>.*?<\\/\\1>/is', " ", $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $lines = preg_split('/\\r\\n|\\n|\\r/', $plain) ?: [];
+        $structured = [];
+        foreach ($lines as $line) {
+            $line = trim(preg_replace('/[ \\t]+/', ' ', $line));
+            if ($line === '') continue;
+            if (str_contains($line, "\\t") || str_contains($line, ',' ) || preg_match('/^(?:[0-9][0-9,]*\\s*(?:[x×]\\s*)?.+|.+\\s+[x×]?\\s*[0-9][0-9,]*)$/i', $line)) {
+                $structured[] = $line;
+            }
+        }
+        return $structured ? $parser->parse(implode("\\n", $structured)) : [];
     }
 
     private function mergeItems(array $items): array
