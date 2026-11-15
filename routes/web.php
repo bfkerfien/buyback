@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AppraisalController;
+use App\Http\Controllers\AppraisalComparisonController;
 use App\Http\Controllers\AppraisalVisibilityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EveSsoController;
@@ -24,6 +25,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/link-character/eve', [EveSsoController::class, 'linkCharacter'])->name('login.eve.link');
     Route::delete('/appraisals/{quote}/hide', [AppraisalVisibilityController::class, 'hide'])->whereNumber('quote')->name('appraisals.hide');
+    Route::post('/admin/appraisal-comparison', [AppraisalComparisonController::class, 'compare'])->middleware('admin')->name('admin.appraisal-comparison');
     Route::post('/admin/appraisals/{quote}/contract', [AppraisalVisibilityController::class, 'markContracted'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.contract');
     Route::post('/admin/appraisals/{quote}/archive', [AppraisalVisibilityController::class, 'archive'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.archive');
     Route::post('/admin/appraisals/{quote}/restore', [AppraisalVisibilityController::class, 'restore'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.restore');
