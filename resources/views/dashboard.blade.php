@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EveBuyback · Operations</title>
 <style>
  :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#071018;color:#eaf7f8}*{box-sizing:border-box}body{margin:0;padding:24px;background:radial-gradient(2px 2px at 8% 16%,#fff 45%,transparent 60%),radial-gradient(1px 1px at 18% 72%,#67d9e8 45%,transparent 60%),radial-gradient(1px 1px at 29% 38%,#fff 45%,transparent 60%),radial-gradient(2px 2px at 43% 82%,#67d9e8 45%,transparent 60%),radial-gradient(1px 1px at 57% 14%,#fff 45%,transparent 60%),radial-gradient(1px 1px at 69% 55%,#fff 45%,transparent 60%),radial-gradient(2px 2px at 83% 27%,#67d9e8 45%,transparent 60%),radial-gradient(1px 1px at 94% 78%,#fff 45%,transparent 60%),radial-gradient(ellipse at 50% -10%,#0d5967 0,transparent 52%),radial-gradient(ellipse at 88% 82%,#3d2512 0,transparent 42%),radial-gradient(ellipse at 8% 90%,#0d2b38 0,transparent 40%),#060d13;min-height:100vh}main{max-width:1200px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:16px}.account-chip{display:flex;align-items:center;gap:9px;padding:5px 11px 5px 6px;border:1px solid #386675;border-radius:999px;background:#09151c;color:#eaf7f8;font-size:13px;font-weight:600;white-space:nowrap}.account-chip img{width:34px;height:34px;display:block;object-fit:cover;border-radius:50%;border:1px solid #68dbea}.muted{color:#9bb5bf;font-size:13px}.panel{background:#101e27;border:1px solid #294a56;border-radius:14px;padding:20px;margin:18px 0}h1{font-size:30px}h2{font-size:19px;margin-top:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{background:#09151c;padding:14px;border-radius:10px}.stat strong{display:block;font-size:22px;margin-top:8px}input,select,textarea{width:100%;background:#09151c;color:#eaf7f8;border:1px solid #315665;border-radius:8px;padding:10px;margin:6px 0 12px}textarea{min-height:70px}button{display:inline-block;background:#ff9b45;color:#111820;border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px;border-bottom:1px solid #294a56;font-size:13px}.success{color:#ffb45f}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}form.inline{display:inline}form.inline select{width:auto;max-width:170px;padding:8px}@media(max-width:700px){.grid,.row{grid-template-columns:1fr}body{padding:12px}.top{align-items:flex-start}}
-.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 16px;border-bottom:1px solid #294a56;padding-bottom:10px}.tab{background:#09151c;color:#d9cbea;border:1px solid #315665}.tab.active{background:#ff9b45;color:#111820;border-color:#ff9b45}.tab-panel{display:none}.tab-panel.active{display:block}.tab-panel[hidden]{display:none}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 16px;border-bottom:1px solid #294a56;padding-bottom:10px}.tab{background:#09151c;color:#c5dbe0;border:1px solid #315665}.tab.active{background:#ff9b45;color:#111820;border-color:#ff9b45}.tab-panel{display:none}.tab-panel.active{display:block}.tab-panel[hidden]{display:none}
 
 /* EveBuyback visual system: orbital graphite, ion-cyan and molten amber */
 :root{color-scheme:dark;--eb-bg:#071018;--eb-panel:#101e27;--eb-line:#294a56;--eb-cyan:#62d9e9;--eb-amber:#ff9b45;--eb-text:#eaf7f8;--eb-muted:#9bb5bf}
@@ -22,9 +22,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid rgba(98,217,233,.35);b
 th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 .account-chip{border-color:#386675!important;box-shadow:0 0 22px rgba(55,194,212,.08)}
 @media(max-width:650px){body:before{background-size:34px 34px}}
-</style></head><body><main>
+ .eb-logo{display:block;height:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 0 18px rgba(18,216,242,.18))} .top .eb-logo{flex:0 1 auto} @media(max-width:650px){.eb-logo{max-width:72vw}}
+</style><link rel="icon" type="image/svg+xml" href="{{ asset('evebuyback-logo.svg') }}">
+</head><body><main>
 @php($activeCharacter = $user->characters->sortByDesc('last_authenticated_at')->first())
-<header class="top"><div><div class="muted">EVEBUYBACK</div><h1>Operations dashboard</h1><div class="muted">Signed in as {{ $user->name }} · {{ ucfirst($user->role) }} · {{ $user->characters->pluck('name')->join(', ') }} · <a href="{{ route('login.eve.link') }}" style="color:#62d9e9">Link another character</a></div></div><nav style="display:flex;align-items:center;gap:10px"><div class="account-chip">@if($activeCharacter)<img src="https://images.evetech.net/characters/{{ $activeCharacter->eve_character_id }}/portrait?size=64" alt="{{ $activeCharacter->name }} portrait">@endif<span>{{ $activeCharacter?->name ?? $user->name }}</span></div><form method="post" action="{{ route('logout') }}">@csrf<button>Sign out</button></form></nav></header>
+<header class="top"><div><img class="eb-logo" style="width:330px" src="{{ asset('evebuyback-logo.svg') }}" alt="EveBuyback"><h1>Operations dashboard</h1><div class="muted">Signed in as {{ $user->name }} · {{ ucfirst($user->role) }} · {{ $user->characters->pluck('name')->join(', ') }} · <a href="{{ route('login.eve.link') }}" style="color:#62d9e9">Link another character</a></div></div><nav style="display:flex;align-items:center;gap:10px"><div class="account-chip">@if($activeCharacter)<img src="https://images.evetech.net/characters/{{ $activeCharacter->eve_character_id }}/portrait?size=64" alt="{{ $activeCharacter->name }} portrait">@endif<span>{{ $activeCharacter?->name ?? $user->name }}</span></div><form method="post" action="{{ route('logout') }}">@csrf<button>Sign out</button></form></nav></header>
 @if(session('status'))<p class="success">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="panel">{{ $errors->first() }}</div>@endif
 <nav class="tabs" role="tablist" aria-label="Buyback sections">
@@ -42,7 +44,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <section class="tab-panel active" id="tab-appraisals" role="tabpanel">
 <section class="panel">
 <h2>Buyback instructions</h2>
-<ol style="color:#d9cbea;line-height:1.9;padding-left:24px;margin:0">
+<ol style="color:#c5dbe0;line-height:1.9;padding-left:24px;margin:0">
 <li><strong>Currently accepting:</strong> Ore, Ice, PI Goods, and Exploration Loot only.</li>
 <li><strong>Appraisals only — do not create a contract.</strong> Buyback price settings are fluctuating. Submit your appraisal form and wait for us to review it and confirm whether the quoted values are approved before taking any further action. This is a temporary process.</li>
 </ol>
@@ -106,7 +108,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <section class="tab-panel" id="tab-marketbaiters" role="tabpanel" hidden>
 <section class="panel">
 <h2>Compressed ore comparison manifest</h2>
-<p style="color:#d9cbea;line-height:1.7">Copy 10,000 units of every compressed ore type from the imported EVE SDE list. Paste the same manifest into EveBuyback and Marketbaiters, selecting BKG-Q2 on Marketbaiters.</p>
+<p style="color:#c5dbe0;line-height:1.7">Copy 10,000 units of every compressed ore type from the imported EVE SDE list. Paste the same manifest into EveBuyback and Marketbaiters, selecting BKG-Q2 on Marketbaiters.</p>
 <button type="button" id="copy-compressed-ore">Copy 10,000 of every compressed ore</button>
 <span id="compressed-ore-copy-status" class="muted" aria-live="polite" style="margin-left:10px"></span>
 <textarea id="compressed-ore-manifest" readonly style="margin-top:12px;min-height:160px">@foreach($compressedOreTypes as $compressedOre){{ $compressedOre->type_name }}&#9;10000
@@ -115,7 +117,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </section>
 <section class="panel">
 <h2>Marketbaiters appraisal comparison</h2>
-<p style="color:#d9cbea;line-height:1.8">Compare one of your EveBuyback quotes with a Marketbaiters appraisal. Marketbaiters currently requires you to enter the cargo manifest and choose a pickup location on its own website. Until a supported integration is confirmed, enter the external total here after obtaining it there.</p>
+<p style="color:#c5dbe0;line-height:1.8">Compare one of your EveBuyback quotes with a Marketbaiters appraisal. Marketbaiters currently requires you to enter the cargo manifest and choose a pickup location on its own website. Until a supported integration is confirmed, enter the external total here after obtaining it there.</p>
 <p><a href="https://marketbaiters.com/" target="_blank" rel="noopener" style="color:#62d9e9;font-weight:700">Open Marketbaiters in a new tab ↗</a></p>
 <label for="marketbaiters-quote">Your EveBuyback appraisal</label>
 <select id="marketbaiters-quote">
@@ -136,24 +138,24 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <section class="tab-panel" id="tab-how-to" role="tabpanel" hidden>
 <section class="panel">
 <h2>How to sell items through EveBuyback</h2>
-<p style="color:#d9cbea;line-height:1.8">Use the appraisal process first. An appraisal is a price estimate for review; it is not an accepted sale, a contract, or confirmation that payment has been made.</p>
+<p style="color:#c5dbe0;line-height:1.8">Use the appraisal process first. An appraisal is a price estimate for review; it is not an accepted sale, a contract, or confirmation that payment has been made.</p>
 <h2>1. Check what we accept</h2>
-<p style="color:#d9cbea;line-height:1.8">We are currently accepting <strong>Ore, Ice, PI Goods, and Exploration Loot</strong> only. Items outside these categories may not be accepted.</p>
+<p style="color:#c5dbe0;line-height:1.8">We are currently accepting <strong>Ore, Ice, PI Goods, and Exploration Loot</strong> only. Items outside these categories may not be accepted.</p>
 <h2>2. Prepare your item list in EVE</h2>
-<p style="color:#d9cbea;line-height:1.8">Open the inventory containing the items you want appraised and copy or export the item names and quantities. Keep the item names and quantities together so the appraisal can identify each item correctly.</p>
+<p style="color:#c5dbe0;line-height:1.8">Open the inventory containing the items you want appraised and copy or export the item names and quantities. Keep the item names and quantities together so the appraisal can identify each item correctly.</p>
 <h2>3. Submit a new appraisal</h2>
-<ol style="color:#d9cbea;line-height:1.9;padding-left:24px">
+<ol style="color:#c5dbe0;line-height:1.9;padding-left:24px">
 <li>Open the <strong>New Appraisals</strong> tab.</li>
 <li>Enter the system where the items are located, if applicable.</li>
 <li>Paste the inventory list into the item list field. EVE tab-separated exports, CSV, and lines in the format “quantity x item name” are supported.</li>
 <li>Select <strong>Calculate appraisal</strong> to generate the quote.</li>
 </ol>
 <h2>4. Review the quote and wait for approval</h2>
-<p style="color:#d9cbea;line-height:1.8">Open the appraisal result and check the listed items and estimated payout. The quote is an estimate only. Buyback price settings are currently fluctuating, so the team must review it and confirm whether the quoted values are approved.</p>
+<p style="color:#c5dbe0;line-height:1.8">Open the appraisal result and check the listed items and estimated payout. The quote is an estimate only. Buyback price settings are currently fluctuating, so the team must review it and confirm whether the quoted values are approved.</p>
 <h2>5. Do not create a contract yet</h2>
-<p style="color:#d9cbea;line-height:1.8"><strong>Appraisals only — do not create an in-game contract.</strong> Wait for the team to confirm approval and provide the next instructions before taking further action with the items. This is a temporary process.</p>
+<p style="color:#c5dbe0;line-height:1.8"><strong>Appraisals only — do not create an in-game contract.</strong> Wait for the team to confirm approval and provide the next instructions before taking further action with the items. This is a temporary process.</p>
 <h2>6. Keep track of your appraisal</h2>
-<p style="color:#d9cbea;line-height:1.8">Use <strong>Appraisals &amp; Contracts</strong> to find your recent appraisals. Appraisals older than 6 hours are moved to <strong>Expired Appraisals</strong>. An expired quote is no longer current; submit a new appraisal if you still want the items reviewed.</p>
+<p style="color:#c5dbe0;line-height:1.8">Use <strong>Appraisals &amp; Contracts</strong> to find your recent appraisals. Appraisals older than 6 hours are moved to <strong>Expired Appraisals</strong>. An expired quote is no longer current; submit a new appraisal if you still want the items reviewed.</p>
 </section>
 </section>
 <script>
