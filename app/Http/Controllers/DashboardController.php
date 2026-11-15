@@ -49,6 +49,11 @@ class DashboardController extends Controller
         ] : [];
         $payoutRules = $admin ? DB::table('appraisal_payout_rules')->orderBy('category_name')->get() : collect();
         $eveCategories = $admin ? DB::table('eve_item_groups')->select('category_id', 'category_name')->distinct()->orderBy('category_name')->get() : collect();
+        $compressedOreTypes = $admin ? DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)->where('g.category_name', 'Asteroid')
+            ->where('t.type_name', 'like', 'Compressed %')
+            ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
         $oreTypes = $admin ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
@@ -59,6 +64,6 @@ class DashboardController extends Controller
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
         $oreValuationRules = $admin ? DB::table('appraisal_ore_valuation_rules')->orderBy('ore_name')->get() : collect();
 
-        return view('dashboard', compact('user', 'jobs', 'quotes', 'expiredQuotes', 'archivedQuotes', 'balance', 'admin', 'adminMetrics', 'payoutRules', 'eveCategories', 'oreTypes', 'mineralTypes', 'oreValuationRules'));
+        return view('dashboard', compact('user', 'jobs', 'quotes', 'expiredQuotes', 'archivedQuotes', 'balance', 'admin', 'adminMetrics', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'oreValuationRules'));
     }
 }
