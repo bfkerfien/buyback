@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 300" role="img" aria-labelledby="title desc">
+<title id="title">EveBuyback</title><desc id="desc">Armored industrial ore hauler with asteroid cargo and cyan and amber orbital lighting.</desc>
+<defs>
+ <linearGradient id="hull" x2="1" y2="1"><stop stop-color="#9aaab0"/><stop offset=".35" stop-color="#394b55"/><stop offset="1" stop-color="#111c24"/></linearGradient>
+ <linearGradient id="silver" x2="0" y2="1"><stop stop-color="#fff"/><stop offset=".5" stop-color="#aabac2"/><stop offset="1" stop-color="#50616a"/></linearGradient>
+ <linearGradient id="amber" x2="0" y2="1"><stop stop-color="#ffe0a0"/><stop offset=".4" stop-color="#ffad45"/><stop offset="1" stop-color="#c95719"/></linearGradient>
+ <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g fill="none" stroke-linecap="round">
+ <path d="M148 26a125 125 0 1 0 0 250" stroke="#52636b" stroke-width="12"/>
+ <path d="M65 72a125 125 0 0 1 145-31" stroke="#ff9d36" stroke-width="8" filter="url(#glow)"/>
+ <path d="M226 82a125 125 0 0 1 15 117" stroke="#16d8f4" stroke-width="8" filter="url(#glow)"/>
+ <path d="M50 224a125 125 0 0 1-15-93" stroke="#16d8f4" stroke-width="6"/>
+ <path d="M85 267a125 125 0 0 0 104-4" stroke="#ff9d36" stroke-width="6"/>
+</g>
+<!-- ore cargo -->
+<g stroke="#17232b" stroke-width="5" stroke-linejoin="round">
+ <path d="M65 116 87 75 113 92 131 53 159 89 185 66 205 113 185 145 91 145Z" fill="#69777a"/>
+ <path d="m87 75 24 17 20-39 7 53-30 22Z" fill="#a5b2ae"/>
+ <path d="m131 53 28 36-20 17Z" fill="#667f8b"/>
+ <path d="m159 89 26-23 20 47-38 16Z" fill="#a85c37"/>
+ <path d="m185 66 20 47-38 16 18-39Z" fill="#d58a45"/>
+ <path d="m65 116 26 29-22 13-24-23Z" fill="#4e6978"/>
+</g>
+<!-- industrial hauler -->
+<g stroke="#0b131a" stroke-width="6" stroke-linejoin="round">
+ <path d="M34 151 69 133 195 133 235 155 224 216 180 239 57 225 25 194Z" fill="url(#hull)"/>
+ <path d="m34 151 40-18 22 25-17 60-54-24Z" fill="#253943"/>
+ <path d="m74 133 121 0 40 22-31 22-108-5Z" fill="#566b73"/>
+ <path d="m98 172 110 5-8 41-119 7Z" fill="#1c2b34"/>
+ <path d="m47 169 27-8 4 42-28-7Z" fill="#101b22"/>
+ <path d="m92 148 20-10 0 26-20 0Z" fill="#263a44"/>
+ <path d="m126 145 48 0 22 18-67 0Z" fill="#111c24"/>
+ <path d="m103 188 92 0-8 12-82 0Z" fill="#53656c"/>
+ <path d="m61 213 131 9-15 15-115-13Z" fill="#354852"/>
+ <path d="m43 181 11 0 0 20-11-3Z" fill="#ff9b36" filter="url(#glow)"/>
+ <path d="m210 168 12 0-4 25-12 0Z" fill="#12d8f2" filter="url(#glow)"/>
+ <path d="m118 137 4-28 6 0 3 28M146 135l5-38 5 0 3 38" fill="none" stroke="#899ba2" stroke-width="4"/>
+ <path d="m119 106 21 0M148 94l23 0" stroke="#ff9b36" stroke-width="4"/>
+ <path d="m83 201 13 2m8 1 13 2m10 1 13 2" stroke="#ffb34f" stroke-width="4"/>
+</g>
+<path d="M262 150h40" stroke="#ff9b36" stroke-width="6" filter="url(#glow)"/>
+<path d="M276 166h26" stroke="#12d8f2" stroke-width="4" filter="url(#glow)"/>
+<g transform="translate(320 0)">
+ <path d="M0 65h750v170H0l-24-24V89Z" fill="#0b151d" stroke="#526873" stroke-width="5"/>
+ <path d="M15 77h724M15 222h724" stroke="#12d8f2" stroke-width="4" opacity=".85" filter="url(#glow)"/>
+ <path d="M30 88h120M620 212h100" stroke="#ff9b36" stroke-width="7"/>
+ <text x="32" y="184" font-family="Arial,Helvetica,sans-serif" font-size="105" font-weight="800" letter-spacing="-5" fill="url(#silver)" stroke="#26353d" stroke-width="2">Eve</text>
+ <text x="235" y="184" font-family="Arial,Helvetica,sans-serif" font-size="105" font-weight="900" letter-spacing="-5" fill="url(#amber)" stroke="#6d3519" stroke-width="2">Buyback</text>
+ <path d="M20 244h30l12 12h55l12-12h52" stroke="#ff9b36" stroke-width="8" fill="none"/>
+ <path d="M600 244h45l12 12h55l12-12h22" stroke="#ff9b36" stroke-width="8" fill="none"/>
+</g></svg>
