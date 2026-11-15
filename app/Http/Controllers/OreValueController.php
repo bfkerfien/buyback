@@ -1,14 +1,16 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\\Http\\Controllers;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\View\View;
+use Illuminate\\Support\\Facades\\DB;
+use Illuminate\\View\\View;
 
 class OreValueController extends Controller
 {
     public function index(): View
     {
+        // Maximum-skill null-sec Tatara with T2 reprocessing rig and RX-804 implant.
+        $quantity = 10000;
         $yieldPercent = 90.628;
         $taxPercent = 0.01;
         $regionId = (string) config('buyback.region_id', '10000002');
@@ -18,6 +20,7 @@ class OreValueController extends Controller
             ->where('region_id', $regionId)
             ->groupBy('type_id');
 
+        // Include every published asteroid ore type, compressed and uncompressed.
         $records = DB::table('eve_item_types as ore')
             ->join('eve_item_groups as groups', 'groups.group_id', '=', 'ore.group_id')
             ->leftJoin('eve_type_materials as materials', 'materials.type_id', '=', 'ore.type_id')
@@ -28,10 +31,6 @@ class OreValueController extends Controller
             ->leftJoin('market_price_snapshots as mineral_price', 'mineral_price.id', '=', 'mineral_latest.latest_id')
             ->where('groups.category_name', 'Asteroid')
             ->where('ore.published', true)
-            ->where(function ($query) {
-                $query->where('ore.type_name', 'like', 'Compressed %')
-                    ->orWhere('ore.type_name', 'like', 'Batch Compressed %');
-            })
             ->orderBy('ore.type_name')
             ->get([
                 'ore.type_id as ore_type_id', 'ore.type_name as ore_name', 'ore.portion_size',
@@ -46,12 +45,20 @@ class OreValueController extends Controller
             $id = (int) $record->ore_type_id;
             if (!isset($ores[$id])) {
                 $portionSize = max(1, (int) $record->portion_size);
+                $batches = intdiv($quantity, $portionSize);
+                $processedQuantity = $batches * $portionSize;
+                $unitBuyPrice = $record->ore_buy_price !== null ? (float) $record->ore_buy_price : null;
+
                 $ores[$id] = [
                     'type_id' => $id,
                     'name' => $record->ore_name,
+                    'quantity' => $quantity,
                     'portion_size' => $portionSize,
-                    'ore_buy_price' => $record->ore_buy_price !== null ? (float) $record->ore_buy_price : null,
-                    'ore_market_value' => $record->ore_buy_price !== null ? (float) $record->ore_buy_price * $portionSize : null,
+                    'batches' => $batches,
+                    'processed_quantity' => $processedQuantity,
+                    'leftover_quantity' => $quantity - $processedQuantity,
+                    'ore_buy_price' => $unitBuyPrice,
+                    'ore_market_value' => $unitBuyPrice !== null ? round($unitBuyPrice * $quantity, 2) : null,
                     'ore_price_at' => $record->ore_price_at,
                     'materials' => [],
                     'refined_gross' => 0.0,
@@ -66,13 +73,14 @@ class OreValueController extends Controller
             }
 
             $ores[$id]['has_recipe'] = true;
-            $yieldedQuantity = (int) floor((int) $record->material_quantity * $yieldPercent / 100);
+            $baseQuantity = (int) $record->material_quantity * $ores[$id]['batches'];
+            $yieldedQuantity = (int) floor($baseQuantity * $yieldPercent / 100);
             $mineralPrice = $record->mineral_buy_price !== null ? (float) $record->mineral_buy_price : null;
-            $lineValue = $mineralPrice !== null ? $yieldedQuantity * $mineralPrice : null;
+            $lineValue = $mineralPrice !== null ? round($yieldedQuantity * $mineralPrice, 2) : null;
 
             $ores[$id]['materials'][] = [
                 'name' => $record->mineral_name ?? ('Type ' . $record->material_type_id),
-                'base_quantity' => (int) $record->material_quantity,
+                'base_quantity' => $baseQuantity,
                 'yielded_quantity' => $yieldedQuantity,
                 'buy_price' => $mineralPrice,
                 'value' => $lineValue,
@@ -86,39 +94,27 @@ class OreValueController extends Controller
         }
 
         foreach ($ores as &$ore) {
-            if (!$ore['has_recipe']) {
+            if (!$ore['has_recipe'] || $ore['batches'] < 1) {
                 $ore['has_complete_mineral_prices'] = false;
             }
             $ore['refined_gross'] = round($ore['refined_gross'], 2);
             $ore['refined_tax'] = round($ore['refined_gross'] * $taxPercent / 100, 2);
             $ore['refined_net'] = round($ore['refined_gross'] - $ore['refined_tax'], 2);
             $ore['ore_buy_price'] = $ore['ore_buy_price'] !== null ? round($ore['ore_buy_price'], 2) : null;
-            $ore['ore_market_value'] = $ore['ore_market_value'] !== null ? round($ore['ore_market_value'], 2) : null;
             $ore['difference'] = ($ore['ore_market_value'] !== null && $ore['has_complete_mineral_prices'])
                 ? round($ore['refined_net'] - $ore['ore_market_value'], 2)
                 : null;
-            $ore['winner'] = $ore['difference'] === null ? 'insufficient data'
-                : ($ore['difference'] > 0 ? 'reprocess' : ($ore['difference'] < 0 ? 'sell compressed' : 'tie'));
-            $ore['advantage_percent'] = ($ore['ore_market_value'] !== null && $ore['ore_market_value'] > 0 && $ore['difference'] !== null)
-                ? round(abs($ore['difference']) / max($ore['ore_market_value'], $ore['refined_net']) * 100, 2)
-                : null;
+            $ore['winner'] = $ore['difference'] === null ? 'incomplete data'
+                : ($ore['difference'] > 0 ? 'refine' : ($ore['difference'] < 0 ? 'sell ore' : 'tie'));
         }
         unset($ore);
 
         $rows = collect(array_values($ores))->sortBy('name')->values();
-        $chartRows = $rows->sortByDesc(fn ($row) => max($row['ore_market_value'] ?? 0, $row['refined_net'] ?? 0))->values();
-        $chartMaxValue = (float) $rows->flatMap(fn ($row) => [
-            $row['ore_market_value'] ?? 0,
-            $row['refined_net'] ?? 0,
-        ])->max();
-        $pricedCount = $rows->filter(fn ($row) => $row['difference'] !== null)->count();
-        $sellCompressedCount = $rows->where('winner', 'sell compressed')->count();
-        $reprocessCount = $rows->where('winner', 'reprocess')->count();
+        $pricedCount = $rows->filter(fn ($row) => $row['ore_market_value'] !== null && $row['has_complete_mineral_prices'])->count();
         $latestObservedAt = $rows->pluck('ore_price_at')->filter()->max();
 
         return view('ore-values.index', compact(
-            'rows', 'chartRows', 'chartMaxValue', 'yieldPercent', 'taxPercent', 'pricedCount',
-            'sellCompressedCount', 'reprocessCount', 'latestObservedAt'
+            'rows', 'quantity', 'yieldPercent', 'taxPercent', 'pricedCount', 'latestObservedAt'
         ));
     }
 }
