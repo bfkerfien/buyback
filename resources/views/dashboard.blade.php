@@ -16,6 +16,7 @@
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin-tools" data-tab="tab-admin-tools">Admin</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-ore-refining" data-tab="tab-ore-refining">Ore Refining</button>
 @endif
+<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-how-to" data-tab="tab-how-to">How To</button>
 </nav>
 <section class="tab-panel active" id="tab-appraisals" role="tabpanel">
 <section class="panel">
@@ -80,6 +81,29 @@
 <iframe title="Ore Refining Comparison" src="{{ route('ore-values.index') }}" loading="lazy" style="display:block;width:100%;height:1900px;border:0;border-radius:12px;background:#070510"></iframe>
 </section>
 @endif
+<section class="tab-panel" id="tab-how-to" role="tabpanel" hidden>
+<section class="panel">
+<h2>How to sell items through Lentivirus Buyback</h2>
+<p style="color:#d9cbea;line-height:1.8">Use the appraisal process first. An appraisal is a price estimate for review; it is not an accepted sale, a contract, or confirmation that payment has been made.</p>
+<h2>1. Check what we accept</h2>
+<p style="color:#d9cbea;line-height:1.8">We are currently accepting <strong>Ore, Ice, PI Goods, and Exploration Loot</strong> only. Items outside these categories may not be accepted.</p>
+<h2>2. Prepare your item list in EVE</h2>
+<p style="color:#d9cbea;line-height:1.8">Open the inventory containing the items you want appraised and copy or export the item names and quantities. Keep the item names and quantities together so the appraisal can identify each item correctly.</p>
+<h2>3. Submit a new appraisal</h2>
+<ol style="color:#d9cbea;line-height:1.9;padding-left:24px">
+<li>Open the <strong>New Appraisals</strong> tab.</li>
+<li>Enter the system where the items are located, if applicable.</li>
+<li>Paste the inventory list into the item list field. EVE tab-separated exports, CSV, and lines in the format “quantity x item name” are supported.</li>
+<li>Select <strong>Calculate appraisal</strong> to generate the quote.</li>
+</ol>
+<h2>4. Review the quote and wait for approval</h2>
+<p style="color:#d9cbea;line-height:1.8">Open the appraisal result and check the listed items and estimated payout. The quote is an estimate only. Buyback price settings are currently fluctuating, so the team must review it and confirm whether the quoted values are approved.</p>
+<h2>5. Do not create a contract yet</h2>
+<p style="color:#d9cbea;line-height:1.8"><strong>Appraisals only — do not create an in-game contract.</strong> Wait for the team to confirm approval and provide the next instructions before taking further action with the items. This is a temporary process.</p>
+<h2>6. Keep track of your appraisal</h2>
+<p style="color:#d9cbea;line-height:1.8">Use <strong>Appraisals &amp; Contracts</strong> to find your recent appraisals. Appraisals older than 6 hours are moved to <strong>Expired Appraisals</strong>. An expired quote is no longer current; submit a new appraisal if you still want the items reviewed.</p>
+</section>
+</section>
 <script>
 (()=>{const tabs=[...document.querySelectorAll('[data-tab]')];const panels=[...document.querySelectorAll('.tab-panel')];tabs.forEach(tab=>tab.addEventListener('click',()=>{const target=tab.dataset.tab;tabs.forEach(item=>{const active=item===tab;item.classList.toggle('active',active);item.setAttribute('aria-selected',active?'true':'false');});panels.forEach(panel=>{const active=panel.id===target;panel.classList.toggle('active',active);panel.hidden=!active;});}));})();
 </script>
