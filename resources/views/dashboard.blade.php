@@ -64,18 +64,60 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </section>
 </section>
 <section class="tab-panel" id="tab-contracts" role="tabpanel" hidden>
-<div class="grid"><div class="stat">Your internal ledger balance<strong>{{ number_format($balance,2) }} ISK</strong></div><div class="stat">Visible runner jobs<strong>{{ $jobs->count() }}</strong></div></div>
-<section class="panel"><h2>Runner board</h2><p class="muted">Accept the job here using the pilot that will haul it. Then accept the matching courier contract in EVE. After EVE shows the contract as completed, return here and mark delivery for ESI verification.</p><table><thead><tr><th>Route</th><th>Status</th><th>Reward</th><th>Action</th></tr></thead><tbody>
-@forelse($jobs as $job)<tr><td>{{ $job->origin }} → {{ $job->destination }}<div class="muted">EVE courier contract #{{ $job->contract_id }} · {{ $job->notes }}</div></td><td>{{ ucfirst($job->status) }}</td><td>{{ number_format((float)$job->reward_isk,2) }} ISK</td><td>
-@if($job->status==='open')<form class="inline" method="post" action="{{ route('runner.jobs.accept',$job->id) }}">@csrf<select name="character_id" required>@foreach($user->characters as $character)<option value="{{ $character->id }}">{{ $character->name }}</option>@endforeach</select><button>Accept</button></form>
-@elseif($job->status==='accepted' && $job->assigned_user_id===$user->id)<form class="inline" method="post" action="{{ route('runner.jobs.deliver',$job->id) }}">@csrf<button>Mark delivered</button></form>@endif
-</td></tr>@empty<tr><td colspan="4">No runner jobs available.</td></tr>@endforelse
-</tbody></table></section>
-@if(!$admin)
-<section class="panel"><h2>{{ $admin ? 'All appraisals' : 'Your recent appraisals' }}</h2><p class="muted">{{ $admin ? 'All player appraisals are visible here, including appraisals hidden by their owners.' : 'Hide an appraisal to remove it from your dashboard. This never deletes its underlying data.' }}</p><table><thead><tr><th>Quote</th><th>Owner</th><th>Origin</th><th>Payout</th><th>Created</th><th>Action</th></tr></thead><tbody>@forelse($quotes as $quote)<tr><td><a href="{{ route('appraisals.show',$quote->public_token) }}">{{ substr($quote->public_token,0,14) }}</a></td><td>{{ $admin ? ($quote->created_by ?? '—') : $user->name }}</td><td>{{ $quote->origin_system ?: '—' }}</td><td>{{ number_format((float)$quote->payout_value,2) }} ISK</td><td>{{ $quote->created_at }}</td><td>@if($admin)<form class="inline" method="post" action="{{ route('admin.appraisals.archive',$quote->id) }}">@csrf<button style="background:#263b46;color:#eaf7f8" onclick="return confirm('Move this appraisal to the archive?')">Archive</button></form>@else<form class="inline" method="post" action="{{ route('appraisals.hide',$quote->id) }}">@csrf @method('DELETE')<button style="background:#263b46;color:#eaf7f8" onclick="return confirm('Hide this appraisal from your dashboard?')">Hide</button></form>@endif</td></tr>@empty<tr><td colspan="6">No appraisals to display.</td></tr>@endforelse</tbody></table></section>
-<section class="panel"><h2>Expired appraisals</h2><p class="muted">Appraisals older than 6 hours are listed here and are no longer in the current appraisal list. Their quote details remain available.</p><table><thead><tr><th>Quote</th><th>Owner</th><th>Origin</th><th>Payout</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>@forelse($expiredQuotes as $quote)<tr><td><a href="{{ route('appraisals.show',$quote->public_token) }}">{{ substr($quote->public_token,0,14) }}</a></td><td>{{ $admin ? ($quote->created_by ?? '—') : $user->name }}</td><td>{{ $quote->origin_system ?: '—' }}</td><td>{{ number_format((float)$quote->payout_value,2) }} ISK</td><td>{{ $quote->created_at }}</td><td><strong style="color:#ffb45f">Expired</strong></td><td>@if($admin)<form class="inline" method="post" action="{{ route('admin.appraisals.archive',$quote->id) }}">@csrf<button style="background:#263b46;color:#eaf7f8" onclick="return confirm('Move this appraisal to the archive?')">Archive</button></form>@else<form class="inline" method="post" action="{{ route('appraisals.hide',$quote->id) }}">@csrf @method('DELETE')<button style="background:#263b46;color:#eaf7f8" onclick="return confirm('Hide this appraisal from your dashboard?')">Hide</button></form>@endif</td></tr>@empty<tr><td colspan="7">No expired appraisals.</td></tr>@endforelse</tbody></table></section>
-@endif
+<section class="panel">
+<h2>Latest 10 account appraisals</h2>
+<p class="muted">Recent appraisals submitted by any EVE character linked to this Buyback account. Deleting an appraisal permanently removes its quote and item details.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>Appraisal</th><th>Character</th><th>Origin</th><th>Appraisal type</th><th>Payout</th><th>Created</th><th>Action</th></tr></thead><tbody>
+@forelse($accountAppraisals as $appraisal)
+<tr>
+<td><a href="{{ route('appraisals.show',$appraisal->public_token) }}">#{{ substr($appraisal->public_token,0,12) }}</a></td>
+<td>{{ $appraisal->character_name }}</td>
+<td>{{ $appraisal->origin_system ?: '—' }}</td>
+<td>{{ $appraisal->appraisal_kind === 'ship' ? 'Ship Buyback · 80%' : 'Standard' }}</td>
+<td>{{ number_format((float)$appraisal->payout_value,2) }} ISK</td>
+<td>{{ \Illuminate\Support\Carbon::parse($appraisal->created_at)->timezone(config('app.timezone'))->format('M j, Y g:i A') }}</td>
+<td><form class="inline" method="post" action="{{ route('appraisals.destroy',$appraisal->id) }}" onsubmit="return confirm('Permanently delete this appraisal and its item details? This cannot be undone.')">@csrf @method('DELETE')<button type="submit" style="background:#8f3940;color:#fff">Delete</button></form></td>
+</tr>
+@empty
+<tr><td colspan="7">No appraisals have been submitted by characters linked to this account.</td></tr>
+@endforelse
+</tbody></table></div>
+</section>
 
+<section class="panel">
+<h2>Latest 10 contracts with My Eve Online</h2>
+@if($contractCharacter)
+<p class="muted">Showing the latest EVE contracts returned for the linked character <strong>{{ $contractCharacter->name }}</strong>.</p>
+@if($contractBoardStatus !== 'ready')
+<p class="muted">{{ $contractBoardMessage }}</p>
+<a href="{{ route('login.eve.link') }}">Reauthorize / link My Eve Online</a>
+@else
+<div style="overflow-x:auto"><table><thead><tr><th>Contract</th><th>Type</th><th>Status</th><th>Availability</th><th>Other party</th><th>Issued</th><th>Price / reward</th></tr></thead><tbody>
+@forelse($myEveContracts as $contract)
+<tr>
+<td>#{{ $contract['contract_id'] }}</td>
+<td>{{ ucwords(str_replace('_',' ',$contract['type'])) }}</td>
+<td>{{ ucwords(str_replace('_',' ',$contract['status'])) }}</td>
+<td>{{ ucfirst($contract['availability']) }}</td>
+<td>{{ $contract['other_party_name'] }}</td>
+<td>{{ !empty($contract['date_issued']) ? \Illuminate\Support\Carbon::parse($contract['date_issued'])->timezone(config('app.timezone'))->format('M j, Y g:i A') : '—' }}</td>
+<td>
+@if($contract['price'] > 0)Price: {{ number_format($contract['price'],2) }} ISK<br>@endif
+@if($contract['reward'] > 0)Reward: {{ number_format($contract['reward'],2) }} ISK<br>@endif
+@if($contract['collateral'] > 0)Collateral: {{ number_format($contract['collateral'],2) }} ISK@endif
+@if($contract['price'] <= 0 && $contract['reward'] <= 0 && $contract['collateral'] <= 0)—@endif
+</td>
+</tr>
+@empty
+<tr><td colspan="7">No EVE contracts were returned for My Eve Online.</td></tr>
+@endforelse
+</tbody></table></div>
+@endif
+@else
+<p class="muted">{{ $contractBoardMessage }}</p>
+<a href="{{ route('login.eve.link') }}">Link My Eve Online to this account</a>
+@endif
+</section>
 </section>
 @if($admin)
 <section class="tab-panel" id="tab-admin" role="tabpanel" hidden>
