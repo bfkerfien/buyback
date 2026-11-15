@@ -53,7 +53,7 @@ class AppraisalVisibilityController extends Controller
             'updated_at' => now(),
         ]);
 
-        return back()->with('status', 'Appraisal flagged as contracted.');
+        return redirect()->route('dashboard', ['tab' => 'tab-admin'])->with('status', 'Appraisal flagged as contracted.');
     }
 
     public function archive(Request $request, int $quote): RedirectResponse
@@ -67,7 +67,7 @@ class AppraisalVisibilityController extends Controller
 
         abort_unless($changed === 1, 404, 'Appraisal not found or already archived.');
 
-        return back()->with('status', 'Appraisal moved to the archive.');
+        return redirect()->route('dashboard', ['tab' => 'tab-admin'])->with('status', 'Appraisal moved to the archive.');
     }
 
     public function restore(Request $request, int $quote): RedirectResponse
@@ -81,6 +81,6 @@ class AppraisalVisibilityController extends Controller
 
         abort_unless($changed === 1, 404, 'Archived appraisal not found.');
 
-        return back()->with('status', 'Appraisal restored to the active appraisal list.');
+        return redirect()->route('dashboard', ['tab' => 'tab-admin'])->with('status', 'Appraisal restored to the active appraisal list.');
     }
 }
