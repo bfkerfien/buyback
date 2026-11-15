@@ -26,7 +26,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @media(max-width:650px){body:before{background-size:34px 34px}}
  .eb-logo{display:block;height:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 0 18px rgba(18,216,242,.18))} .top .eb-logo{flex:0 1 auto} @media(max-width:650px){.eb-logo{max-width:72vw}}
 </style>
-<link rel="icon" type="image/svg+xml" href="{{ asset('evebuyback-logo.svg') }}">
+<link rel="icon" type="image/svg+xml" href="{{ asset('evebuyback-icon.svg') }}">
 </head>
 <body><main>
 <header class="top"><div><img class="eb-logo" style="width:300px" src="{{ asset('evebuyback-logo.svg') }}" alt="EveBuyback"><h1>Ore Refining Comparison</h1></div><a href="{{ route('home') }}">Back to Buyback</a></header>
