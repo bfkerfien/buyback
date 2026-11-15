@@ -76,4 +76,4 @@ No CCP SDE reprocessing recipe found for this ore.
 </tbody></table></div>
 </section>
 <p class="muted">Values are estimates from the latest stored Jita buy-price snapshots, not guaranteed execution prices or available volume. Comparison excludes hauling, market fees, and slippage. Reprocessing output is based on CCP SDE portion recipes and the fixed maximum-skill Tatara profile shown above.</p>
-</main></body></html>
+</main><footer style="margin:28px auto 12px;text-align:center;color:#7f9ba5;font-size:12px">(c) 2027 My Eve Online</footer></body></html>
