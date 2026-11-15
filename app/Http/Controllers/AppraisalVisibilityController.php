@@ -8,6 +8,20 @@ use Illuminate\Support\Facades\DB;
 
 class AppraisalVisibilityController extends Controller
 {
+    public function destroy(Request $request, int $quote): RedirectResponse
+    {
+        $characterIds = $request->user()->characters()->pluck('id');
+        $deleted = DB::table('appraisal_quotes')
+            ->where('id', $quote)
+            ->whereIn('eve_character_id', $characterIds)
+            ->delete();
+
+        abort_unless($deleted === 1, 404, 'Appraisal not found under this account.');
+
+        return redirect()->route('dashboard', ['tab' => 'tab-contracts'])
+            ->with('status', 'Appraisal permanently deleted.');
+    }
+
     public function hide(Request $request, int $quote): RedirectResponse
     {
         $user = $request->user();
