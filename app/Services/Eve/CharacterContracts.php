@@ -121,7 +121,7 @@ class CharacterContracts
     private function otherPartyId(array $contract, int $characterId): ?int
     {
         $candidateFields = (int) ($contract['issuer_id'] ?? 0) === $characterId
-            ? ['assignee_id', 'acceptor_id', 'issuer_corporation_id']
+            ? ['assignee_id', 'acceptor_id']
             : ['issuer_id', 'issuer_corporation_id', 'assignee_id', 'acceptor_id'];
 
         foreach ($candidateFields as $field) {
