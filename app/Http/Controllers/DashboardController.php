@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\Eve\CharacterContracts;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -14,12 +15,6 @@ class DashboardController extends Controller
         $admin = $user->isAdmin();
         $characterIds = $user->characters()->pluck('id');
 
-        $jobs = DB::table('runner_jobs')
-            ->when(!$admin, fn ($q) => $q->where(function ($w) use ($user) {
-                $w->where('status', 'open')->orWhere('assigned_user_id', $user->id);
-            }))
-            ->orderByDesc('created_at')->limit(50)->get();
-
         $visibleQuotes = DB::table('appraisal_quotes')
             ->when(!$admin, fn ($q) => $q->where('created_by', $user->id))
             ->whereNull('archived_at')
@@ -28,6 +23,41 @@ class DashboardController extends Controller
                     ->whereColumn('appraisal_quote_hidden.appraisal_quote_id', 'appraisal_quotes.id')
                     ->where('appraisal_quote_hidden.user_id', $user->id);
             }));
+
+        $accountAppraisals = $characterIds->isNotEmpty()
+            ? DB::table('appraisal_quotes')
+                ->join('eve_characters', 'eve_characters.id', '=', 'appraisal_quotes.eve_character_id')
+                ->whereIn('appraisal_quotes.eve_character_id', $characterIds)
+                ->whereNull('appraisal_quotes.archived_at')
+                ->orderByDesc('appraisal_quotes.created_at')
+                ->limit(10)
+                ->get([
+                    'appraisal_quotes.id',
+                    'appraisal_quotes.public_token',
+                    'appraisal_quotes.origin_system',
+                    'appraisal_quotes.appraisal_kind',
+                    'appraisal_quotes.payout_value',
+                    'appraisal_quotes.status',
+                    'appraisal_quotes.created_at',
+                    'eve_characters.name as character_name',
+                ])
+            : collect();
+
+        // Contracts are shown for the account's linked character named exactly
+        // "My Eve Online". This keeps the board tied to a verified EVE SSO identity.
+        $contractCharacter = $user->characters()
+            ->whereRaw('LOWER(name) = ?', ['my eve online'])
+            ->first();
+        $myEveContracts = collect();
+        $contractBoardStatus = 'missing_character';
+        $contractBoardMessage = 'Link the EVE character named My Eve Online to this account to display its latest contracts.';
+
+        if ($contractCharacter) {
+            $contractResult = app(CharacterContracts::class)->latest($contractCharacter, 10);
+            $myEveContracts = collect($contractResult['contracts']);
+            $contractBoardStatus = $contractResult['status'];
+            $contractBoardMessage = $contractResult['message'];
+        }
 
         $expiryCutoff = now()->subHours(6);
         $quotes = (clone $visibleQuotes)
@@ -65,7 +95,6 @@ class DashboardController extends Controller
                 ])->values())
             : collect();
 
-        $balance = (float) DB::table('ledger_entries')->whereIn('eve_character_id', $characterIds)->sum('amount_isk');
         $adminMetrics = $admin ? [
             'open_jobs' => DB::table('runner_jobs')->where('status', 'open')->count(),
             'users' => DB::table('users')->count(),
@@ -95,6 +124,6 @@ class DashboardController extends Controller
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
         $oreValuationRules = $admin ? DB::table('appraisal_ore_valuation_rules')->orderBy('ore_name')->get() : collect();
 
-        return view('dashboard', compact('user', 'jobs', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'balance', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'oreValuationRules'));
+        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'oreValuationRules'));
     }
 }
