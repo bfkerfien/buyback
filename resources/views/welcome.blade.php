@@ -48,4 +48,4 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <p class="hint">Quotes are estimates, not accepted contracts or completed payouts. Unrecognized or unpriced items are reported rather than silently valued at zero.</p>
 </section>
 <p class="muted" style="text-align:center"><a href="{{ route('login.eve') }}" style="color:#62d9e9">Sign in with EVE SSO</a> to access your EveBuyback dashboard.</p>
-</div></body></html>
+</div><footer style="margin:28px auto 12px;text-align:center;color:#7f9ba5;font-size:12px">(c) 2027 My Eve Online</footer></body></html>
