@@ -16,6 +16,7 @@
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin-tools" data-tab="tab-admin-tools">Admin</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-ore-refining" data-tab="tab-ore-refining">Ore Refining</button>
 @endif
+<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-marketbaiters" data-tab="tab-marketbaiters">Marketbaiters Comparison</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-how-to" data-tab="tab-how-to">How To</button>
 </nav>
 <section class="tab-panel active" id="tab-appraisals" role="tabpanel">
@@ -81,6 +82,26 @@
 <iframe title="Ore Refining Comparison" src="{{ route('ore-values.index') }}" loading="lazy" style="display:block;width:100%;height:1900px;border:0;border-radius:12px;background:#070510"></iframe>
 </section>
 @endif
+<section class="tab-panel" id="tab-marketbaiters" role="tabpanel" hidden>
+<section class="panel">
+<h2>Marketbaiters appraisal comparison</h2>
+<p style="color:#d9cbea;line-height:1.8">Compare one of your Lentivirus Buyback quotes with a Marketbaiters appraisal. Marketbaiters currently requires you to enter the cargo manifest and choose a pickup location on its own website. Until a supported integration is confirmed, enter the external total here after obtaining it there.</p>
+<p><a href="https://marketbaiters.com/" target="_blank" rel="noopener" style="color:#c6a4ff;font-weight:700">Open Marketbaiters in a new tab ↗</a></p>
+<label for="marketbaiters-quote">Your appraisal</label>
+<select id="marketbaiters-quote">
+<option value="">Select a Lentivirus appraisal</option>
+@foreach($quotes->concat($expiredQuotes)->sortByDesc('created_at') as $quote)
+<option value="{{ $quote->id }}" data-value="{{ (float)$quote->payout_value }}" data-url="{{ route('appraisals.show',$quote->public_token) }}">#{{ substr($quote->public_token,0,12) }} · {{ $quote->created_at }} · {{ number_format((float)$quote->payout_value,2) }} ISK{{ $quote->created_at < now()->subHours(6) ? ' · Expired' : '' }}</option>
+@endforeach
+</select>
+<p><a id="marketbaiters-open-quote" href="#" target="_blank" rel="noopener" style="display:none;color:#c6a4ff">Open selected appraisal details to copy the item list ↗</a></p>
+<label for="marketbaiters-value">Marketbaiters appraisal total (ISK)</label>
+<input id="marketbaiters-value" type="number" min="0" step="0.01" placeholder="Enter the total shown by Marketbaiters">
+<button type="button" id="marketbaiters-compare">Compare values</button>
+<div id="marketbaiters-result" class="stat" style="display:none;margin-top:16px" aria-live="polite"></div>
+<p class="muted" style="line-height:1.7">Workflow: select your quote, open its details and copy the item list, open Marketbaiters, paste the cargo manifest, choose the matching pickup location, and run its appraisal. Enter the Marketbaiters total above to calculate the difference. This first version is a manual comparison; it does not submit data to Marketbaiters or retrieve its result automatically.</p>
+</section>
+</section>
 <section class="tab-panel" id="tab-how-to" role="tabpanel" hidden>
 <section class="panel">
 <h2>How to sell items through Lentivirus Buyback</h2>
@@ -105,6 +126,7 @@
 </section>
 </section>
 <script>
+const quoteSelect=document.getElementById('marketbaiters-quote');const quoteLink=document.getElementById('marketbaiters-open-quote');const externalInput=document.getElementById('marketbaiters-value');const compareButton=document.getElementById('marketbaiters-compare');const result=document.getElementById('marketbaiters-result');if(quoteSelect){quoteSelect.addEventListener('change',()=>{const option=quoteSelect.selectedOptions[0];const url=option?.dataset.url||'';quoteLink.href=url;quoteLink.style.display=url?'inline':'none';result.style.display='none';});compareButton.addEventListener('click',()=>{const option=quoteSelect.selectedOptions[0];const ours=Number(option?.dataset.value);const theirs=Number(externalInput.value);if(!option?.value||!Number.isFinite(ours)||!externalInput.value||!Number.isFinite(theirs)||theirs<0){result.style.display='block';result.textContent='Select an appraisal and enter a valid Marketbaiters total.';return;}const diff=theirs-ours;const pct=ours>0?(diff/ours)*100:0;const direction=diff>0?'higher':diff<0?'lower':'the same as';const fmt=n=>n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});result.style.display='block';result.innerHTML='<div class="muted">Lentivirus Buyback payout</div><strong>'+fmt(ours)+' ISK</strong><div class="muted" style="margin-top:10px">Marketbaiters appraisal</div><strong>'+fmt(theirs)+' ISK</strong><div style="margin-top:12px">Marketbaiters is <strong>'+fmt(Math.abs(diff))+' ISK '+direction+'</strong> ('+Math.abs(pct).toFixed(2)+'%).</div>';});}
 (()=>{const tabs=[...document.querySelectorAll('[data-tab]')];const panels=[...document.querySelectorAll('.tab-panel')];tabs.forEach(tab=>tab.addEventListener('click',()=>{const target=tab.dataset.tab;tabs.forEach(item=>{const active=item===tab;item.classList.toggle('active',active);item.setAttribute('aria-selected',active?'true':'false');});panels.forEach(panel=>{const active=panel.id===target;panel.classList.toggle('active',active);panel.hidden=!active;});}));})();
 </script>
 <p class="muted">Internal ledger values are not confirmation of an in-game ISK transfer. Payments must be reconciled manually.</p></main></body></html>
