@@ -127,11 +127,11 @@ class AppraisalComparisonController extends Controller
         foreach ($lines as $line) {
             $line = trim(preg_replace('/[ \\t]+/', ' ', $line));
             if ($line === '') continue;
-            if (str_contains($line, "\\t") || str_contains($line, ',' ) || preg_match('/^(?:[0-9][0-9,]*\\s*(?:[x×]\\s*)?.+|.+\\s+[x×]?\\s*[0-9][0-9,]*)$/i', $line)) {
+            if (str_contains($line, "\t") || str_contains($line, ',' ) || preg_match('/^(?:[0-9][0-9,]*\\s*(?:[x×]\\s*)?.+|.+\\s+[x×]?\\s*[0-9][0-9,]*)$/i', $line)) {
                 $structured[] = $line;
             }
         }
-        return $structured ? $parser->parse(implode("\\n", $structured)) : [];
+        return $structured ? $parser->parse(implode("\n", $structured)) : [];
     }
 
     private function mergeItems(array $items): array
