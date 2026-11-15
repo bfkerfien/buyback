@@ -10,7 +10,7 @@
 <section class="hero">
 <div class="eyebrow">Public · No EVE login required</div>
 <h1>Ship Buyback Appraisal</h1>
-<p>Submit ship hulls for a separate buyback appraisal at <span class="rate">80% of hull value</span>. Values use the current stored Jita buy-price snapshots.</p>
+<p>Submit ship hulls for a separate buyback appraisal at <span class="rate">80% of hull value</span>. Values use the current stored Jita market-price snapshots.</p>
 <p><strong>Hull-only appraisal:</strong> paste ship names and quantities. Modules, rigs, drones, ammunition, cargo, and all other non-ship entries are simply ignored. Only published EVE ship hulls are included in the quote.</p>
 </section>
 <section class="hero">
