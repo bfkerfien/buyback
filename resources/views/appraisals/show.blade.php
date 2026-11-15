@@ -26,10 +26,10 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @media(max-width:650px){body:before{background-size:34px 34px}}
  .eb-logo{display:block;height:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 0 18px rgba(18,216,242,.18))} .top .eb-logo{flex:0 1 auto} @media(max-width:650px){.eb-logo{max-width:72vw}}
 </style>
-<link rel="icon" type="image/svg+xml" href="{{ asset('evebuyback-icon.svg') }}">
+<link rel="icon" type="image/png" href="{{ asset('evebuyback-logo.png') }}">
 </head>
 <body><main>
-<nav style="display:flex;justify-content:space-between;align-items:center;gap:12px"><img class="eb-logo" style="width:280px" src="{{ asset('evebuyback-logo.svg') }}" alt="EveBuyback"><a href="{{ route('home') }}" style="color:#62d9e9;text-decoration:none;border:1px solid #386675;border-radius:8px;padding:9px 13px">Home</a></nav><h1>Appraisal result</h1>
+<nav style="display:flex;justify-content:space-between;align-items:center;gap:12px"><img class="eb-logo" style="width:280px" src="{{ asset('evebuyback-logo.png') }}" alt="EveBuyback"><a href="{{ route('home') }}" style="color:#62d9e9;text-decoration:none;border:1px solid #386675;border-radius:8px;padding:9px 13px">Home</a></nav><h1>Appraisal result</h1>
 <section class="panel"><div class="grid">
 <div class="stat"><span class="muted">Gross market value</span><strong>{{ number_format((float)$quote->gross_value, 2) }} ISK</strong></div>
 <div class="stat"><span class="muted">Service fees</span><strong>{{ number_format((float)$quote->fees, 2) }} ISK</strong></div>
