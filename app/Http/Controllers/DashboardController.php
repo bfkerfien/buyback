@@ -42,6 +42,29 @@ class DashboardController extends Controller
             ? DB::table('appraisal_quotes')->whereNotNull('archived_at')->orderByDesc('archived_at')->limit(100)->get()
             : collect();
 
+        // The first Admin tab shows every non-archived appraisal, regardless of age
+        // or whether its owner hid it from their own dashboard.
+        $adminQuotes = $admin
+            ? DB::table('appraisal_quotes')
+                ->leftJoin('users', 'users.id', '=', 'appraisal_quotes.created_by')
+                ->whereNull('appraisal_quotes.archived_at')
+                ->orderByDesc('appraisal_quotes.created_at')
+                ->select('appraisal_quotes.*', 'users.name as owner_name')
+                ->get()
+            : collect();
+
+        $adminAppraisalItems = $admin && $adminQuotes->isNotEmpty()
+            ? DB::table('appraisal_quote_items')
+                ->whereIn('appraisal_quote_id', $adminQuotes->pluck('id'))
+                ->orderBy('type_name')
+                ->get(['appraisal_quote_id', 'type_name', 'quantity'])
+                ->groupBy('appraisal_quote_id')
+                ->map(fn ($items) => $items->map(fn ($item) => [
+                    'name' => $item->type_name,
+                    'quantity' => (int) $item->quantity,
+                ])->values())
+            : collect();
+
         $balance = (float) DB::table('ledger_entries')->whereIn('eve_character_id', $characterIds)->sum('amount_isk');
         $adminMetrics = $admin ? [
             'open_jobs' => DB::table('runner_jobs')->where('status', 'open')->count(),
@@ -64,6 +87,6 @@ class DashboardController extends Controller
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
         $oreValuationRules = $admin ? DB::table('appraisal_ore_valuation_rules')->orderBy('ore_name')->get() : collect();
 
-        return view('dashboard', compact('user', 'jobs', 'quotes', 'expiredQuotes', 'archivedQuotes', 'balance', 'admin', 'adminMetrics', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'oreValuationRules'));
+        return view('dashboard', compact('user', 'jobs', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'balance', 'admin', 'adminMetrics', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'oreValuationRules'));
     }
 }
