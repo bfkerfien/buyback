@@ -112,6 +112,12 @@ class RefreshJitaPrices extends Command
             $rows[] = ['type_id' => $typeId, 'buy_price' => $price['buy'], 'sell_price' => $price['sell']];
         }
 
+        if (!$rows) {
+            $this->newLine();
+            $this->error('No Jita IV - Moon 4 market orders were found; full refresh was not recorded as successful.');
+            return self::FAILURE;
+        }
+
         foreach (array_chunk($rows, 500) as $chunk) {
             $this->storeSnapshots($chunk);
         }
