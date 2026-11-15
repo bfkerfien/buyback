@@ -23,10 +23,10 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 .account-chip{border-color:#386675!important;box-shadow:0 0 22px rgba(55,194,212,.08)}
 @media(max-width:650px){body:before{background-size:34px 34px}}
  .eb-logo{display:block;height:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 0 18px rgba(18,216,242,.18))} .top .eb-logo{flex:0 1 auto} @media(max-width:650px){.eb-logo{max-width:72vw}}
-</style><link rel="icon" type="image/svg+xml" href="{{ asset('evebuyback-icon.svg') }}">
+</style><link rel="icon" type="image/png" href="{{ asset('evebuyback-logo.png') }}">
 </head><body><main>
 @php($activeCharacter = $user->characters->sortByDesc('last_authenticated_at')->first())
-<header class="top"><div><img class="eb-logo" style="width:330px" src="{{ asset('evebuyback-logo.svg') }}" alt="EveBuyback"></div><nav style="display:flex;align-items:center;gap:10px"><div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div class="account-chip">@if($activeCharacter)<img src="https://images.evetech.net/characters/{{ $activeCharacter->eve_character_id }}/portrait?size=64" alt="{{ $activeCharacter->name }} portrait">@endif<span>{{ $activeCharacter?->name ?? $user->name }}</span></div>@if($activeCharacter)<a href="{{ route('login.eve.link') }}" style="color:#62d9e9;font-size:12px;text-decoration:none">Link another character</a>@endif</div><form method="post" action="{{ route('logout') }}">@csrf<button>Sign out</button></form></nav></header>
+<header class="top"><div><img class="eb-logo" style="width:330px" src="{{ asset('evebuyback-logo.png') }}" alt="EveBuyback"></div><nav style="display:flex;align-items:center;gap:10px"><div style="display:flex;flex-direction:column;align-items:center;gap:6px"><div class="account-chip">@if($activeCharacter)<img src="https://images.evetech.net/characters/{{ $activeCharacter->eve_character_id }}/portrait?size=64" alt="{{ $activeCharacter->name }} portrait">@endif<span>{{ $activeCharacter?->name ?? $user->name }}</span></div>@if($activeCharacter)<a href="{{ route('login.eve.link') }}" style="color:#62d9e9;font-size:12px;text-decoration:none">Link another character</a>@endif</div><form method="post" action="{{ route('logout') }}">@csrf<button>Sign out</button></form></nav></header>
 @if(session('status'))<p class="success">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="panel">{{ $errors->first() }}</div>@endif
 <nav class="tabs" role="tablist" aria-label="Buyback sections">
