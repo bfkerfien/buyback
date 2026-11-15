@@ -116,6 +116,19 @@ class RefreshJitaPrices extends Command
             $this->storeSnapshots($chunk);
         }
 
+        // Record only a completed full-market refresh. Targeted type refreshes do not
+        // change this timestamp, so the admin panel reflects database-wide updates.
+        $refreshedAt = now();
+        foreach ([
+            'jita_full_refresh_at' => $refreshedAt->toDateTimeString(),
+            'jita_full_refresh_items' => (string) count($rows),
+        ] as $key => $value) {
+            DB::table('buyback_system_status')->updateOrInsert(
+                ['status_key' => $key],
+                ['status_value' => $value, 'created_at' => $refreshedAt, 'updated_at' => $refreshedAt]
+            );
+        }
+
         $this->newLine();
         $this->info('Saved '.count($rows).' Jita 4-4 price snapshots from '.$pages.' market pages.');
         return $rows ? self::SUCCESS : self::FAILURE;
