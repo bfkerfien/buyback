@@ -26,7 +26,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @media(max-width:650px){body:before{background-size:34px 34px}}
  .eb-logo{display:block;height:auto;max-width:100%;object-fit:contain;filter:drop-shadow(0 0 18px rgba(18,216,242,.18))} .top .eb-logo{flex:0 1 auto} @media(max-width:650px){.eb-logo{max-width:72vw}}
 </style>
-<link rel="icon" type="image/svg+xml" href="{{ asset('evebuyback-logo.svg') }}">
+<link rel="icon" type="image/svg+xml" href="{{ asset('evebuyback-icon.svg') }}">
 </head>
 <body><div class="wrap">
 <header class="top"><img class="eb-logo" style="width:360px" src="{{ asset('evebuyback-logo.svg') }}" alt="EveBuyback"><div class="tag">EVE ONLINE · BUYBACK OPERATIONS</div><nav style="display:flex;gap:8px;align-items:center"><a href="{{ route('login.eve') }}" style="color:#eaf7f8;border:1px solid #386675;border-radius:9px;padding:9px 13px;text-decoration:none">Sign in with EVE</a></nav></header>
