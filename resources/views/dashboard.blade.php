@@ -81,7 +81,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <section class="panel">
 <h2>Market data status</h2>
 <div class="grid">
-<div class="stat">Last full Jita price database refresh<strong style="font-size:17px">{{ $lastJitaPriceRefreshAt ? \\Illuminate\\Support\\Carbon::parse($lastJitaPriceRefreshAt)->timezone(config('app.timezone'))->format('M j, Y g:i:s A T') : 'Not recorded yet' }}</strong><div class="muted">This timestamp changes only after a successful full-market refresh, not a single-item refresh.</div></div>
+<div class="stat">Last full Jita price database refresh<strong style="font-size:17px">{{ $lastJitaPriceRefreshAt ? \Illuminate\Support\Carbon::parse($lastJitaPriceRefreshAt)->timezone(config('app.timezone'))->format('M j, Y g:i:s A T') : 'Not recorded yet' }}</strong><div class="muted">This timestamp changes only after a successful full-market refresh, not a single-item refresh.</div></div>
 <div class="stat">Item types with Jita orders in last refresh<strong>{{ number_format($lastJitaPriceRefreshCount) }}</strong><div class="muted">Types with live orders at Jita IV - Moon 4 saved during the last completed refresh.</div></div>
 </div>
 </section>
