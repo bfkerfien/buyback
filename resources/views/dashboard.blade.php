@@ -211,37 +211,86 @@ const compressedCopy=document.getElementById('copy-compressed-ore');if(compresse
  const status=document.getElementById('contract-compare-status');
  const results=document.getElementById('contract-compare-results');
  let currentQuote=null;
- const key=s=>String(s||'').trim().replace(/\\s+/g,' ').toLocaleLowerCase();
+ const key=s=>String(s||'').trim().replace(/\s+/g,' ').toLocaleLowerCase();
  function parseList(raw){
    const merged=new Map();
-   let headerNameColumn=0,headerQuantityColumn=-1;
-   for(const sourceLine of String(raw||'').split(/\\r?\\n/)){
-     const line=sourceLine.trim();if(!line)continue;
-     const cols=line.split(/\\t|,/).map(x=>x.trim());
-     if(cols.some(x=>/^(quantity|qty)$/i.test(x))){
-       headerQuantityColumn=cols.findIndex(x=>/^(quantity|qty)$/i.test(x));
-       const nameIndex=cols.findIndex(x=>/^(item|item name|type|type name|name)$/i.test(x));
-       headerNameColumn=nameIndex>=0?nameIndex:0;
+   const add=(name,quantity)=>{
+     name=String(name||'').trim().replace(/\s+/g,' ');
+     const qty=Number(String(quantity??'').replace(/,/g,''));
+     if(!name||!Number.isSafeInteger(qty)||qty<1)return;
+     const k=key(name);
+     const current=merged.get(k)||{name,quantity:0};
+     current.quantity+=qty;
+     merged.set(k,current);
+   };
+
+   const source=String(raw||'').replace(/\r/g,'');
+   const allLines=source.split('\n');
+   const itemLines=[];
+   let inSaleSection=false;
+   let hasSaleSection=false;
+
+   for(const sourceLine of allLines){
+     let line=sourceLine.trim();
+     if(!line)continue;
+
+     if(/Items\s+For\s+Sale/i.test(line)){
+       hasSaleSection=true;
+       inSaleSection=true;
+       line=line.replace(/^.*?Items\s+For\s+Sale\s*:?\s*/i,'').trim();
+       if(line)itemLines.push(line);
        continue;
      }
-     if(/^(item|type|type name|name|quantity|qty|volume|price|total)\\b/i.test(line))continue;
-     let name='',qty=null;
-     if(headerQuantityColumn>=0&&cols.length>headerQuantityColumn&&cols.length>headerNameColumn&&/^\\d[\\d,]*$/.test(cols[headerQuantityColumn])){
-       name=cols[headerNameColumn];qty=Number(cols[headerQuantityColumn].replace(/,/g,''));
-     } else if(cols.length>=2){
-       if(/^\\d[\\d,]*$/.test(cols[0])){qty=Number(cols[0].replace(/,/g,''));name=cols.slice(1).join(' ');}
-       else if(/^\\d[\\d,]*$/.test(cols[1])){name=cols[0];qty=Number(cols[1].replace(/,/g,''));}
+
+     if(inSaleSection){
+       if(/^(Items\s+(Received|Wanted)|Collateral|Contract\s+Type|Description|Availability|Location|Price|Reward|Issuer|Acceptor|Date|Expires)\b/i.test(line)){
+         inSaleSection=false;
+         continue;
+       }
+       itemLines.push(line);
+       continue;
      }
-     if(qty===null){
-       let m=line.match(/^([\\d,]+)\\s*[x×]\\s*(.+)$/i);
-       if(m){qty=Number(m[1].replace(/,/g,''));name=m[2].trim();}
-       else if((m=line.match(/^(.+?)\\s*[x×]\\s*([\\d,]+)$/i))){name=m[1].trim();qty=Number(m[2].replace(/,/g,''));}
-       else if((m=line.match(/^([\\d,]+)\\s+(.+)$/))){qty=Number(m[1].replace(/,/g,''));name=m[2].trim();}
-       else if((m=line.match(/^(.+?)\\s+([\\d,]+)$/))){name=m[1].trim();qty=Number(m[2].replace(/,/g,''));}
+
+     if(!hasSaleSection&&!/^(Contract\s+Type|Description|Availability|Location|Price|Reward|Issuer|Acceptor|Date|Expires|Items\s+(Received|Wanted)|Collateral)\b/i.test(line)){
+       itemLines.push(line);
      }
-     if(!name||!Number.isSafeInteger(qty)||qty<1)continue;
-     const k=key(name);const current=merged.get(k)||{name,quantity:0};current.quantity+=qty;merged.set(k,current);
    }
+
+   for(const originalLine of itemLines){
+     let line=originalLine.trim();
+     if(!line||/^\(?None\)?$/i.test(line))continue;
+
+     // EVE contract clipboard output can concatenate entries without a newline:
+     // "Hurricane Fleet Issue x 1Apocalypse Navy Issue x 1".
+     const suffixPattern=/(.+?)\s*[x×]\s*([\d,]+)(?=\s*(?:[A-Z]|$))/g;
+     const suffixMatches=[...line.matchAll(suffixPattern)];
+     if(suffixMatches.length){
+       for(const match of suffixMatches)add(match[1],match[2]);
+       continue;
+     }
+
+     const prefix=line.match(/^([\d,]+)\s*[x×]\s*(.+)$/i);
+     if(prefix){add(prefix[2],prefix[1]);continue;}
+
+     const cells=line.split(/\t+|,\s*/).map(cell=>cell.trim()).filter(Boolean);
+     if(cells.length>=2){
+       const quantityIndex=cells.findIndex((cell,index)=>index>0&&/^[\d,]+$/.test(cell));
+       if(quantityIndex>0){
+         add(cells.slice(0,quantityIndex).join(' '),cells[quantityIndex]);
+         continue;
+       }
+       if(/^[\d,]+$/.test(cells[0])){
+         add(cells.slice(1).join(' '),cells[0]);
+         continue;
+       }
+     }
+
+     let match=line.match(/^([\d,]+)\s+(.+)$/);
+     if(match){add(match[2],match[1]);continue;}
+     match=line.match(/^(.+?)\s+([\d,]+)$/);
+     if(match)add(match[1],match[2]);
+   }
+
    return merged;
  }
  function safe(s){return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
