@@ -12,11 +12,12 @@
 <button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="tab-appraisals" data-tab="tab-appraisals">New Appraisals</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-contracts" data-tab="tab-contracts">Appraisals &amp; Contracts</button>
 @if($admin)
+<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-marketbaiters" data-tab="tab-marketbaiters">Marketbaiters Comparison</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin" data-tab="tab-admin">Admin</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin-tools" data-tab="tab-admin-tools">Admin</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-ore-refining" data-tab="tab-ore-refining">Ore Refining</button>
 @endif
-<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-marketbaiters" data-tab="tab-marketbaiters">Marketbaiters Comparison</button>
+
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-how-to" data-tab="tab-how-to">How To</button>
 </nav>
 <section class="tab-panel active" id="tab-appraisals" role="tabpanel">
@@ -82,6 +83,7 @@
 <iframe title="Ore Refining Comparison" src="{{ route('ore-values.index') }}" loading="lazy" style="display:block;width:100%;height:1900px;border:0;border-radius:12px;background:#070510"></iframe>
 </section>
 @endif
+@if($admin)
 <section class="tab-panel" id="tab-marketbaiters" role="tabpanel" hidden>
 <section class="panel">
 <h2>Marketbaiters appraisal comparison</h2>
@@ -102,6 +104,7 @@
 <p class="muted" style="line-height:1.7">Workflow: select your quote, open its details and copy the item list, open Marketbaiters, paste the cargo manifest, choose the matching pickup location, and run its appraisal. Enter the Marketbaiters total above to calculate the difference. This first version is a manual comparison; it does not submit data to Marketbaiters or retrieve its result automatically.</p>
 </section>
 </section>
+@endif
 <section class="tab-panel" id="tab-how-to" role="tabpanel" hidden>
 <section class="panel">
 <h2>How to sell items through Lentivirus Buyback</h2>
