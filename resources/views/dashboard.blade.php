@@ -9,7 +9,7 @@
 @if(session('status'))<p class="success">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="panel">{{ $errors->first() }}</div>@endif
 <nav class="tabs" role="tablist" aria-label="Buyback sections">
-<button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="tab-appraisals" data-tab="tab-appraisals">Appraisals</button>
+<button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="tab-appraisals" data-tab="tab-appraisals">New Appraisals</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-contracts" data-tab="tab-contracts">Appraisals &amp; Contracts</button>
 @if($admin)
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin" data-tab="tab-admin">Admin</button>
