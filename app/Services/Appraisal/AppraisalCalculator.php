@@ -96,7 +96,7 @@ final class AppraisalCalculator
                 'payout_value' => round($lineValue * $rate / 100, 2),
                 'category_id' => $effectiveCategoryId,
                 'category_name' => $effectiveCategoryName,
-                'rate_source' => $payoutRule ? 'category' : 'default',
+                'rate_source' => $fixedPayoutPercent !== null ? 'fixed' : ($payoutRule ? 'category' : 'default'),
                 'source' => $price->source,
                 'observed_at' => $price->observed_at,
                 'valuation_mode' => $valuationMode,
