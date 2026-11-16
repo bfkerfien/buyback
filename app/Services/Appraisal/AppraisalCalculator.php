@@ -39,10 +39,11 @@ final class AppraisalCalculator
         $mineralIds = $oreMaterials->flatten(1)->pluck('material_type_id')->unique()->values();
         $mineralTypes = $mineralIds->isEmpty() ? collect() : DB::table('eve_item_types')
             ->whereIn('type_id', $mineralIds)->where('published', true)
-            ->get(['type_id', 'type_name'])->keyBy('type_id');
+            ->get(['type_id', 'type_name', 'volume'])->keyBy('type_id');
 
         $rules = DB::table('appraisal_payout_rules')->get()->keyBy('category_id');
         $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
+        $mineralPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key');
         $unresolvedTypes = [];
         $unpricedTypes = [];
         $lines = [];
@@ -91,19 +92,36 @@ final class AppraisalCalculator
                         continue 2;
                     }
                     $yieldedQuantity = (int) floor((int) $material->quantity * $batches * 0.90628);
-                    $mineralPrice = $this->jitaBuyPrice((int) $mineral->type_id, $regionId, 50000);
+                    $mineralId = (int) $mineral->type_id;
+                    $defaultDepths = [
+                        'Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000,
+                        'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000,
+                        'Megacyte' => 500000, 'Morphite' => 45000,
+                    ];
+                    $depth = max(1, (int) $mineralPricingSettings->get('mineral_buy_depth_' . $mineralId, $defaultDepths[$mineral->type_name] ?? 50000));
+                    $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
+                    $mineralPrice = $this->jitaBuyPrice($mineralId, $regionId, $depth, false);
                     if ($mineralPrice === null) {
-                        $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': no valid Jita buy price at 50,000-unit depth within 3% of the 7-day average)';
+                        $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': insufficient Jita buy volume at configured ' . number_format($depth) . '-unit depth)';
                         continue 2;
                     }
-                    $mineralValue = round($yieldedQuantity * $mineralPrice['price'], 2);
-                    $refinedLineValue += $mineralValue;
+                    $grossMineralValue = round($yieldedQuantity * $mineralPrice['price'], 2);
+                    $mineralValue = round($grossMineralValue * $buyPercent / 100, 2);
+                    $mineralVolume = (float) ($mineral->volume ?? 0);
+                    $shippingVolume = $yieldedQuantity * $mineralVolume;
+                    $shippingCost = round($shippingVolume * 320, 2);
+                    $refinedLineValue += $mineralValue - $shippingCost;
                     $refinedMineralDetails[] = [
-                        'type_id' => (int) $mineral->type_id,
+                        'type_id' => $mineralId,
                         'name' => $mineral->type_name,
                         'quantity' => $yieldedQuantity,
                         'unit_price' => $mineralPrice['price'],
-                        'value' => $mineralValue,
+                        'buy_percent' => $buyPercent,
+                        'price_depth' => $depth,
+                        'volume_m3' => $shippingVolume,
+                        'shipping_cost' => $shippingCost,
+                        'gross_value' => $grossMineralValue,
+                        'value' => $mineralValue - $shippingCost,
                     ];
                 }
                 $refinedLineValue = round($refinedLineValue, 2);
@@ -152,7 +170,7 @@ final class AppraisalCalculator
             ];
             $hasSpecial87Percent = in_array(mb_strtolower($type->type_name), $special87PercentNames, true);
             $rate = (int) $type->category_id === 25
-                ? 87.0
+                ? 100.0
                 : ($fixedPayoutPercent !== null
                     ? $fixedPayoutPercent
                     : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate)));
@@ -218,7 +236,7 @@ final class AppraisalCalculator
         ];
     }
 
-    private function jitaBuyPrice(int $typeId, string $regionId, int $requiredDepth): ?array
+    private function jitaBuyPrice(int $typeId, string $regionId, int $requiredDepth, bool $checkAverage = true): ?array
     {
         $latestBookAt = DB::table('market_order_book_snapshots')
             ->where('type_id', $typeId)->where('region_id', $regionId)
@@ -239,11 +257,13 @@ final class AppraisalCalculator
         }
         if ($price === null || $price <= 0) return null;
 
-        $average = (float) DB::table('market_price_snapshots')
-            ->where('type_id', $typeId)->where('region_id', $regionId)
-            ->where('source', 'esi-jita-4-4')->where('observed_at', '>=', now()->subDays(7))
-            ->whereNotNull('buy_price')->where('buy_price', '>', 0)->avg('buy_price');
-        if ($average <= 0 || abs($price - $average) / $average > 0.03) return null;
+        if ($checkAverage) {
+            $average = (float) DB::table('market_price_snapshots')
+                ->where('type_id', $typeId)->where('region_id', $regionId)
+                ->where('source', 'esi-jita-4-4')->where('observed_at', '>=', now()->subDays(7))
+                ->whereNotNull('buy_price')->where('buy_price', '>', 0)->avg('buy_price');
+            if ($average <= 0 || abs($price - $average) / $average > 0.03) return null;
+        }
 
         return ['price' => $price, 'observed_at' => $latestBookAt];
     }
