@@ -100,14 +100,14 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 <tr>
 <td style="padding:10px;border-bottom:1px solid #294a56">{{ $item['name'] }} <span class="muted">({{ $item['recipes'] }} recipe{{ $item['recipes'] === 1 ? '' : 's' }})</span></td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">{{ $item['jita_buy'] !== null ? number_format($item['jita_buy'],2).' ISK' : 'No price' }}</td>
-<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">{{ number_format($item['lowest_percent'],2) }}%</td>
+<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['can_set']) {{ number_format($item['lowest_percent'],2) }}% @else <span class="muted">Unavailable · recipe target missing or below 80% floor</span> @endif</td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['is_set']) {{ number_format($item['saved_percent'],2) }}% @else <span class="muted">Shared PI rate</span> @endif</td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">
 <form method="post" action="{{ route('pi-planner.p1-buy-rule') }}" style="margin:0">
 @csrf
 <input type="hidden" name="type_id" value="{{ $item['type_id'] }}">
-<input type="hidden" name="buy_percent" value="{{ number_format($item['lowest_percent'],2,'.','') }}">
-<button type="submit" style="padding:7px 12px">{{ $item['is_set'] ? 'Update' : 'Set' }}</button>
+<input type="hidden" name="buy_percent" value="{{ $item['can_set'] ? number_format($item['lowest_percent'],2,'.','') : '' }}">
+<button type="submit" style="padding:7px 12px" {{ $item['can_set'] ? '' : 'disabled' }}>{{ $item['is_set'] ? 'Update' : 'Set' }}</button>
 </form>
 </td>
 </tr>
