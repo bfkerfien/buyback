@@ -27,8 +27,8 @@ class OreValueController extends Controller
 
         // Mission/NPE-only ore variants are excluded from the normal asteroid basket.
         $missionOres = [
-            'Arisite', 'Augumene', 'Banidine', 'Geodite', 'Green Arisite',
-            'Lyavite', 'Mercium', 'Oeryl', 'Pithix', 'Polygypsum', 'Zuthrine',
+            'Arisite', 'Augumene', 'Banidine', 'Flawed Gneiss', 'Geodite',
+            'Green Arisite', 'Lyavite', 'Mercium', 'Oeryl', 'Pithix', 'Polygypsum', 'Zuthrine',
         ];
 
         $records = DB::table('eve_item_types as ore')
