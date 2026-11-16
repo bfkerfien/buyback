@@ -327,6 +327,7 @@ class OreValueController extends Controller
         $validated = $request->validate([
             'import_tax_percent' => ['required', 'numeric', 'min:0', 'max:100'],
             'export_tax_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'target_profit_percent' => ['nullable', 'numeric', 'min:0.01', 'max:99.99'],
             'tier' => ['nullable', 'in:P2,P3,P4'],
             'return_to' => ['nullable', 'in:pi-planner'],
         ]);
@@ -334,6 +335,7 @@ class OreValueController extends Controller
         $settings = [
             'import_tax_percent' => $validated['import_tax_percent'],
             'export_tax_percent' => $validated['export_tax_percent'],
+            'target_profit_percent' => $validated['target_profit_percent'] ?? 18,
             'updated_at' => now(),
         ];
         if (DB::table('pi_tax_settings')->where('id', 1)->exists()) {
@@ -343,7 +345,7 @@ class OreValueController extends Controller
         }
 
         if (($validated['return_to'] ?? null) === 'pi-planner') {
-            return redirect()->route('pi-planner.index')->with('status', 'PI import and export tax settings saved.');
+            return redirect()->route('pi-planner.index')->with('status', 'PI tax rates and target profit saved. All recipe targets have been recalculated.');
         }
         $tier = $validated['tier'] ?? 'P2';
         return redirect(route('ore-values.index') . '?tier=' . urlencode($tier))
