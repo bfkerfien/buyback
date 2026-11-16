@@ -201,6 +201,30 @@ class PiPlannerController extends Controller
                 }
             }
         }
+        // Include every published P1 commodity from the SDE, even if no loaded
+        // schematic currently consumes it; those rows remain unset until calculable.
+        $p1Catalog = DB::table('eve_item_types as item')
+            ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
+            ->where('groups.category_id', 43)
+            ->where('groups.group_id', 1042)
+            ->where('item.published', true)
+            ->orderBy('item.type_name')
+            ->get(['item.type_id', 'item.type_name']);
+        foreach ($p1Catalog as $p1Item) {
+            $id = (int) $p1Item->type_id;
+            if (!isset($p1Targets[$id])) {
+                $price = $prices->get($id);
+                $p1Targets[$id] = [
+                    'type_id' => $id,
+                    'name' => $p1Item->type_name,
+                    'jita_buy' => $price?->buy_price !== null ? (float) $price->buy_price : null,
+                    'lowest_percent' => null,
+                    'recipes' => 0,
+                    'target_complete' => false,
+                ];
+            }
+        }
+
         $savedPiRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
         $p1BuyTargets = collect(array_values($p1Targets))
             ->map(function ($item) use ($savedPiRules) {
