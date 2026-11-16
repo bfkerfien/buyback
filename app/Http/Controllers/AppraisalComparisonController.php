@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Eve\ExcludedMissionOre;
 use App\Services\Appraisal\InventoryParser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
