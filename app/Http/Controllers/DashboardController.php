@@ -118,10 +118,20 @@ class DashboardController extends Controller
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
+        // The standard asteroid-ore mineral list is exactly these eight materials.
+        // Do not expose every SDE type assigned to the broader Mineral group.
+        $standardMineralNames = [
+            'Tritanium', 'Pyerite', 'Mexallon', 'Isogen',
+            'Nocxium', 'Zydrine', 'Megacyte', 'Morphite',
+        ];
         $mineralTypes = $admin ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-            ->where('t.published', true)->where('g.category_name', 'Material')->where('g.group_name', 'Mineral')
-            ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
+            ->where('t.published', true)
+            ->where('g.category_name', 'Material')
+            ->where('g.group_name', 'Mineral')
+            ->whereIn('t.type_name', $standardMineralNames)
+            ->orderByRaw("FIELD(t.type_name, 'Tritanium', 'Pyerite', 'Mexallon', 'Isogen', 'Nocxium', 'Zydrine', 'Megacyte', 'Morphite')")
+            ->get(['t.type_id', 't.type_name']) : collect();
         $oreValuationRules = $admin ? DB::table('appraisal_ore_valuation_rules')->orderBy('ore_name')->get() : collect();
         $mineralPricingSettings = $admin
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key')
