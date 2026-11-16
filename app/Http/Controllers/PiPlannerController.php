@@ -26,6 +26,7 @@ class PiPlannerController extends Controller
         $taxSettings = DB::table('pi_tax_settings')->where('id', 1)->first();
         $importTaxPercent = (float) ($taxSettings->import_tax_percent ?? 0);
         $exportTaxPercent = (float) ($taxSettings->export_tax_percent ?? 0);
+        $targetProfitPercent = (float) ($taxSettings->target_profit_percent ?? 18);
         $piTaxableValues = [
             1042 => 400.0,
             1034 => 7200.0,
@@ -49,7 +50,7 @@ class PiPlannerController extends Controller
             ->orderBy('output.type_name')
             ->get()
             ->groupBy('schematic_id')
-            ->map(function ($rows) use ($prices, $importTaxPercent, $exportTaxPercent, $piTaxableValues) {
+            ->map(function ($rows) use ($prices, $importTaxPercent, $exportTaxPercent, $targetProfitPercent, $piTaxableValues) {
                 $first = $rows->first();
                 $outputPrice = $prices->get($first->product_type_id);
                 $inputs = $rows->filter(fn ($r) => $r->input_type_id !== null)->map(function ($r) use ($prices) {
@@ -97,26 +98,24 @@ class PiPlannerController extends Controller
                 $netSaleValue = $outputBuyValue !== null && $exportTax !== null && $transportFee !== null
                     ? round($outputBuyValue - $exportTax - $transportFee, 2)
                     : null;
-                // Maximum common percentage of current Jita buy prices payable for every input
-                // while keeping the all-in production cost (including both customs fees)
-                // at or below 82% of the P2 output's gross Jita buy value.
+                // Target material budget leaves the configured profit margin after
+                // import tax, export tax, and outbound transport are all paid.
                 $targetMaterialBudget = $outputBuyValue !== null && $inputTax !== null && $exportTax !== null && $transportFee !== null
-                    ? round(($outputBuyValue * 0.82) - $inputTax - $exportTax - $transportFee, 2)
+                    ? round(($outputBuyValue * (1 - ($targetProfitPercent / 100))) - $inputTax - $exportTax - $transportFee, 2)
                     : null;
-                // Allocate the exact remaining material budget proportionally to
-                // each input's current Jita cost (quantity × unit buy price). This
-                // produces the same buy-below percentage for each input and has no
-                // minimum percentage floor.
                 $targetBuyPercent = null;
                 $targetInputsComplete = $inputCost !== null && $inputs->isNotEmpty()
                     && $inputs->every(fn ($input) => $input['buy_price'] !== null && $input['buy_price'] > 0);
-                if ($targetInputsComplete && $targetMaterialBudget !== null && $inputCost > 0) {
+                if ($targetInputsComplete && $targetMaterialBudget !== null && $inputCost > 0 && $targetMaterialBudget >= 0) {
                     $targetBuyPercent = round(($targetMaterialBudget / $inputCost) * 100, 2);
                     $inputs = $inputs->map(function ($input) use ($targetBuyPercent) {
                         $input['target_buy_percent'] = $targetBuyPercent;
                         return $input;
                     });
                 }
+                $targetProfitValue = $outputBuyValue !== null
+                    ? round($outputBuyValue * $targetProfitPercent / 100, 2)
+                    : null;
 
                 return [
                     'id' => (int) $first->schematic_id,
@@ -139,9 +138,9 @@ class PiPlannerController extends Controller
                     'net_sale_value' => $netSaleValue,
                     'target_material_budget' => $targetMaterialBudget,
                     'target_buy_percent' => $targetBuyPercent,
-                    'profit_loss' => $totalProductionCost !== null && $netSaleValue !== null
-                        ? round($netSaleValue - $totalProductionCost, 2)
-                        : null,
+                    'target_profit_percent' => $targetProfitPercent,
+                    'target_profit_value' => $targetProfitValue,
+                    'profit_loss' => $targetMaterialBudget !== null && $targetMaterialBudget >= 0 ? $targetProfitValue : null,
                 ];
             })->values();
 
@@ -215,7 +214,7 @@ class PiPlannerController extends Controller
             ->sortBy('name')
             ->values();
 
-        return view('pi-planner', compact('recipes', 'importTaxPercent', 'exportTaxPercent', 'p1BuyTargets'));
+        return view('pi-planner', compact('recipes', 'importTaxPercent', 'exportTaxPercent', 'targetProfitPercent', 'p1BuyTargets'));
     }
 
     public function setP1BuyRule(Request $request): RedirectResponse
