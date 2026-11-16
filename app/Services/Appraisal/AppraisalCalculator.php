@@ -25,31 +25,18 @@ final class AppraisalCalculator
         $types = DB::table('eve_item_types as t')
             ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->whereIn('t.type_name', $names)
-            ->get(['t.type_id','t.type_name','t.group_id','g.category_id','g.category_name'])
+            ->get(['t.type_id','t.type_name','t.group_id','t.portion_size','g.category_id','g.category_name'])
             ->keyBy(fn ($type) => mb_strtolower($type->type_name));
 
-        // Uncompressed asteroid ores are valued from their matching compressed ore's
-        // Jita buy order, at 10% of that compressed unit price. Only published
-        // asteroid-ore types with an exact "Compressed {name}" SDE counterpart qualify.
-        $compressedNames = collect($names)->map(fn ($name) => 'Compressed ' . $name)->unique()->values();
-        $compressedOreTypes = DB::table('eve_item_types as t')
-            ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-            ->where('t.published', true)
-            ->where('g.category_id', 25)
-            ->whereIn('t.type_name', $compressedNames)
-            ->get(['t.type_id','t.type_name','t.group_id','g.category_id','g.category_name'])
-            ->keyBy(fn ($type) => mb_strtolower(mb_substr($type->type_name, strlen('Compressed '))));
-
-        $oreRules = DB::table('appraisal_ore_valuation_rules')->get()->keyBy('ore_type_id');
-        $typeIdsByName = DB::table('eve_item_types')->where('published', true)
-            ->whereIn('type_name', collect($names)->map(fn ($name) => preg_replace('/^Compressed /i', '', $name))->unique()->values())
-            ->pluck('type_id', 'type_name');
-        $outputIds = $oreRules->where('valuation_mode', 'reprocessed')->pluck('output_type_id')->filter()->unique()->values();
-        $outputTypes = $outputIds->isEmpty() ? collect() : DB::table('eve_item_types as t')
-            ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-            ->whereIn('t.type_id', $outputIds)->where('t.published', true)
-            ->get(['t.type_id','t.type_name','t.group_id','g.category_id','g.category_name'])
-            ->keyBy('type_id');
+        // Reprocessing recipes from CCP SDE are the source of truth for every ore.
+        $oreMaterials = DB::table('eve_type_materials')
+            ->whereIn('type_id', $types->pluck('type_id'))
+            ->get(['type_id', 'material_type_id', 'quantity'])
+            ->groupBy('type_id');
+        $mineralIds = $oreMaterials->flatten(1)->pluck('material_type_id')->unique()->values();
+        $mineralTypes = $mineralIds->isEmpty() ? collect() : DB::table('eve_item_types')
+            ->whereIn('type_id', $mineralIds)->where('published', true)
+            ->get(['type_id', 'type_name'])->keyBy('type_id');
 
         $rules = DB::table('appraisal_payout_rules')->get()->keyBy('category_id');
         $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
@@ -74,11 +61,55 @@ final class AppraisalCalculator
 
             $pricingType = $type;
             $pricingQuantity = (int) $item['quantity'];
-            $valuationMode = 'compressed';
+            $valuationMode = 'market';
             $outputQuantity = null;
             $conversionRatio = null;
+            $refinedLineValue = null;
+            $refinedMineralDetails = [];
 
-            $oreRule = $oreRules->get($type->type_id);
+            // Every asteroid ore, compressed or uncompressed, is valued from its
+            // SDE refined mineral outputs at the established max-refine yield:
+            // null-sec Tatara, T2 rig and RX-804 implant (90.628%).
+            if ((int) $type->category_id === 25) {
+                $recipe = $oreMaterials->get($type->type_id, collect());
+                $portionSize = max(1, (int) ($type->portion_size ?? 1));
+                $batches = intdiv($pricingQuantity, $portionSize);
+                if ($recipe->isEmpty() || $batches < 1) {
+                    $unresolvedTypes[] = $item['name'] . ' (missing SDE reprocessing recipe or incomplete batch quantity)';
+                    continue;
+                }
+
+                $refinedLineValue = 0.0;
+                foreach ($recipe as $material) {
+                    $mineral = $mineralTypes->get($material->material_type_id);
+                    if (!$mineral) {
+                        $unresolvedTypes[] = $item['name'] . ' (missing refined material type ID ' . $material->material_type_id . ')';
+                        continue 2;
+                    }
+                    $yieldedQuantity = (int) floor((int) $material->quantity * $batches * 0.90628);
+                    $mineralPrice = $this->jitaBuyPrice((int) $mineral->type_id, $regionId, 50000);
+                    if ($mineralPrice === null) {
+                        $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': no valid Jita buy price at 50,000-unit depth within 3% of the 7-day average)';
+                        continue 2;
+                    }
+                    $mineralValue = round($yieldedQuantity * $mineralPrice['price'], 2);
+                    $refinedLineValue += $mineralValue;
+                    $refinedMineralDetails[] = [
+                        'type_id' => (int) $mineral->type_id,
+                        'name' => $mineral->type_name,
+                        'quantity' => $yieldedQuantity,
+                        'unit_price' => $mineralPrice['price'],
+                        'value' => $mineralValue,
+                    ];
+                }
+                $refinedLineValue = round($refinedLineValue, 2);
+                $outputQuantity = array_sum(array_column($refinedMineralDetails, 'quantity'));
+                $valuationMode = 'reprocessed';
+                $unitPrice = $refinedLineValue / $pricingQuantity;
+                $price = (object) ['source' => 'sde-refined-outputs-50000-depth', 'observed_at' => now()];
+                $lineValue = $refinedLineValue;
+            } else {
+                $oreRule = null;
             $usesCompressedOrePrice = false;
 
             // Compressed Mercoxit variants are valued through their Morphite
@@ -193,12 +224,22 @@ final class AppraisalCalculator
 
             if ($unitPrice === null || $unitPrice <= 0 || !$price) {
                 $unpricedTypes[] = $valuationMode === 'reprocessed'
-                    ? $item['name'] . ' (type ID ' . $pricingType->type_id . ': no valid Jita price; requires 250,000 units of buy depth within 3% of the 7-day buy average)'
-                    : $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price; requires 250,000 units of buy depth within 3% of the 7-day buy average)';
+                    ? $item['name'] . ' (type ID ' . $pricingType->type_id . ': no valid Jita price; requires 50,000 units of buy depth within 3% of the 7-day buy average)'
+                    : $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price; requires 50,000 units of buy depth within 3% of the 7-day buy average)';
                 continue;
             }
 
             $lineValue = round($unitPrice * $pricingQuantity, 2);
+            }
+
+            if ($unitPrice === null || $unitPrice <= 0 || !$price) {
+                $unpricedTypes[] = $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price)';
+                continue;
+            }
+
+            if ($valuationMode !== 'reprocessed') {
+                $lineValue = round($unitPrice * $pricingQuantity, 2);
+            }
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
             $payoutRule = $effectiveCategoryId ? $rules->get($effectiveCategoryId) : null;
@@ -218,9 +259,11 @@ final class AppraisalCalculator
                 'morphite',
             ];
             $hasSpecial87Percent = in_array(mb_strtolower($type->type_name), $special87PercentNames, true);
-            $rate = $fixedPayoutPercent !== null
-                ? $fixedPayoutPercent
-                : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate));
+            $rate = (int) $type->category_id === 25
+                ? 87.0
+                : ($fixedPayoutPercent !== null
+                    ? $fixedPayoutPercent
+                    : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate)));
             // Normalize every existing 90% payout rule to 87%, including
             // category rules, individual PI rules, and explicitly fixed rates.
             if (abs($rate - 90.0) < 0.000001) {
@@ -247,6 +290,7 @@ final class AppraisalCalculator
                 'output_quantity' => $outputQuantity,
                 'conversion_ratio' => $conversionRatio,
                 'output_unit_price' => $unitPrice,
+                'refined_materials' => $refinedMineralDetails,
             ];
         }
 
@@ -280,5 +324,35 @@ final class AppraisalCalculator
             'payout_percent' => $fixedPayoutPercent !== null ? $fixedPayoutPercent : $defaultRate,
             'region_id' => $regionId,
         ];
+    }
+
+    private function jitaBuyPrice(int $typeId, string $regionId, int $requiredDepth): ?array
+    {
+        $latestBookAt = DB::table('market_order_book_snapshots')
+            ->where('type_id', $typeId)->where('region_id', $regionId)
+            ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
+            ->where('is_buy_order', true)->max('observed_at');
+        if (!$latestBookAt) return null;
+
+        $orders = DB::table('market_order_book_snapshots')
+            ->where('type_id', $typeId)->where('region_id', $regionId)
+            ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
+            ->where('is_buy_order', true)->where('observed_at', $latestBookAt)
+            ->orderByDesc('price')->get(['price', 'volume_remain']);
+        $remaining = $requiredDepth;
+        $price = null;
+        foreach ($orders as $order) {
+            if ((int) $order->volume_remain >= $remaining) { $price = (float) $order->price; break; }
+            $remaining -= (int) $order->volume_remain;
+        }
+        if ($price === null || $price <= 0) return null;
+
+        $average = (float) DB::table('market_price_snapshots')
+            ->where('type_id', $typeId)->where('region_id', $regionId)
+            ->where('source', 'esi-jita-4-4')->where('observed_at', '>=', now()->subDays(7))
+            ->whereNotNull('buy_price')->where('buy_price', '>', 0)->avg('buy_price');
+        if ($average <= 0 || abs($price - $average) / $average > 0.03) return null;
+
+        return ['price' => $price, 'observed_at' => $latestBookAt];
     }
 }
