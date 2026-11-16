@@ -24,11 +24,13 @@
 <a href="{{ route('dashboard', ['tab' => 'tab-ore-refining']) }}">Ore Refining</a>
 @endif
 <a href="{{ route('dashboard', ['tab' => 'tab-how-to']) }}">How To</a>
-<a href="{{ route('dashboard') }}">Dashboard</a>
 @else
 <a href="{{ route('login.eve') }}">Sign in with EVE</a>
 @endauth
 </nav>
+@auth
+<form method="post" action="{{ route('logout') }}" style="text-align:right;margin:-14px 0 18px">@csrf<button type="submit" style="margin:0;padding:8px 12px;font-size:12px">Sign out</button></form>
+@endauth
 <section class="hero">
 <div class="eyebrow">Public · No EVE login required</div>
 <h1>Ship Buyback Appraisal</h1>
