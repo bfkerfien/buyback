@@ -166,6 +166,36 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <div class="row"><label>EVE item category<select name="category_id" required><option value="">Select category</option>@foreach($eveCategories as $category)<option value="{{ $category->category_id }}">{{ $category->category_name }}</option>@endforeach</select></label><label>Buyback rate (%)<input name="payout_percent" type="number" min="0.01" max="100" step="0.01" placeholder="80.00" required></label></div><button>Save category rate</button></form>
 <table><thead><tr><th>Category</th><th>Buyback rate</th><th>Action</th></tr></thead><tbody>@forelse($payoutRules as $rule)<tr><td>{{ $rule->category_name }}</td><td>{{ number_format((float)$rule->payout_percent,2) }}%</td><td><form class="inline" method="post" action="{{ route('admin.appraisal-rates.destroy',$rule->category_id) }}">@csrf @method('DELETE')<button style="background:#263b46;color:#eaf7f8">Remove</button></form></td></tr>@empty<tr><td colspan="3">No category-specific rates. All items use the default rate.</td></tr>@endforelse</tbody></table>
 <p class="muted">CCP SDE category data must be imported once before categories appear in this list.</p>
+<h2 style="margin-top:24px">Standard mineral buyback settings</h2>
+<p class="muted">Each mineral has its own buy percentage and cumulative Jita buy-order quantity. The calculator uses the price at that unit in the live Jita buy book. Save each mineral independently.</p>
+@php($standardMineralDepths = ['Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000, 'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000, 'Megacyte' => 500000, 'Morphite' => 45000])
+<div style="overflow-x:auto"><table><thead><tr><th>Mineral</th><th>Buy percentage</th><th>Jita unit depth</th><th>Save</th></tr></thead><tbody>
+@foreach($mineralTypes as $mineral)
+@php($buyPercentKey = 'mineral_buy_percent_'.$mineral->type_id)
+@php($buyDepthKey = 'mineral_buy_depth_'.$mineral->type_id)
+<tr><form method="post" action="{{ route('admin.mineral-pricing.store') }}">@csrf
+<td>{{ $mineral->type_name }}<input type="hidden" name="type_id" value="{{ $mineral->type_id }}"></td>
+<td><input aria-label="{{ $mineral->type_name }} buy percentage" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $mineralPricingSettings->get($buyPercentKey, 87) }}" required style="max-width:130px;margin:0"></td>
+<td><input aria-label="{{ $mineral->type_name }} Jita cumulative unit depth" name="price_depth" type="number" min="1" step="1" value="{{ $mineralPricingSettings->get($buyDepthKey, $standardMineralDepths[$mineral->type_name] ?? 50000) }}" required style="max-width:190px;margin:0"></td>
+<td><button type="submit">Submit</button></td>
+</form></tr>
+@endforeach
+</tbody></table></div>
+<h2 style="margin-top:24px">Moon-ore refined material settings</h2>
+<p class="muted">Every material found in the SDE refining recipes for moon ores appears here. Configure its buy percentage and cumulative Jita quantity independently. Defaults are 87% and 50,000 units until changed.</p>
+<div style="overflow-x:auto"><table><thead><tr><th>Refined material</th><th>Material group</th><th>Buy percentage</th><th>Jita unit depth</th><th>Save</th></tr></thead><tbody>
+@forelse($moonMineralTypes as $material)
+@php($buyPercentKey = 'mineral_buy_percent_'.$material->type_id)
+@php($buyDepthKey = 'mineral_buy_depth_'.$material->type_id)
+<tr><form method="post" action="{{ route('admin.mineral-pricing.store') }}">@csrf
+<td>{{ $material->type_name }}<input type="hidden" name="type_id" value="{{ $material->type_id }}"></td>
+<td>{{ $material->group_name }}</td>
+<td><input aria-label="{{ $material->type_name }} buy percentage" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $mineralPricingSettings->get($buyPercentKey, 87) }}" required style="max-width:130px;margin:0"></td>
+<td><input aria-label="{{ $material->type_name }} Jita cumulative unit depth" name="price_depth" type="number" min="1" step="1" value="{{ $mineralPricingSettings->get($buyDepthKey, 50000) }}" required style="max-width:190px;margin:0"></td>
+<td><button type="submit">Submit</button></td>
+</form></tr>
+@empty<tr><td colspan="5">No moon-ore refining materials found. Confirm the CCP SDE moon-ore groups and reprocessing recipes are imported.</td></tr>@endforelse
+</tbody></table></div>
 <h2 style="margin-top:24px">Ore valuation rules</h2>
 <p class="muted">Choose the valuation basis per ore. Compressed price uses the ore's own Jita buy price. Reprocessed price converts the submitted ore quantity into the configured output material, prices that material in Jita, and applies the output material's effective category/default buyback rate. Ore without an override uses compressed price.</p>
 <form method="post" action="{{ route('admin.appraisal-ore-rules.store') }}">@csrf
