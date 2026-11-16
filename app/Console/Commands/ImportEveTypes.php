@@ -1,9 +1,9 @@
 <?php
 
-namespace App\\Console\\Commands;
+namespace App\Console\Commands;
 
-use Illuminate\\Console\\Command;
-use Illuminate\\Support\\Facades\\DB;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class ImportEveTypes extends Command
@@ -34,7 +34,7 @@ class ImportEveTypes extends Command
             if (count($batch) >= 1000) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','updated_at']); $imported += count($batch); $batch=[]; $this->output->write('.'); }
         }
         fclose($handle);
-        if ($batch) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','portion_size','updated_at']); $imported += count($batch); }
+        if ($batch) { DB::table('eve_item_types')->upsert($batch,['type_id'],['type_name','published','group_id','updated_at']); $imported += count($batch); }
         $this->newLine(); $this->info("Imported or updated {$imported} published EVE item types.");
         return self::SUCCESS;
     }
