@@ -71,7 +71,7 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 <strong>T1 buy target · 18% below P2 Jita buy</strong>
 <div class="muted">Maximum combined T1 material budget after import tax, export tax, and outbound transport: @if($recipe['target_material_budget'] !== null) {{ number_format($recipe['target_material_budget'],2) }} ISK per run @else unavailable @endif</div>
 <div class="result" style="color:#ffbd75">Each T1 input has its own value-weighted buy target, shown beside its name. No input is assigned less than 80% of Jita buy.</div>
-<div class="muted">The available material budget is calculated after import tax, export tax, and outbound shipping, with total production cost capped at 82% of the finished P2 product's gross Jita buy value. Higher-value inputs receive a higher percentage than lower-value inputs. If the budget cannot cover every input at the 80% minimum, no target is shown.</div>
+<div class="muted">The available material budget is calculated after import tax, export tax, and outbound shipping, with total production cost capped at 82% of the finished P2 product's gross Jita buy value. Higher-value inputs receive a higher percentage than lower-value inputs. If the calculated target would fall below 80%, the displayed and recommended target is floored at 80%. This floor takes precedence even when it means exceeding the production budget.</div>
 </div>
 @endif
 @if($recipe['profit_loss'] !== null)
@@ -100,7 +100,7 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 <tr>
 <td style="padding:10px;border-bottom:1px solid #294a56">{{ $item['name'] }} <span class="muted">({{ $item['recipes'] }} recipe{{ $item['recipes'] === 1 ? '' : 's' }})</span></td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">{{ $item['jita_buy'] !== null ? number_format($item['jita_buy'],2).' ISK' : 'No price' }}</td>
-<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['can_set']) {{ number_format($item['lowest_percent'],2) }}% @else <span class="muted">Unavailable · recipe target missing or below 80% floor</span> @endif</td>
+<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['can_set']) {{ number_format($item['lowest_percent'],2) }}% @else <span class="muted">Unavailable · recipe target missing</span> @endif</td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['is_set']) {{ number_format($item['saved_percent'],2) }}% @else <span class="muted">Shared PI rate</span> @endif</td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">
 <form method="post" action="{{ route('pi-planner.p1-buy-rule') }}" style="margin:0">
