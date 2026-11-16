@@ -196,23 +196,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </tr>
 @empty<tr><td colspan="5">No moon-ore refining materials found. Confirm the CCP SDE moon-ore groups and reprocessing recipes are imported.</td></tr>@endforelse
 </tbody></table></div>
-<h2 style="margin-top:24px">Ore valuation rules</h2>
-<p class="muted">Choose the valuation basis per ore. Compressed price uses the ore's own Jita buy price. Reprocessed price converts the submitted ore quantity into the configured output material, prices that material in Jita, and applies the output material's effective category/default buyback rate. Ore without an override uses compressed price.</p>
-<form method="post" action="{{ route('admin.appraisal-ore-rules.store') }}">@csrf
-<div class="row">
-<label>Ore<select name="ore_type_id" required><option value="">Select ore</option>@foreach($oreTypes as $ore)<option value="{{ $ore->type_id }}">{{ $ore->type_name }}</option>@endforeach</select></label>
-<label>Valuation basis<select name="valuation_mode" id="ore-valuation-mode" required><option value="compressed">Compressed price</option><option value="reprocessed">Reprocessed material price</option></select></label>
-<label>Reprocessed output material<select name="output_type_id" id="ore-output-type"><option value="">Select mineral</option>@foreach($mineralTypes as $mineral)<option value="{{ $mineral->type_id }}">{{ $mineral->type_name }}</option>@endforeach</select></label>
-<label>Output units per 1 ore unit<input name="output_quantity_per_input" id="ore-output-ratio" type="number" min="0.00000001" max="1000000" step="0.00000001" placeholder="1.2688"></label>
-</div><button>Save ore valuation rule</button></form>
-<table><thead><tr><th>Ore</th><th>Valuation basis</th><th>Output conversion</th><th>Action</th></tr></thead><tbody>
-@forelse($oreValuationRules as $oreRule)<tr><td>{{ $oreRule->ore_name }}</td><td>{{ $oreRule->valuation_mode === 'reprocessed' ? 'Reprocessed price' : 'Compressed price' }}</td><td>{{ $oreRule->valuation_mode === 'reprocessed' ? number_format((float)$oreRule->output_quantity_per_input, 8).' × '.$oreRule->output_name.' per ore unit' : '—' }}</td><td><form class="inline" method="post" action="{{ route('admin.appraisal-ore-rules.destroy',$oreRule->ore_type_id) }}">@csrf @method('DELETE')<button style="background:#263b46;color:#eaf7f8">Remove</button></form></td></tr>@empty<tr><td colspan="4">No ore-specific overrides. All ores use compressed pricing.</td></tr>@endforelse
-</tbody></table>
-@if(!$oreTypes->count())<p class="muted">Import CCP SDE types and taxonomy first. Ore options are loaded from the Asteroid category.</p>@endif
-<script>
-(()=>{const mode=document.getElementById('ore-valuation-mode');const output=document.getElementById('ore-output-type');const ratio=document.getElementById('ore-output-ratio');const sync=()=>{const active=mode.value==='reprocessed';output.required=active;ratio.required=active;output.disabled=!active;ratio.disabled=!active;};mode.addEventListener('change',sync);sync();})();
-</script>
-<h2 style="margin-top:24px">Publish runner contract</h2><form method="post" action="{{ route('runner.jobs.create') }}">@csrf<div class="row"><label>Origin<input name="origin" required maxlength="100"></label><label>Destination<input name="destination" required maxlength="100"></label><label>EVE courier contract ID<input name="contract_id" type="number" min="1" required></label><label>Runner reward (ISK)<input name="reward_isk" type="number" min="0.01" step="0.01" required></label><label>Appraisal quote ID (optional)<input name="appraisal_quote_id" type="number"></label></div><label>Notes<textarea name="notes"></textarea></label><button>Publish job</button></form></section>
+</section>
 </section>
 <section class="tab-panel" id="tab-ore-refining" role="tabpanel" hidden>
 <iframe title="Ore Refining Comparison" src="{{ route('ore-values.index') }}" loading="lazy" style="display:block;width:100%;height:1900px;border:0;border-radius:12px;background:#060d13"></iframe>
