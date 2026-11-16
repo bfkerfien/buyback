@@ -166,9 +166,20 @@ final class AppraisalCalculator
             $piBuyRule = ((int) $type->category_id === 43 && (int) $type->group_id === 1042)
                 ? $piBuyRules->get($type->type_id)
                 : null;
+            // Mercoxit in every grade and Morphite have a fixed 87% buyback rate.
+            $special87PercentNames = [
+                'mercoxit',
+                'magma mercoxit',
+                'vitreous mercoxit',
+                'compressed mercoxit',
+                'compressed magma mercoxit',
+                'compressed vitreous mercoxit',
+                'morphite',
+            ];
+            $hasSpecial87Percent = in_array(mb_strtolower($type->type_name), $special87PercentNames, true);
             $rate = $fixedPayoutPercent !== null
                 ? $fixedPayoutPercent
-                : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate);
+                : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate));
 
             $lines[] = [
                 'type_id' => (int) $type->type_id,
