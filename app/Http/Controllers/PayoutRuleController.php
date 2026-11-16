@@ -43,17 +43,10 @@ class PayoutRuleController extends Controller
 
         $material = DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-            ->where('t.type_id', $data['type_id'])->where('t.published', true)
-            ->where(function ($query) use ($data) {
-                $query->where('g.group_name', 'Mineral')
-                    ->orWhereExists(function ($moon) use ($data) {
-                        $moon->select(DB::raw(1))->from('eve_type_materials as m')
-                            ->join('eve_item_types as ore', 'ore.type_id', '=', 'm.type_id')
-                            ->join('eve_item_groups as og', 'og.group_id', '=', 'ore.group_id')
-                            ->whereColumn('m.material_type_id', 't.type_id')
-                            ->where('og.group_name', 'like', '%Moon%');
-                    });
-            })
+            ->where('t.type_id', $data['type_id'])
+            ->where('t.published', true)
+            ->where('g.category_name', 'Material')
+            ->whereIn('g.group_name', ['Mineral', 'Moon Materials'])
             ->first(['t.type_id', 't.type_name']);
 
         if (!$material) {
