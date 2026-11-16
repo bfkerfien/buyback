@@ -25,6 +25,7 @@ final class AppraisalCalculator
             ->keyBy('type_id');
 
         $rules = DB::table('appraisal_payout_rules')->get()->keyBy('category_id');
+        $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
         $unresolvedTypes = [];
         $unpricedTypes = [];
         $lines = [];
@@ -92,7 +93,14 @@ final class AppraisalCalculator
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
             $payoutRule = $effectiveCategoryId ? $rules->get($effectiveCategoryId) : null;
-            $rate = $fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($payoutRule->payout_percent ?? $defaultRate);
+            // P1 planetary commodities use their individually configured appraisal
+            // buy percentage instead of the shared PI category payout percentage.
+            $piBuyRule = ((int) $type->category_id === 43 && (int) $type->group_id === 1042)
+                ? $piBuyRules->get($type->type_id)
+                : null;
+            $rate = $fixedPayoutPercent !== null
+                ? $fixedPayoutPercent
+                : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate);
 
             $lines[] = [
                 'type_id' => (int) $type->type_id,
@@ -105,7 +113,7 @@ final class AppraisalCalculator
                 'payout_value' => round($lineValue * $rate / 100, 2),
                 'category_id' => $effectiveCategoryId,
                 'category_name' => $effectiveCategoryName,
-                'rate_source' => $fixedPayoutPercent !== null ? 'fixed' : ($payoutRule ? 'category' : 'default'),
+                'rate_source' => $fixedPayoutPercent !== null ? 'fixed' : ($piBuyRule ? 'individual_pi' : ($payoutRule ? 'category' : 'default')),
                 'source' => $price->source,
                 'observed_at' => $price->observed_at,
                 'valuation_mode' => $valuationMode,
