@@ -109,137 +109,25 @@ final class AppraisalCalculator
                 $price = (object) ['source' => 'sde-refined-outputs-50000-depth', 'observed_at' => now()];
                 $lineValue = $refinedLineValue;
             } else {
-                $oreRule = null;
-            $usesCompressedOrePrice = false;
-
-            // Compressed Mercoxit variants are valued through their Morphite
-            // reprocessing yield, not through a market price for the compressed
-            // variant. A compressed unit represents 100 units of its base ore.
-            $isCompressedMercoxit = (bool) preg_match('/^Compressed .+Mercoxit/i', $type->type_name);
-            if ($isCompressedMercoxit) {
-                $baseOreName = preg_replace('/^Compressed /i', '', $type->type_name);
-                $baseOreId = $typeIdsByName->get($baseOreName);
-                $oreRule = $baseOreId ? $oreRules->get($baseOreId) : null;
-                if (!$oreRule || $oreRule->valuation_mode !== 'reprocessed') {
-                    $mercoxitId = DB::table('eve_item_types')->where('published', true)->where('type_name', 'Mercoxit')->value('type_id');
-                    $oreRule = $mercoxitId ? $oreRules->get($mercoxitId) : null;
-                }
-            }
-
-            if ($oreRule && $oreRule->valuation_mode === 'reprocessed') {
-                $pricingType = $outputTypes->get($oreRule->output_type_id);
-                if (!$pricingType) {
-                    $unresolved[] = $item['name'] . ' (missing reprocessed output item)';
-                    continue;
-                }
-
-                $conversionRatio = (float) $oreRule->output_quantity_per_input;
-                if ($isCompressedMercoxit) {
-                    $conversionRatio *= 100;
-                }
-                $outputQuantity = (int) floor($pricingQuantity * $conversionRatio + 0.00000001);
-                if ($outputQuantity < 1) {
-                    $unresolved[] = $item['name'] . ' (reprocessed output rounds to zero)';
-                    continue;
-                }
-
-                $pricingQuantity = $outputQuantity;
-                $valuationMode = 'reprocessed';
-            } elseif ((int) $type->category_id === 25 && $compressedOreTypes->has(mb_strtolower($type->type_name))) {
-                $pricingType = $compressedOreTypes->get(mb_strtolower($type->type_name));
-                $usesCompressedOrePrice = true;
-            }
-
-            // Buyback valuation is the marginal Jita buy price at 50,000 units
-            // of visible station buy-order depth, not the best single order.
-            // That depth price must remain within 3% of the 7-day average stored
-            // Jita buy snapshot price; otherwise treat the market as anomalous.
-            $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
-            if ($side === 'sell') {
-                $price = DB::table('market_price_snapshots')
-                    ->where('type_id', $pricingType->type_id)
-                    ->where('region_id', $regionId)
-                    ->whereNotNull($priceColumn)
-                    ->where($priceColumn, '>', 0)
-                    ->orderByDesc('observed_at')
-                    ->first(['buy_price','sell_price','source','observed_at']);
-                $unitPrice = $price ? (float) $price->{$priceColumn} : 0.0;
-            } else {
-                $latestBookAt = DB::table('market_order_book_snapshots')
-                    ->where('type_id', $pricingType->type_id)
-                    ->where('region_id', $regionId)
-                    ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
-                    ->where('is_buy_order', true)
-                    ->max('observed_at');
-
-                $depthOrders = $latestBookAt
-                    ? DB::table('market_order_book_snapshots')
-                        ->where('type_id', $pricingType->type_id)
-                        ->where('region_id', $regionId)
-                        ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
-                        ->where('is_buy_order', true)
-                        ->where('observed_at', $latestBookAt)
-                        ->orderByDesc('price')
-                        ->get(['price', 'volume_remain'])
-                    : collect();
-
-                $remainingDepth = 50000;
-                $unitPrice = null;
-                foreach ($depthOrders as $order) {
-                    $volume = (int) $order->volume_remain;
-                    if ($volume >= $remainingDepth) {
-                        $unitPrice = (float) $order->price;
-                        break;
-                    }
-                    $remainingDepth -= $volume;
-                }
-
-                $sevenDayAverage = (float) DB::table('market_price_snapshots')
-                    ->where('type_id', $pricingType->type_id)
-                    ->where('region_id', $regionId)
-                    ->where('source', 'esi-jita-4-4')
-                    ->where('observed_at', '>=', now()->subDays(7))
-                    ->whereNotNull('buy_price')
-                    ->where('buy_price', '>', 0)
-                    ->avg('buy_price');
-
-                if ($unitPrice !== null && $sevenDayAverage > 0) {
-                    $deviation = abs($unitPrice - $sevenDayAverage) / $sevenDayAverage;
-                    if ($deviation > 0.03) {
-                        $unitPrice = null;
-                    }
+                $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
+                if ($side === 'sell') {
+                    $price = DB::table('market_price_snapshots')
+                        ->where('type_id', $type->type_id)->where('region_id', $regionId)
+                        ->whereNotNull($priceColumn)->where($priceColumn, '>', 0)
+                        ->orderByDesc('observed_at')->first(['buy_price','sell_price','source','observed_at']);
+                    $unitPrice = $price ? (float) $price->{$priceColumn} : null;
                 } else {
-                    $unitPrice = null;
+                    $marketPrice = $this->jitaBuyPrice((int) $type->type_id, $regionId, 50000);
+                    $unitPrice = $marketPrice['price'] ?? null;
+                    $price = $marketPrice ? (object) ['source' => 'jita-50000-unit-depth', 'observed_at' => $marketPrice['observed_at']] : null;
                 }
-
-                $price = $unitPrice !== null ? (object) [
-                    'source' => 'jita-50000-unit-depth',
-                    'observed_at' => $latestBookAt,
-                ] : null;
-            }
-
-            if ($usesCompressedOrePrice && $unitPrice !== null) {
-                $unitPrice *= 0.10;
-            }
-
-            if ($unitPrice === null || $unitPrice <= 0 || !$price) {
-                $unpricedTypes[] = $valuationMode === 'reprocessed'
-                    ? $item['name'] . ' (type ID ' . $pricingType->type_id . ': no valid Jita price; requires 50,000 units of buy depth within 3% of the 7-day buy average)'
-                    : $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price; requires 50,000 units of buy depth within 3% of the 7-day buy average)';
-                continue;
-            }
-
-            $lineValue = round($unitPrice * $pricingQuantity, 2);
-            }
-
-            if ($unitPrice === null || $unitPrice <= 0 || !$price) {
-                $unpricedTypes[] = $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price)';
-                continue;
-            }
-
-            if ($valuationMode !== 'reprocessed') {
+                if ($unitPrice === null || $unitPrice <= 0 || !$price) {
+                    $unpricedTypes[] = $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price)';
+                    continue;
+                }
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
             }
+
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
             $payoutRule = $effectiveCategoryId ? $rules->get($effectiveCategoryId) : null;
