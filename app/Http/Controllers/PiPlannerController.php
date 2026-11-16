@@ -171,6 +171,70 @@ class PiPlannerController extends Controller
                 ];
             })->values();
 
-        return view('pi-planner', compact('recipes', 'importTaxPercent', 'exportTaxPercent'));
+        // One row per P1 input, using the lowest recommended percentage across
+        // every P1 -> P2 recipe that consumes it.
+        $p1Targets = [];
+        foreach ($recipes->filter(fn ($recipe) => strcasecmp($recipe['output_group'], 'Refined Commodities - Tier 2') === 0) as $recipe) {
+            foreach ($recipe['inputs'] as $input) {
+                if (!isset($input['target_buy_percent'])) {
+                    continue;
+                }
+                $id = (int) $input['id'];
+                if (!isset($p1Targets[$id])) {
+                    $p1Targets[$id] = [
+                        'type_id' => $id,
+                        'name' => $input['name'],
+                        'jita_buy' => $input['buy_price'],
+                        'lowest_percent' => (float) $input['target_buy_percent'],
+                        'recipes' => 1,
+                    ];
+                } else {
+                    $p1Targets[$id]['lowest_percent'] = min($p1Targets[$id]['lowest_percent'], (float) $input['target_buy_percent']);
+                    $p1Targets[$id]['recipes']++;
+                }
+            }
+        }
+        $savedPiRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
+        $p1BuyTargets = collect(array_values($p1Targets))
+            ->map(function ($item) use ($savedPiRules) {
+                $rule = $savedPiRules->get($item['type_id']);
+                $item['saved_percent'] = $rule ? (float) $rule->buy_percent : null;
+                $item['is_set'] = $rule !== null;
+                return $item;
+            })
+            ->sortBy('name')
+            ->values();
+
+        return view('pi-planner', compact('recipes', 'importTaxPercent', 'exportTaxPercent', 'p1BuyTargets'));
+    }
+
+    public function setP1BuyRule(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $data = $request->validate([
+            'type_id' => ['required', 'integer', 'min:1'],
+            'buy_percent' => ['required', 'numeric', 'min:80', 'max:100'],
+        ]);
+
+        $item = DB::table('eve_item_types as item')
+            ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
+            ->where('item.type_id', $data['type_id'])
+            ->where('item.published', true)
+            ->where('groups.category_id', 43)
+            ->where('groups.group_id', 1042)
+            ->first(['item.type_id', 'item.type_name']);
+        abort_unless($item, 404);
+
+        DB::table('appraisal_pi_buy_rules')->updateOrInsert(
+            ['type_id' => (int) $item->type_id],
+            [
+                'type_name' => $item->type_name,
+                'buy_percent' => round((float) $data['buy_percent'], 2),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+
+        return redirect()->route('pi-planner.index')->with('status', $item->type_name . ' appraisal buy price set to ' . number_format((float) $data['buy_percent'], 2) . '% of Jita buy.');
     }
 }
