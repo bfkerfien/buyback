@@ -111,7 +111,15 @@ class PiPlannerController extends Controller
                     && $inputs->every(fn ($input) => $input['buy_price'] !== null && $input['buy_price'] > 0);
                 if ($targetInputsComplete && $targetMaterialBudget !== null && $inputCost > 0) {
                     $minimumMaterialBudget = $inputCost * 0.80;
-                    if ($targetMaterialBudget >= $minimumMaterialBudget) {
+                    if ($targetMaterialBudget < $minimumMaterialBudget) {
+                        // The buy-rate floor takes precedence when the production
+                        // budget cannot support it: report 80% rather than no target.
+                        $inputs = $inputs->map(function ($input) {
+                            $input['target_buy_percent'] = 80.0;
+                            return $input;
+                        });
+                        $targetBuyPercent = 80.0;
+                    } else {
                         if ($targetMaterialBudget >= $inputCost) {
                             $inputs = $inputs->map(function ($input) {
                                 $input['target_buy_percent'] = 100.0;
