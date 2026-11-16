@@ -46,6 +46,19 @@ class RepairEveCatalog extends Command
             return self::FAILURE;
         }
 
+        $schematicsFile = $directory . '/planetSchematics.jsonl';
+        if (is_file($schematicsFile) && is_readable($schematicsFile)) {
+            $this->info('Importing planetary-industry schematics...');
+            $exit = Artisan::call('buyback:import-planet-schematics', ['file' => $schematicsFile]);
+            $this->output->write(Artisan::output());
+            if ($exit !== self::SUCCESS) {
+                $this->error('The planetary schematic import failed.');
+                return self::FAILURE;
+            }
+        } else {
+            $this->warn('planetSchematics.jsonl was not found; PI profitability recipes have not been imported yet.');
+        }
+
         $typeCount = DB::table('eve_item_types')->where('published', true)->count();
         $groupCount = DB::table('eve_item_groups')->count();
         $veldspar = DB::table('eve_item_types')->where('type_id', 1230)->value('type_name');
@@ -61,7 +74,9 @@ class RepairEveCatalog extends Command
             return self::FAILURE;
         }
 
-        $this->info('EVE item catalog and category mappings have been repaired.');
+        $schematicCount = DB::table('eve_planet_schematics')->count();
+        $this->line('Planetary schematics: ' . number_format($schematicCount));
+        $this->info('EVE item catalog, category mappings, and available planetary recipes have been repaired.');
         return self::SUCCESS;
     }
 }
