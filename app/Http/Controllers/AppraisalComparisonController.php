@@ -20,8 +20,14 @@ class AppraisalComparisonController extends Controller
             'buyback_input' => ['required', 'string', 'max:50000'],
         ]);
 
-        $marketbaiters = $this->resolveInput($data['marketbaiters_input'], 'Marketbaiters', $request, $parser);
-        $buyback = $this->resolveInput($data['buyback_input'], 'EveBuyback', $request, $parser);
+        $marketbaiters = array_values(array_filter(
+            $this->resolveInput($data['marketbaiters_input'], 'Marketbaiters', $request, $parser),
+            fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
+        ));
+        $buyback = array_values(array_filter(
+            $this->resolveInput($data['buyback_input'], 'EveBuyback', $request, $parser),
+            fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
+        ));
 
         $left = collect($marketbaiters)->keyBy(fn ($item) => $this->key($item['name']));
         $right = collect($buyback)->keyBy(fn ($item) => $this->key($item['name']));
