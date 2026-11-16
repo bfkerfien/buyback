@@ -107,8 +107,8 @@ class DashboardController extends Controller
         $lastJitaPriceRefreshAt = $admin ? $priceRefreshStatus->get('jita_full_refresh_at') : null;
         $lastJitaPriceRefreshCount = $admin ? (int) $priceRefreshStatus->get('jita_full_refresh_items', 0) : 0;
         $catalogPublishedTypeCount = $admin ? DB::table('eve_item_types')->where('published', true)->count() : 0;
-        $payoutRules = $admin ? DB::table('appraisal_payout_rules')->orderBy('category_name')->get() : collect();
-        $eveCategories = $admin ? DB::table('eve_item_groups')->select('category_id', 'category_name')->distinct()->orderBy('category_name')->get() : collect();
+        $payoutRules = $admin ? DB::table('appraisal_payout_rules')->whereNotIn('category_name', ['Asteroid', 'Material'])->orderBy('category_name')->get() : collect();
+        $eveCategories = $admin ? DB::table('eve_item_groups')->whereNotIn('category_name', ['Asteroid', 'Material'])->select('category_id', 'category_name')->distinct()->orderBy('category_name')->get() : collect();
         $compressedOreTypes = $admin ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
@@ -132,7 +132,6 @@ class DashboardController extends Controller
             ->whereIn('t.type_name', $standardMineralNames)
             ->orderByRaw("FIELD(t.type_name, 'Tritanium', 'Pyerite', 'Mexallon', 'Isogen', 'Nocxium', 'Zydrine', 'Megacyte', 'Morphite')")
             ->get(['t.type_id', 't.type_name']) : collect();
-        $oreValuationRules = $admin ? DB::table('appraisal_ore_valuation_rules')->orderBy('ore_name')->get() : collect();
         $mineralPricingSettings = $admin
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key')
             : collect();
@@ -148,6 +147,6 @@ class DashboardController extends Controller
             ->get(['material.type_id', 'material.type_name', 'mg.group_name'])
             : collect();
 
-        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'oreValuationRules', 'mineralPricingSettings', 'moonMineralTypes'));
+        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes'));
     }
 }
