@@ -16,7 +16,7 @@ class PayoutRuleController extends Controller
             'category_id' => ['required', 'integer', 'min:1'],
             'payout_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
         ]);
-        $category = DB::table('eve_item_groups')->where('category_id', $data['category_id'])->orderBy('category_name')->first(['category_id','category_name']);
+        $category = DB::table('eve_item_groups')->where('category_id', $data['category_id'])->whereNotIn('category_name', ['Asteroid', 'Material'])->orderBy('category_name')->first(['category_id','category_name']);
         if (!$category) throw ValidationException::withMessages(['category_id'=>['That EVE category was not found. Import the CCP SDE categories and groups first.']]);
 
         DB::table('appraisal_payout_rules')->updateOrInsert(
