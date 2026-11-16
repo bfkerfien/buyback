@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ore Refining · EveBuyback</title>
 <style>
-:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#071018;color:#eaf7f8}*{box-sizing:border-box}body{margin:0;padding:18px;background:radial-gradient(ellipse at 50% -10%,#0d5967 0,transparent 52%),#060d13;min-height:100vh}main{max-width:1500px;margin:auto}.muted{color:#9bb5bf;font-size:12px;line-height:1.6}.panel{background:#101e27;border:1px solid #294a56;border-radius:14px;padding:18px;margin:14px 0}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.top a{color:#62d9e9;text-decoration:none;border:1px solid #386675;border-radius:8px;padding:8px 12px}h1{font-size:26px;margin:8px 0}.profile{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.stat{background:#09151c;border-radius:10px;padding:12px}.stat span{display:block;color:#9bb5bf;font-size:12px}.stat strong{display:block;margin-top:6px;font-size:16px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:1050px}th,td{padding:10px;border-bottom:1px solid #294a56;text-align:right;font-size:12px;white-space:nowrap}th{color:#9deaf0;position:sticky;top:0;background:#101e27}th:first-child,td:first-child{text-align:left}.ore{font-weight:700;color:#eaf7f8}.sell{color:#9de0b1}.refine{color:#ffb45f}.unknown{color:#e8c27c}.winner{font-weight:800}.details{background:#315665;color:#fff;border:0;border-radius:6px;padding:6px 9px;cursor:pointer}.materials{display:none;text-align:left;white-space:normal;padding:12px;background:#09151c}.materials.open{display:table-cell}.materials ul{margin:0;padding-left:18px;line-height:1.7}.notice{background:#172c35;border:1px solid #386675;border-radius:10px;padding:12px;color:#d9edf0;font-size:12px;line-height:1.6}@media(max-width:760px){body{padding:8px}.profile{grid-template-columns:repeat(2,1fr)}.panel{padding:12px}}
+:root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#071018;color:#eaf7f8}*{box-sizing:border-box}body{margin:0;padding:18px;background:radial-gradient(ellipse at 50% -10%,#0d5967 0,transparent 52%),#060d13;min-height:100vh}main{max-width:1500px;margin:auto}.muted{color:#9bb5bf;font-size:12px;line-height:1.6}.panel{background:#101e27;border:1px solid #294a56;border-radius:14px;padding:18px;margin:14px 0}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.top a{color:#62d9e9;text-decoration:none;border:1px solid #386675;border-radius:8px;padding:8px 12px}h1{font-size:26px;margin:8px 0}.profile{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:9px}.stat{background:#09151c;border-radius:10px;padding:12px}.stat span{display:block;color:#9bb5bf;font-size:12px}.stat strong{display:block;margin-top:6px;font-size:16px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:1050px}th,td{padding:10px;border-bottom:1px solid #294a56;text-align:right;font-size:12px;white-space:nowrap}th{color:#9deaf0;position:sticky;top:0;background:#101e27}th:first-child,td:first-child{text-align:left}.ore{font-weight:700;color:#eaf7f8}.sell{color:#9de0b1}.refine{color:#ffb45f}.unknown{color:#e8c27c}.winner{font-weight:800}.details{background:#315665;color:#fff;border:0;border-radius:6px;padding:6px 9px;cursor:pointer}.materials{display:none;text-align:left;white-space:normal;padding:12px;background:#09151c}.materials.open{display:table-cell}.materials ul{margin:0;padding-left:18px;line-height:1.7}.pi-tabs{display:flex;gap:8px;margin:12px 0}.pi-tabs .tab{border:1px solid #315665;border-radius:8px;padding:9px 18px;cursor:pointer}.pi-chart{display:grid;gap:9px}.pi-chart-row{display:grid;grid-template-columns:minmax(140px,220px) minmax(180px,1fr) 110px;align-items:center;gap:12px}.pi-chart-name{font-weight:700;font-size:12px}.pi-chart-track{height:14px;background:#1a3039;border-radius:10px;position:relative;overflow:hidden}.pi-chart-zero{position:absolute;left:50%;top:0;bottom:0;width:1px;background:#d8e9eb;z-index:2}.pi-chart-bar{position:absolute;top:0;height:100%;border-radius:3px}.pi-chart-bar.positive{background:#54c7a0}.pi-chart-bar.negative{background:#e07d5a}.pi-chart-value{text-align:right;font-weight:800;font-size:12px}.notice{background:#172c35;border:1px solid #386675;border-radius:10px;padding:12px;color:#d9edf0;font-size:12px;line-height:1.6}@media(max-width:760px){body{padding:8px}.profile{grid-template-columns:repeat(2,1fr)}.panel{padding:12px}}
 
 /* EveBuyback visual system: orbital graphite, ion-cyan and molten amber */
 :root{color-scheme:dark;--eb-bg:#071018;--eb-panel:#101e27;--eb-line:#294a56;--eb-cyan:#62d9e9;--eb-amber:#ff9b45;--eb-text:#eaf7f8;--eb-muted:#9bb5bf}
@@ -37,11 +37,14 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <div class="stat"><span>Structure</span><strong>Null-sec Tatara · T2 rig</strong></div>
 <div class="stat"><span>Skills / implant</span><strong>All skills V · RX-804</strong></div>
 <div class="stat"><span>Reprocessing yield / tax</span><strong>{{ number_format($yieldPercent,3) }}% / {{ number_format($taxPercent,2) }}%</strong></div>
+<div class="stat"><span>Ore sale basket · all priced ore</span><strong>{{ number_format($oreSaleValueTotal,2) }} ISK</strong></div>
+<div class="stat"><span>PI basket · 1,000 of each</span><strong>{{ number_format($piBasketValue,2) }} ISK</strong><span>{{ number_format($piPricedCount) }} / {{ number_format($piItems->count()) }} commodities priced</span></div>
+<div class="stat"><span>Combined basket · ore + PI</span><strong>{{ number_format($combinedSaleValueTotal,2) }} ISK</strong></div>
 </div>
-<p class="muted">Every published asteroid ore type is included, both compressed and uncompressed. Reprocessing uses complete SDE portions only; any units below the next portion size are not refined. Mineral output is calculated at the stated yield, then valued using Jita buy orders.</p>
+<p class="muted">Regular published asteroid ore is included, compressed and uncompressed; mission-specific ores are excluded. Reprocessing uses complete SDE portions only. The PI basket values 1,000 units of every published Planetary Commodity at Jita buy prices. Items without a stored price are excluded from basket totals.</p>
 </section>
 <section class="panel">
-<div class="notice">Jita IV - Moon 4 buy-order snapshots · {{ $rows->count() }} ore types · {{ $pricedCount }} with complete ore and mineral pricing. Latest ore-price snapshot: {{ $latestObservedAt ?: 'No Jita snapshots available' }}. Missing prices or SDE recipes are shown as incomplete, not estimated.</div>
+<div class="notice">Jita IV - Moon 4 buy-order snapshots · {{ $rows->count() }} regular ore types · {{ $pricedCount }} with complete ore and mineral pricing. {{ $piItems->count() }} Planetary Commodities loaded, {{ $piPricedCount }} priced. Combined priced sell basket: <strong>{{ number_format($combinedSaleValueTotal,2) }} ISK</strong> (10,000 units of each ore plus 1,000 units of each PI item). Missing prices and incomplete SDE recipes are not estimated.</div>
 </section>
 <section class="panel">
 <h2 style="margin:0 0 6px">All ore · value of {{ number_format($quantity) }} units each</h2>
@@ -75,5 +78,98 @@ No CCP SDE reprocessing recipe found for this ore.
 @endforelse
 </tbody></table></div>
 </section>
-<p class="muted">Values are estimates from the latest stored Jita buy-price snapshots, not guaranteed execution prices or available volume. Comparison excludes hauling, market fees, and slippage. Reprocessing output is based on CCP SDE portion recipes and the fixed maximum-skill Tatara profile shown above.</p>
+<section class="panel">
+<h2 style="margin:0 0 6px">Planetary Interaction · value of {{ number_format($piQuantity) }} units each</h2>
+<p class="muted">Every published Planetary Commodity is listed across P1, P2, P3, and P4. Each commodity is valued as a 1,000-unit lot using the stored Jita buy price.</p>
+<div class="table-wrap"><table style="min-width:760px">
+<thead><tr><th>Commodity</th><th>PI tier</th><th>Quantity</th><th>Jita buy / unit</th><th>Value · {{ number_format($piQuantity) }} units</th></tr></thead>
+<tbody>
+@forelse($piItems as $item)
+<tr>
+<td class="ore">{{ $item['name'] }}</td>
+<td>{{ $item['tier'] }}</td>
+<td>{{ number_format($item['quantity']) }}</td>
+<td>{{ $item['unit_buy_price'] !== null ? number_format($item['unit_buy_price'],2).' ISK' : 'No price' }}</td>
+<td>{{ $item['market_value'] !== null ? number_format($item['market_value'],2).' ISK' : 'No price' }}</td>
+</tr>
+@empty
+<tr><td colspan="5" style="text-align:left">No Planetary Commodities found. Import the CCP SDE types and taxonomy datasets first.</td></tr>
+@endforelse
+</tbody>
+<tfoot><tr><th colspan="4">Total PI basket · priced commodities only</th><th>{{ number_format($piBasketValue,2) }} ISK</th></tr></tfoot>
+</table></div>
+<div class="notice" style="margin-top:12px">Combined basket: {{ number_format($oreSaleValueTotal,2) }} ISK for 10,000 units of each priced regular ore, plus {{ number_format($piBasketValue,2) }} ISK for 1,000 units of each priced PI commodity = <strong>{{ number_format($combinedSaleValueTotal,2) }} ISK</strong>. Commodities without a Jita buy price are not included.</div>
+</section>
+<section class="panel" id="pi-profitability">
+<h2 style="margin:0 0 6px">PI production profitability · admin</h2>
+<p class="muted">Each recipe is valued per schematic cycle. Input materials are costed at Jita buy, and the output is valued at its Jita buy price. Import tax is applied to total input cost; export tax is applied to output value. Profit percentage is net profit divided by input cost plus import tax.</p>
+@if(session('status'))<div class="notice" style="margin:10px 0">{{ session('status') }}</div>@endif
+@if($errors->any())<div class="notice" style="margin:10px 0">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif
+<form method="post" action="{{ route('ore-values.pi-taxes') }}" class="panel" style="margin:12px 0;padding:14px">
+@csrf
+<input type="hidden" name="tier" id="pi-tax-tier" value="{{ $activePiTier }}">
+<div class="profile">
+<label class="stat"><span>Import tax · % of input Jita value</span><input type="number" name="import_tax_percent" min="0" max="100" step="0.01" required value="{{ number_format($importTaxPercent,2,'.','') }}" style="width:100%;padding:9px;border-radius:7px;border:1px solid #315665;margin-top:8px"></label>
+<label class="stat"><span>Export tax · % of output Jita value</span><input type="number" name="export_tax_percent" min="0" max="100" step="0.01" required value="{{ number_format($exportTaxPercent,2,'.','') }}" style="width:100%;padding:9px;border-radius:7px;border:1px solid #315665;margin-top:8px"></label>
+<div class="stat" style="display:flex;align-items:end"><button type="submit" style="border:0;border-radius:8px;padding:10px 16px;cursor:pointer;font-weight:800">Save tax settings</button></div>
+</div>
+</form>
+<div class="pi-tabs" role="tablist" aria-label="PI production tier">
+<button type="button" class="tab {{ $activePiTier === 'P2' ? 'active' : '' }}" id="pi-tab-P2" onclick="showPiTier('P2')">P2</button>
+<button type="button" class="tab {{ $activePiTier === 'P3' ? 'active' : '' }}" id="pi-tab-P3" onclick="showPiTier('P3')">P3</button>
+<button type="button" class="tab {{ $activePiTier === 'P4' ? 'active' : '' }}" id="pi-tab-P4" onclick="showPiTier('P4')">P4</button>
+</div>
+@foreach(['P2','P3','P4'] as $tier)
+<div class="pi-tier" id="pi-tier-{{ $tier }}" style="{{ $activePiTier === $tier ? '' : 'display:none' }}">
+<h3 style="margin:14px 0 8px">{{ $tier }} profitability · per production cycle</h3>
+@if(count($piProfitability[$tier]))
+<div class="pi-chart">
+@foreach($piProfitability[$tier] as $row)
+<div class="pi-chart-row">
+<div class="pi-chart-name">{{ $row['name'] }}</div>
+<div class="pi-chart-track"><span class="pi-chart-zero"></span>
+@if($row['profit_percent'] !== null)
+<span class="pi-chart-bar {{ $row['is_profit'] ? 'positive' : 'negative' }}" style="{{ $row['is_profit'] ? 'left:50%' : 'right:50%' }};width:{{ number_format($row['chart_width'],2,'.','') }}%"></span>
+@endif
+</div>
+<div class="pi-chart-value {{ $row['profit_percent'] === null ? 'unknown' : ($row['is_profit'] ? 'sell' : 'refine') }}">{{ $row['profit_percent'] !== null ? number_format($row['profit_percent'],2).'%' : 'Missing price' }}</div>
+</div>
+@endforeach
+</div>
+<div class="table-wrap" style="margin-top:16px"><table style="min-width:1100px">
+<thead><tr><th>Product</th><th>Output / cycle</th><th>Required inputs / cycle</th><th>Input cost</th><th>Import tax</th><th>Output value</th><th>Export tax</th><th>Net profit / loss</th><th>ROI</th></tr></thead>
+<tbody>
+@foreach($piProfitability[$tier] as $row)
+<tr>
+<td class="ore">{{ $row['name'] }}</td>
+<td>{{ number_format($row['quantity']) }}</td>
+<td style="text-align:left;white-space:normal;min-width:260px">@foreach($row['inputs'] as $input)<div>{{ number_format($input['quantity']) }} × {{ $input['name'] }} · {{ $input['unit_price'] !== null ? number_format($input['unit_price'],2).' ISK each' : 'No Jita price' }} · {{ $input['line_cost'] !== null ? number_format($input['line_cost'],2).' ISK' : '—' }}</div>@endforeach</td>
+<td>{{ number_format($row['inputs_cost'],2) }} ISK</td>
+<td>{{ $row['import_tax'] !== null ? number_format($row['import_tax'],2).' ISK' : '—' }}</td>
+<td>{{ $row['output_revenue'] !== null ? number_format($row['output_revenue'],2).' ISK' : 'No Jita price' }}</td>
+<td>{{ $row['export_tax'] !== null ? number_format($row['export_tax'],2).' ISK' : '—' }}</td>
+<td class="{{ $row['net_profit'] === null ? 'unknown' : ($row['net_profit'] >= 0 ? 'sell' : 'refine') }}">{{ $row['net_profit'] !== null ? number_format($row['net_profit'],2).' ISK' : 'Incomplete price data' }}</td>
+<td class="{{ $row['profit_percent'] === null ? 'unknown' : ($row['profit_percent'] >= 0 ? 'sell' : 'refine') }}">{{ $row['profit_percent'] !== null ? number_format($row['profit_percent'],2).'%' : '—' }}</td>
+</tr>
+@endforeach
+</tbody></table></div>
+@else
+<div class="notice">No {{ $tier }} recipes are loaded. Import the CCP planetSchematics.jsonl file after deploying the schematic migration.</div>
+@endif
+</div>
+@endforeach
+</section>
+<p class="muted">Values are estimates from the latest stored Jita buy-price snapshots, not guaranteed execution prices or available volume. Ore comparison excludes hauling, market fees, and slippage. PI profitability compares buying each recipe's inputs and selling its output at Jita buy prices, less the configured import and export taxes; it excludes hauling and facility costs.</p>
+<script>
+function showPiTier(tier){
+  ['P2','P3','P4'].forEach(function(key){
+    var panel=document.getElementById('pi-tier-'+key);
+    var tab=document.getElementById('pi-tab-'+key);
+    if(panel) panel.style.display=key===tier?'block':'none';
+    if(tab) tab.classList.toggle('active',key===tier);
+  });
+  var hidden=document.getElementById('pi-tax-tier');
+  if(hidden) hidden.value=tier;
+}
+</script>
 </main><footer style="margin:28px auto 12px;text-align:center;color:#7f9ba5;font-size:12px">(c) 2027 My Eve Online</footer></body></html>
