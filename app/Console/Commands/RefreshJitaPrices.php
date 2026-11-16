@@ -1,36 +1,30 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\\Console\\Commands;
 
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
+use Illuminate\\Console\\Command;
+use Illuminate\\Support\\Facades\\DB;
+use Illuminate\\Support\\Facades\\Http;
 use Throwable;
 
 class RefreshJitaPrices extends Command
 {
     protected $signature = 'buyback:refresh-jita-prices {type_ids?* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4} {--pi : Refresh every input and output type used by imported PI schematics}';
-    protected $description = 'Fetch best buy and sell orders at Jita IV - Moon 4 from EVE ESI.';
+    protected $description = 'Fetch Jita IV - Moon 4 market order depth and prices from EVE ESI.';
 
     public function handle(): int
     {
-        $userAgent = (string) config('buyback.eve_user_agent');
-        if ($userAgent === '') {
+        if ((string) config('buyback.eve_user_agent') === '') {
             $this->error('Set EVE_USER_AGENT in the environment before calling ESI.');
             return self::FAILURE;
         }
 
-        $typeIds = array_values(array_unique(array_filter(
-            array_map('intval', $this->argument('type_ids')),
-            fn (int $id) => $id > 0
-        )));
-
+        $typeIds = array_values(array_unique(array_filter(array_map('intval', $this->argument('type_ids')), fn (int $id) => $id > 0)));
         if ($this->option('pi')) {
             if ($this->option('all') || $typeIds) {
                 $this->error('Use --pi by itself, without --all or explicit type IDs.');
                 return self::FAILURE;
             }
-
             $typeIds = array_merge(
                 DB::table('eve_planet_schematics')->pluck('product_type_id')->all(),
                 DB::table('eve_planet_schematic_inputs')->pluck('type_id')->all()
@@ -40,7 +34,6 @@ class RefreshJitaPrices extends Command
                 $this->error('No PI recipe types are imported yet.');
                 return self::FAILURE;
             }
-            $this->info('Refreshing Jita buy/sell prices for '.count($typeIds).' PI input and output types...');
         }
 
         if ($this->option('all')) {
@@ -48,10 +41,8 @@ class RefreshJitaPrices extends Command
                 $this->error('Use either --all or explicit type IDs, not both.');
                 return self::FAILURE;
             }
-
             return $this->refreshAll();
         }
-
         if (!$typeIds) {
             $this->error('Supply type IDs or use --all to refresh every item traded at Jita 4-4.');
             return self::FAILURE;
@@ -60,62 +51,68 @@ class RefreshJitaPrices extends Command
         $saved = 0;
         foreach ($typeIds as $typeId) {
             try {
-                $prices = $this->fetchTypePrices($typeId);
-                $this->storeSnapshots([[
-                    'type_id' => $typeId,
-                    'buy_price' => $prices['buy'],
-                    'sell_price' => $prices['sell'],
-                ]]);
+                $orders = $this->fetchTypeOrders($typeId);
+                if (!$orders) {
+                    $this->warn("Type {$typeId}: no Jita IV - Moon 4 orders.");
+                    continue;
+                }
+                $this->storeOrderBook($orders);
+                $this->storeBestPriceSnapshot($typeId, $orders);
                 $saved++;
-                $this->line("Type {$typeId}: buy ".($prices['buy'] ?? 'n/a').' / sell '.($prices['sell'] ?? 'n/a'));
+                $this->line("Type {$typeId}: stored ".count($orders)." Jita orders.");
             } catch (Throwable $exception) {
                 $this->warn("Failed to refresh type {$typeId}: {$exception->getMessage()}");
             }
         }
-
-        $this->info("Saved {$saved} Jita 4-4 price snapshots.");
+        $this->info("Saved order-book depth for {$saved} of ".count($typeIds)." requested types.");
         return $saved === count($typeIds) ? self::SUCCESS : self::FAILURE;
     }
 
     private function refreshAll(): int
     {
-        $this->info('Fetching The Forge market orders and selecting orders located at Jita IV - Moon 4...');
-        $http = Http::withHeaders(['User-Agent' => config('buyback.eve_user_agent'), 'X-Compatibility-Date' => config('buyback.esi_compatibility_date')])
-            ->acceptJson()->timeout(45)->retry(3, 750);
+        $this->info('Fetching The Forge market orders and retaining all orders located at Jita IV - Moon 4...');
+        $http = Http::withHeaders([
+            'User-Agent' => config('buyback.eve_user_agent'),
+            'X-Compatibility-Date' => config('buyback.esi_compatibility_date'),
+        ])->acceptJson()->timeout(45)->retry(3, 750);
+
         $regionId = (int) config('buyback.region_id', 10000002);
         $stationId = (int) config('buyback.jita_station_id', 60003760);
         $pages = 1;
+        $orders = [];
         $prices = [];
 
         try {
             for ($page = 1; $page <= $pages; $page++) {
-                $response = $http->get(
-                    "https://esi.evetech.net/latest/markets/{$regionId}/orders/",
-                    ['order_type' => 'all', 'page' => $page]
-                )->throw();
+                $response = $http->get("https://esi.evetech.net/latest/markets/{$regionId}/orders/", [
+                    'order_type' => 'all',
+                    'page' => $page,
+                ])->throw();
 
                 $pages = min(1000, max(1, (int) $response->header('X-Pages', 1)));
                 foreach ($response->json() as $order) {
-                    if ((int) ($order['location_id'] ?? 0) !== $stationId) {
-                        continue;
-                    }
-
+                    if ((int) ($order['location_id'] ?? 0) !== $stationId) continue;
                     $typeId = (int) ($order['type_id'] ?? 0);
                     $price = (float) ($order['price'] ?? 0);
-                    if ($typeId < 1 || $price <= 0) {
-                        continue;
-                    }
+                    $volume = (int) ($order['volume_remain'] ?? 0);
+                    if ($typeId < 1 || $price <= 0 || $volume < 1) continue;
 
+                    $isBuy = (bool) ($order['is_buy_order'] ?? false);
+                    $orders[] = [
+                        'type_id' => $typeId,
+                        'region_id' => (string) $regionId,
+                        'location_id' => $stationId,
+                        'is_buy_order' => $isBuy,
+                        'price' => $price,
+                        'volume_remain' => $volume,
+                    ];
                     $prices[$typeId] ??= ['buy' => null, 'sell' => null];
-                    if (!empty($order['is_buy_order'])) {
-                        $prices[$typeId]['buy'] = $prices[$typeId]['buy'] === null
-                            ? $price : max($prices[$typeId]['buy'], $price);
+                    if ($isBuy) {
+                        $prices[$typeId]['buy'] = $prices[$typeId]['buy'] === null ? $price : max($prices[$typeId]['buy'], $price);
                     } else {
-                        $prices[$typeId]['sell'] = $prices[$typeId]['sell'] === null
-                            ? $price : min($prices[$typeId]['sell'], $price);
+                        $prices[$typeId]['sell'] = $prices[$typeId]['sell'] === null ? $price : min($prices[$typeId]['sell'], $price);
                     }
                 }
-
                 $this->output->write('.');
                 usleep(100000);
             }
@@ -125,27 +122,23 @@ class RefreshJitaPrices extends Command
             return self::FAILURE;
         }
 
-        $rows = [];
-        foreach ($prices as $typeId => $price) {
-            $rows[] = ['type_id' => $typeId, 'buy_price' => $price['buy'], 'sell_price' => $price['sell']];
-        }
-
-        if (!$rows) {
+        if (!$orders) {
             $this->newLine();
-            $this->error('No Jita IV - Moon 4 market orders were found; full refresh was not recorded as successful.');
+            $this->error('No Jita IV - Moon 4 orders found; refresh was not recorded as successful.');
             return self::FAILURE;
         }
 
-        foreach (array_chunk($rows, 500) as $chunk) {
-            $this->storeSnapshots($chunk);
+        $this->storeOrderBook($orders);
+        $snapshots = [];
+        foreach ($prices as $typeId => $price) {
+            $snapshots[] = ['type_id' => $typeId, 'buy_price' => $price['buy'], 'sell_price' => $price['sell']];
         }
+        foreach (array_chunk($snapshots, 500) as $chunk) $this->storeSnapshots($chunk);
 
-        // Record only a completed full-market refresh. Targeted type refreshes do not
-        // change this timestamp, so the admin panel reflects database-wide updates.
         $refreshedAt = now();
         foreach ([
             'jita_full_refresh_at' => $refreshedAt->toDateTimeString(),
-            'jita_full_refresh_items' => (string) count($rows),
+            'jita_full_refresh_items' => (string) count($prices),
         ] as $key => $value) {
             DB::table('buyback_system_status')->updateOrInsert(
                 ['status_key' => $key],
@@ -154,51 +147,72 @@ class RefreshJitaPrices extends Command
         }
 
         $this->newLine();
-        $this->info('Saved '.count($rows).' Jita 4-4 price snapshots from '.$pages.' market pages.');
-        return $rows ? self::SUCCESS : self::FAILURE;
+        $this->info('Saved '.count($orders).' Jita IV - Moon 4 orders covering '.count($prices).' item types across '.$pages.' market pages.');
+        return self::SUCCESS;
     }
 
-    private function fetchTypePrices(int $typeId): array
+    private function fetchTypeOrders(int $typeId): array
     {
         $http = Http::withHeaders([
-                'User-Agent' => config('buyback.eve_user_agent'),
-                'X-Compatibility-Date' => config('buyback.esi_compatibility_date'),
-            ])
-            ->acceptJson()->timeout(30)->retry(3, 500);
+            'User-Agent' => config('buyback.eve_user_agent'),
+            'X-Compatibility-Date' => config('buyback.esi_compatibility_date'),
+        ])->acceptJson()->timeout(30)->retry(3, 500);
+
         $regionId = (int) config('buyback.region_id', 10000002);
         $stationId = (int) config('buyback.jita_station_id', 60003760);
-        $buy = null;
-        $sell = null;
         $pages = 1;
-
+        $orders = [];
         for ($page = 1; $page <= $pages; $page++) {
-            $response = $http->get(
-                "https://esi.evetech.net/latest/markets/{$regionId}/orders/",
-                ['order_type' => 'all', 'type_id' => $typeId, 'page' => $page]
-            )->throw();
-
+            $response = $http->get("https://esi.evetech.net/latest/markets/{$regionId}/orders/", [
+                'order_type' => 'all',
+                'type_id' => $typeId,
+                'page' => $page,
+            ])->throw();
             $pages = min(1000, max(1, (int) $response->header('X-Pages', 1)));
             foreach ($response->json() as $order) {
-                if ((int) ($order['location_id'] ?? 0) !== $stationId) {
-                    continue;
-                }
-
+                if ((int) ($order['location_id'] ?? 0) !== $stationId) continue;
                 $price = (float) ($order['price'] ?? 0);
-                if ($price <= 0) {
-                    continue;
-                }
-
-                if (!empty($order['is_buy_order'])) {
-                    $buy = $buy === null ? $price : max($buy, $price);
-                } else {
-                    $sell = $sell === null ? $price : min($sell, $price);
-                }
+                $volume = (int) ($order['volume_remain'] ?? 0);
+                if ($price <= 0 || $volume < 1) continue;
+                $orders[] = [
+                    'type_id' => $typeId,
+                    'region_id' => (string) $regionId,
+                    'location_id' => $stationId,
+                    'is_buy_order' => (bool) ($order['is_buy_order'] ?? false),
+                    'price' => $price,
+                    'volume_remain' => $volume,
+                ];
             }
-
             usleep(100000);
         }
+        return $orders;
+    }
 
-        return ['buy' => $buy, 'sell' => $sell];
+    private function storeOrderBook(array $orders): void
+    {
+        $now = now();
+        foreach (array_chunk($orders, 500) as $chunk) {
+            $records = array_map(fn (array $order) => $order + [
+                'observed_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $chunk);
+            DB::table('market_order_book_snapshots')->insert($records);
+        }
+    }
+
+    private function storeBestPriceSnapshot(int $typeId, array $orders): void
+    {
+        $buy = null;
+        $sell = null;
+        foreach ($orders as $order) {
+            if ($order['is_buy_order']) {
+                $buy = $buy === null ? $order['price'] : max($buy, $order['price']);
+            } else {
+                $sell = $sell === null ? $order['price'] : min($sell, $order['price']);
+            }
+        }
+        $this->storeSnapshots([['type_id' => $typeId, 'buy_price' => $buy, 'sell_price' => $sell]]);
     }
 
     private function storeSnapshots(array $rows): void
@@ -214,9 +228,6 @@ class RefreshJitaPrices extends Command
             'created_at' => $now,
             'updated_at' => $now,
         ], $rows);
-
-        if ($records) {
-            DB::table('market_price_snapshots')->insert($records);
-        }
+        if ($records) DB::table('market_price_snapshots')->insert($records);
     }
 }
