@@ -19,7 +19,11 @@ $stages = [
 @foreach($stages as $key => $stage)
 <section class="tab-panel {{ $loop->first ? 'active' : '' }}" id="stage-{{ $key }}">
 <div class="panel"><h2>{{ $stage['title'] }}</h2><p class="muted">{{ $stage['description'] }}</p>
-@php($stageRecipes = $recipes->filter(fn($recipe) => strcasecmp($recipe['output_group'], $stage['group']) === 0)->values())
+@php
+$stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
+    return strcasecmp($recipe['output_group'], $stage['group']) === 0;
+})->values();
+@endphp
 @if($stageRecipes->isEmpty())
 <div class="empty">No recipes found for {{ $stage['group'] }}. Confirm that the CCP SDE schematic import and item taxonomy are current.</div>
 @else
