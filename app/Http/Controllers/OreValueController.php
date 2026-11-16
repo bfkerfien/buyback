@@ -21,6 +21,8 @@ class OreValueController extends Controller
         $latestPrices = DB::table('market_price_snapshots')
             ->selectRaw('type_id, MAX(id) as latest_id')
             ->where('region_id', $regionId)
+            ->whereNotNull('buy_price')
+            ->where('buy_price', '>', 0)
             ->groupBy('type_id');
 
         // Mission/NPE-only ore variants are excluded from the normal asteroid basket.
@@ -308,15 +310,16 @@ class OreValueController extends Controller
             'tier' => ['nullable', 'in:P2,P3,P4'],
         ]);
 
-        DB::table('pi_tax_settings')->updateOrInsert(
-            ['id' => 1],
-            [
-                'import_tax_percent' => $validated['import_tax_percent'],
-                'export_tax_percent' => $validated['export_tax_percent'],
-                'updated_at' => now(),
-                'created_at' => now(),
-            ]
-        );
+        $settings = [
+            'import_tax_percent' => $validated['import_tax_percent'],
+            'export_tax_percent' => $validated['export_tax_percent'],
+            'updated_at' => now(),
+        ];
+        if (DB::table('pi_tax_settings')->where('id', 1)->exists()) {
+            DB::table('pi_tax_settings')->where('id', 1)->update($settings);
+        } else {
+            DB::table('pi_tax_settings')->insert($settings + ['id' => 1, 'created_at' => now()]);
+        }
 
         $tier = $validated['tier'] ?? 'P2';
         return redirect(route('ore-values.index') . '?tier=' . urlencode($tier))
