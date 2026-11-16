@@ -112,7 +112,7 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 @endforeach
 </tbody></table></div>
 @endif
-</section>
+</div></details>
 </main>
 <script>
 (()=> {
