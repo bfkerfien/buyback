@@ -136,15 +136,15 @@ class DashboardController extends Controller
         $mineralPricingSettings = $admin
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key')
             : collect();
-        $moonMineralTypes = $admin ? DB::table('eve_type_materials as m')
-            ->join('eve_item_types as ore', 'ore.type_id', '=', 'm.type_id')
-            ->join('eve_item_groups as og', 'og.group_id', '=', 'ore.group_id')
-            ->join('eve_item_types as material', 'material.type_id', '=', 'm.material_type_id')
+        // Moon goo settings contain only the 20 published types in the
+        // dedicated Moon Materials group. Do not infer moon materials from
+        // every non-mineral output in a moon-ore recipe.
+        $moonMineralTypes = $admin ? DB::table('eve_item_types as material')
             ->join('eve_item_groups as mg', 'mg.group_id', '=', 'material.group_id')
-            ->where('ore.published', true)->where('material.published', true)
-            ->where('og.group_name', 'like', '%Moon%')
-            ->where('mg.group_name', '<>', 'Mineral')
-            ->distinct()->orderBy('material.type_name')
+            ->where('material.published', true)
+            ->where('mg.category_name', 'Material')
+            ->where('mg.group_name', 'Moon Materials')
+            ->orderBy('material.type_name')
             ->get(['material.type_id', 'material.type_name', 'mg.group_name'])
             : collect();
 
