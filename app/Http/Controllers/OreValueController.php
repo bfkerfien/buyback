@@ -332,10 +332,11 @@ class OreValueController extends Controller
             'return_to' => ['nullable', 'in:pi-planner'],
         ]);
 
+        $existingPiSettings = DB::table('pi_tax_settings')->where('id', 1)->first();
         $settings = [
             'import_tax_percent' => $validated['import_tax_percent'],
             'export_tax_percent' => $validated['export_tax_percent'],
-            'target_profit_percent' => $validated['target_profit_percent'] ?? 18,
+            'target_profit_percent' => $validated['target_profit_percent'] ?? (float) ($existingPiSettings->target_profit_percent ?? 18),
             'updated_at' => now(),
         ];
         if (DB::table('pi_tax_settings')->where('id', 1)->exists()) {
