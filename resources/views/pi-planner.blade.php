@@ -94,13 +94,14 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 @else
 <div style="overflow-x:auto">
 <table style="width:100%;border-collapse:collapse;min-width:650px">
-<thead><tr><th style="text-align:left;padding:10px;border-bottom:1px solid #294a56">P1 commodity</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Jita buy</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Lowest recipe target</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Current appraisal rate</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Action</th></tr></thead>
+<thead><tr><th style="text-align:left;padding:10px;border-bottom:1px solid #294a56">P1 commodity</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Jita buy</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Lowest recipe target</th><th style="text-align:left;padding:10px;border-bottom:1px solid #294a56">Lowest-target recipe</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Current appraisal rate</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Action</th></tr></thead>
 <tbody>
 @foreach($p1BuyTargets as $item)
 <tr>
 <td style="padding:10px;border-bottom:1px solid #294a56">{{ $item['name'] }} <span class="muted">({{ $item['recipes'] }} recipe{{ $item['recipes'] === 1 ? '' : 's' }})</span></td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">{{ $item['jita_buy'] !== null ? number_format($item['jita_buy'],2).' ISK' : 'No price' }}</td>
-<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['can_set']) {{ number_format($item['lowest_percent'],2) }}% @else <span class="muted">Unavailable · recipe target missing</span> @endif</td>
+<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['lowest_percent'] !== null) {{ number_format($item['lowest_percent'],2) }}% @else <span class="muted">Unavailable</span> @endif</td>
+<td style="padding:10px;text-align:left;border-bottom:1px solid #294a56">@if(!empty($item['lowest_recipes'])) {{ implode(', ', $item['lowest_recipes']) }} @else <span class="muted">No calculated recipe target</span> @endif @if(!$item['target_complete']) <div class="muted">Some recipe targets unavailable</div> @endif</td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['is_set']) {{ number_format($item['saved_percent'],2) }}% @else <span class="muted">Shared PI rate</span> @endif</td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">
 <form method="post" action="{{ route('pi-planner.p1-buy-rule') }}" style="margin:0">
