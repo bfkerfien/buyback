@@ -56,6 +56,8 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 <div class="material-head"><strong style="margin:0">{{ $input['name'] }}</strong><span class="target-percent">@if(isset($input['target_buy_percent'])) {{ number_format($input['target_buy_percent'],2) }}% of Jita buy @else Target unavailable @endif</span></div>
 <strong class="input-total">{{ number_format($input['quantity'] * 10) }}</strong>
 <span class="muted">{{ $input['quantity'] }} per run</span>
+<div class="muted" style="margin-top:6px">Jita buy: @if($input['buy_price'] !== null) {{ number_format($input['buy_price'],2) }} ISK each @else price unavailable @endif</div>
+<div class="muted">Material cost per run: @if($input['run_cost'] !== null) {{ number_format($input['run_cost'],2) }} ISK @else unavailable @endif</div>
 </div>
 @endforeach
 </div>
