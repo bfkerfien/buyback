@@ -102,15 +102,15 @@ No CCP SDE reprocessing recipe found for this ore.
 </section>
 <section class="panel" id="pi-profitability">
 <h2 style="margin:0 0 6px">PI production profitability · admin</h2>
-<p class="muted">Each recipe is valued per schematic cycle. Input materials are costed at Jita buy, and the output is valued at its Jita buy price. Import tax is applied to total input cost; export tax is applied to output value. Profit percentage is net profit divided by input cost plus import tax.</p>
+<p class="muted">Each recipe is valued per schematic cycle. Inputs and output use Jita buy prices. Customs taxes use EVE's fixed taxable values per PI tier: import fees are half the configured rate on imported input value; export fees use the full configured rate on the finished output. Profit percentage is net profit divided by input cost plus import tax.</p>
 @if(session('status'))<div class="notice" style="margin:10px 0">{{ session('status') }}</div>@endif
 @if($errors->any())<div class="notice" style="margin:10px 0">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif
 <form method="post" action="{{ route('ore-values.pi-taxes') }}" class="panel" style="margin:12px 0;padding:14px">
 @csrf
 <input type="hidden" name="tier" id="pi-tax-tier" value="{{ $activePiTier }}">
 <div class="profile">
-<label class="stat"><span>Import tax · % of input Jita value</span><input type="number" name="import_tax_percent" min="0" max="100" step="0.01" required value="{{ number_format($importTaxPercent,2,'.','') }}" style="width:100%;padding:9px;border-radius:7px;border:1px solid #315665;margin-top:8px"></label>
-<label class="stat"><span>Export tax · % of output Jita value</span><input type="number" name="export_tax_percent" min="0" max="100" step="0.01" required value="{{ number_format($exportTaxPercent,2,'.','') }}" style="width:100%;padding:9px;border-radius:7px;border:1px solid #315665;margin-top:8px"></label>
+<label class="stat"><span>Import tax rate · % (EVE import fee is half)</span><input type="number" name="import_tax_percent" min="0" max="100" step="0.01" required value="{{ number_format($importTaxPercent,2,'.','') }}" style="width:100%;padding:9px;border-radius:7px;border:1px solid #315665;margin-top:8px"></label>
+<label class="stat"><span>Export tax rate · % of PI taxable value</span><input type="number" name="export_tax_percent" min="0" max="100" step="0.01" required value="{{ number_format($exportTaxPercent,2,'.','') }}" style="width:100%;padding:9px;border-radius:7px;border:1px solid #315665;margin-top:8px"></label>
 <div class="stat" style="display:flex;align-items:end"><button type="submit" style="border:0;border-radius:8px;padding:10px 16px;cursor:pointer;font-weight:800">Save tax settings</button></div>
 </div>
 </form>
@@ -159,7 +159,7 @@ No CCP SDE reprocessing recipe found for this ore.
 </div>
 @endforeach
 </section>
-<p class="muted">Values are estimates from the latest stored Jita buy-price snapshots, not guaranteed execution prices or available volume. Ore comparison excludes hauling, market fees, and slippage. PI profitability compares buying each recipe's inputs and selling its output at Jita buy prices, less the configured import and export taxes; it excludes hauling and facility costs.</p>
+<p class="muted">Values are estimates from the latest stored Jita buy-price snapshots, not guaranteed execution prices or available volume. Ore comparison excludes hauling, market fees, and slippage. PI profitability compares buying each recipe's inputs and selling its output at Jita buy prices, less customs charges calculated from EVE's per-tier PI taxable values and your configured rates. Import fees use the 50% import multiplier. Hauling and facility costs are excluded.</p>
 <script>
 function showPiTier(tier){
   ['P2','P3','P4'].forEach(function(key){
