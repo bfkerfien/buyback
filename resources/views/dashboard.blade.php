@@ -173,12 +173,12 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @foreach($mineralTypes as $mineral)
 @php($buyPercentKey = 'mineral_buy_percent_'.$mineral->type_id)
 @php($buyDepthKey = 'mineral_buy_depth_'.$mineral->type_id)
-<tr><form method="post" action="{{ route('admin.mineral-pricing.store') }}">@csrf
-<td>{{ $mineral->type_name }}<input type="hidden" name="type_id" value="{{ $mineral->type_id }}"></td>
-<td><input aria-label="{{ $mineral->type_name }} buy percentage" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $mineralPricingSettings->get($buyPercentKey, 87) }}" required style="max-width:130px;margin:0"></td>
-<td><input aria-label="{{ $mineral->type_name }} Jita cumulative unit depth" name="price_depth" type="number" min="1" step="1" value="{{ $mineralPricingSettings->get($buyDepthKey, $standardMineralDepths[$mineral->type_name] ?? 50000) }}" required style="max-width:190px;margin:0"></td>
-<td><button type="submit">Submit</button></td>
-</form></tr>
+<tr>
+<td><form id="standard-mineral-{{ $mineral->type_id }}" method="post" action="{{ route('admin.mineral-pricing.store') }}">@csrf<input type="hidden" name="type_id" value="{{ $mineral->type_id }}">{{ $mineral->type_name }}</form></td>
+<td><input form="standard-mineral-{{ $mineral->type_id }}" aria-label="{{ $mineral->type_name }} buy percentage" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $mineralPricingSettings->get($buyPercentKey, 87) }}" required style="max-width:130px;margin:0"></td>
+<td><input form="standard-mineral-{{ $mineral->type_id }}" aria-label="{{ $mineral->type_name }} Jita cumulative unit depth" name="price_depth" type="number" min="1" step="1" value="{{ $mineralPricingSettings->get($buyDepthKey, $standardMineralDepths[$mineral->type_name] ?? 50000) }}" required style="max-width:190px;margin:0"></td>
+<td><button form="standard-mineral-{{ $mineral->type_id }}" type="submit">Submit</button></td>
+</tr>
 @endforeach
 </tbody></table></div>
 <h2 style="margin-top:24px">Moon-ore refined material settings</h2>
@@ -187,13 +187,13 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @forelse($moonMineralTypes as $material)
 @php($buyPercentKey = 'mineral_buy_percent_'.$material->type_id)
 @php($buyDepthKey = 'mineral_buy_depth_'.$material->type_id)
-<tr><form method="post" action="{{ route('admin.mineral-pricing.store') }}">@csrf
-<td>{{ $material->type_name }}<input type="hidden" name="type_id" value="{{ $material->type_id }}"></td>
+<tr>
+<td><form id="moon-material-{{ $material->type_id }}" method="post" action="{{ route('admin.mineral-pricing.store') }}">@csrf<input type="hidden" name="type_id" value="{{ $material->type_id }}">{{ $material->type_name }}</form></td>
 <td>{{ $material->group_name }}</td>
-<td><input aria-label="{{ $material->type_name }} buy percentage" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $mineralPricingSettings->get($buyPercentKey, 87) }}" required style="max-width:130px;margin:0"></td>
-<td><input aria-label="{{ $material->type_name }} Jita cumulative unit depth" name="price_depth" type="number" min="1" step="1" value="{{ $mineralPricingSettings->get($buyDepthKey, 50000) }}" required style="max-width:190px;margin:0"></td>
-<td><button type="submit">Submit</button></td>
-</form></tr>
+<td><input form="moon-material-{{ $material->type_id }}" aria-label="{{ $material->type_name }} buy percentage" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $mineralPricingSettings->get($buyPercentKey, 87) }}" required style="max-width:130px;margin:0"></td>
+<td><input form="moon-material-{{ $material->type_id }}" aria-label="{{ $material->type_name }} Jita cumulative unit depth" name="price_depth" type="number" min="1" step="1" value="{{ $mineralPricingSettings->get($buyDepthKey, 50000) }}" required style="max-width:190px;margin:0"></td>
+<td><button form="moon-material-{{ $material->type_id }}" type="submit">Submit</button></td>
+</tr>
 @empty<tr><td colspan="5">No moon-ore refining materials found. Confirm the CCP SDE moon-ore groups and reprocessing recipes are imported.</td></tr>@endforelse
 </tbody></table></div>
 <h2 style="margin-top:24px">Ore valuation rules</h2>
