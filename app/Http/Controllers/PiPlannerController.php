@@ -101,9 +101,48 @@ class PiPlannerController extends Controller
                 $targetMaterialBudget = $outputBuyValue !== null && $inputTax !== null && $exportTax !== null && $transportFee !== null
                     ? round(($outputBuyValue * 0.82) - $inputTax - $exportTax - $transportFee, 2)
                     : null;
-                $targetBuyPercent = $targetMaterialBudget !== null && $inputCost !== null && $inputCost > 0
-                    ? round(($targetMaterialBudget / $inputCost) * 100, 2)
-                    : null;
+                // Keep every input at or above 80% of Jita buy. Any budget above
+                // that floor is weighted toward higher-value inputs, so a more valuable
+                // material receives a higher percentage than a cheaper one.
+                $targetBuyPercent = null;
+                $targetInputsComplete = $inputCost !== null && $inputs->isNotEmpty()
+                    && $inputs->every(fn ($input) => $input['buy_price'] !== null && $input['buy_price'] > 0);
+                if ($targetInputsComplete && $targetMaterialBudget !== null && $inputCost > 0) {
+                    $minimumMaterialBudget = $inputCost * 0.80;
+                    if ($targetMaterialBudget >= $minimumMaterialBudget) {
+                        if ($targetMaterialBudget >= $inputCost) {
+                            $inputs = $inputs->map(function ($input) {
+                                $input['target_buy_percent'] = 100.0;
+                                return $input;
+                            });
+                        } else {
+                            // Solve for a common value-weighted uplift: target percentage
+                            // = 80% + (unit Jita buy price × factor). Higher-value inputs
+                            // therefore receive a higher percentage, while no input falls
+                            // below 80%. Quantities are included in the budget calculation.
+                            $low = 0.0;
+                            $high = 20.0 / min($inputs->pluck('buy_price')->all());
+                            for ($iteration = 0; $iteration < 64; $iteration++) {
+                                $factor = ($low + $high) / 2;
+                                $proposedSpend = $inputs->sum(function ($input) use ($factor) {
+                                    $percent = min(100.0, 80.0 + ($input['buy_price'] * $factor));
+                                    return $input['run_cost'] * $percent / 100;
+                                });
+                                if ($proposedSpend > $targetMaterialBudget) {
+                                    $high = $factor;
+                                } else {
+                                    $low = $factor;
+                                }
+                            }
+                            $factor = $low;
+                            $inputs = $inputs->map(function ($input) use ($factor) {
+                                $input['target_buy_percent'] = round(min(100.0, 80.0 + ($input['buy_price'] * $factor)), 2);
+                                return $input;
+                            });
+                        }
+                        $targetBuyPercent = round($inputs->sum(fn ($input) => $input['run_cost'] * $input['target_buy_percent'] / 100) / $inputCost * 100, 2);
+                    }
+                }
 
                 return [
                     'id' => (int) $first->schematic_id,
