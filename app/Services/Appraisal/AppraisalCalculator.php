@@ -82,22 +82,78 @@ final class AppraisalCalculator
                 $valuationMode = 'reprocessed';
             }
 
-            // A newer market snapshot can legitimately contain a null buy or sell
-            // side. Select the newest positive price for the configured side instead
-            // of letting a null latest snapshot hide an older valid Jita quote.
+            // Buyback valuation is the marginal Jita buy price at 250,000 units
+            // of visible station buy-order depth, not the best single order.
+            // That depth price must remain within 3% of the 7-day average stored
+            // Jita buy snapshot price; otherwise treat the market as anomalous.
             $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
-            $price = DB::table('market_price_snapshots')
-                ->where('type_id', $pricingType->type_id)
-                ->where('region_id', $regionId)
-                ->whereNotNull($priceColumn)
-                ->where($priceColumn, '>', 0)
-                ->orderByDesc('observed_at')
-                ->first(['buy_price','sell_price','source','observed_at']);
-            $unitPrice = $price ? (float) $price->{$priceColumn} : 0.0;
-            if ($unitPrice <= 0) {
+            if ($side === 'sell') {
+                $price = DB::table('market_price_snapshots')
+                    ->where('type_id', $pricingType->type_id)
+                    ->where('region_id', $regionId)
+                    ->whereNotNull($priceColumn)
+                    ->where($priceColumn, '>', 0)
+                    ->orderByDesc('observed_at')
+                    ->first(['buy_price','sell_price','source','observed_at']);
+                $unitPrice = $price ? (float) $price->{$priceColumn} : 0.0;
+            } else {
+                $latestBookAt = DB::table('market_order_book_snapshots')
+                    ->where('type_id', $pricingType->type_id)
+                    ->where('region_id', $regionId)
+                    ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
+                    ->where('is_buy_order', true)
+                    ->max('observed_at');
+
+                $depthOrders = $latestBookAt
+                    ? DB::table('market_order_book_snapshots')
+                        ->where('type_id', $pricingType->type_id)
+                        ->where('region_id', $regionId)
+                        ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
+                        ->where('is_buy_order', true)
+                        ->where('observed_at', $latestBookAt)
+                        ->orderByDesc('price')
+                        ->get(['price', 'volume_remain'])
+                    : collect();
+
+                $remainingDepth = 250000;
+                $unitPrice = null;
+                foreach ($depthOrders as $order) {
+                    $volume = (int) $order->volume_remain;
+                    if ($volume >= $remainingDepth) {
+                        $unitPrice = (float) $order->price;
+                        break;
+                    }
+                    $remainingDepth -= $volume;
+                }
+
+                $sevenDayAverage = (float) DB::table('market_price_snapshots')
+                    ->where('type_id', $pricingType->type_id)
+                    ->where('region_id', $regionId)
+                    ->where('source', 'esi-jita-4-4')
+                    ->where('observed_at', '>=', now()->subDays(7))
+                    ->whereNotNull('buy_price')
+                    ->where('buy_price', '>', 0)
+                    ->avg('buy_price');
+
+                if ($unitPrice !== null && $sevenDayAverage > 0) {
+                    $deviation = abs($unitPrice - $sevenDayAverage) / $sevenDayAverage;
+                    if ($deviation > 0.03) {
+                        $unitPrice = null;
+                    }
+                } else {
+                    $unitPrice = null;
+                }
+
+                $price = $unitPrice !== null ? (object) [
+                    'source' => 'jita-250000-unit-depth',
+                    'observed_at' => $latestBookAt,
+                ] : null;
+            }
+
+            if ($unitPrice === null || $unitPrice <= 0 || !$price) {
                 $unpricedTypes[] = $valuationMode === 'reprocessed'
-                    ? $item['name'] . ' (type ID ' . $pricingType->type_id . ': no Jita ' . $side . ' price; refresh market prices)'
-                    : $item['name'] . ' (type ID ' . $type->type_id . ': no Jita ' . $side . ' price; refresh market prices)';
+                    ? $item['name'] . ' (type ID ' . $pricingType->type_id . ': no valid Jita price; requires 250,000 units of buy depth within 3% of the 7-day buy average)'
+                    : $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price; requires 250,000 units of buy depth within 3% of the 7-day buy average)';
                 continue;
             }
 
