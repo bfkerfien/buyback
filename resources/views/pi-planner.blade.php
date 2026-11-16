@@ -65,6 +65,14 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 <div class="muted">Gross value of {{ $recipe['output_quantity'] }} finished units: @if($recipe['output_buy_value'] !== null) {{ number_format($recipe['output_buy_value'], 2) }} ISK @else price unavailable @endif</div>
 <div class="muted">Export tax ({{ number_format($exportTaxPercent,2) }}% configured): @if($recipe['export_tax'] !== null) {{ number_format($recipe['export_tax'], 2) }} ISK @else unavailable @endif</div>
 <div class="muted">Net sale value after export tax: @if($recipe['net_sale_value'] !== null) {{ number_format($recipe['net_sale_value'], 2) }} ISK @else unavailable @endif</div>
+@if($key === 'p1-p2')
+<div class="panel" style="margin-top:12px;border-color:#ff9b45">
+<strong>T1 buy target · 18% below P2 Jita buy</strong>
+<div class="muted">Maximum combined T1 material budget after allowing for both import and export customs fees: @if($recipe['target_material_budget'] !== null) {{ number_format($recipe['target_material_budget'],2) }} ISK per run @else unavailable @endif</div>
+<div class="result" style="color:#ffbd75">Maximum price to pay for each T1 input: @if($recipe['target_buy_percent'] !== null) {{ number_format($recipe['target_buy_percent'],2) }}% of its current Jita buy price @else unavailable until all input/output prices and tax values are available @endif</div>
+<div class="muted">This same percentage applies to each required T1 input. It is calculated so material spend + import tax + export tax stays at or below 82% of the finished P2 product's gross Jita buy value.</div>
+</div>
+@endif
 @if($recipe['profit_loss'] !== null)
 <div class="result" style="color:{{ $recipe['profit_loss'] >= 0 ? '#8de4a8' : '#ff9b8f' }}">@if($recipe['profit_loss'] >= 0) PROFIT @else LOSS @endif: {{ number_format(abs($recipe['profit_loss']), 2) }} ISK per run — compare against buying {{ $recipe['output_name'] }} directly</div>
 @else
