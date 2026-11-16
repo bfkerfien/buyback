@@ -1,6 +1,6 @@
 <?php
 
-namespace App\\Services\\Eve;
+namespace App\Services\Eve;
 
 final class ExcludedMissionOre
 {
@@ -22,7 +22,7 @@ final class ExcludedMissionOre
             return true;
         }
 
-        $key = mb_strtolower(trim(preg_replace('/\\s+/', ' ', $name)));
+        $key = mb_strtolower(trim(preg_replace('/\s+/', ' ', $name)));
         foreach (self::NAMES as $excludedName) {
             if ($key === mb_strtolower($excludedName)) {
                 return true;
@@ -30,10 +30,5 @@ final class ExcludedMissionOre
         }
 
         return false;
-    }
-
-    public static function names(): array
-    {
-        return self::NAMES;
     }
 }
