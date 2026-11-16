@@ -54,7 +54,7 @@ final class AppraisalCalculator
         $unpricedTypes = [];
         $lines = [];
         $side = config('buyback.price_side', 'buy');
-        $defaultRate = (float) config('buyback.payout_percent', 90);
+        $defaultRate = (float) config('buyback.payout_percent', 87);
         $regionId = (string) config('buyback.region_id', '10000002');
 
         foreach ($parsedItems as $item) {
@@ -200,6 +200,11 @@ final class AppraisalCalculator
             $rate = $fixedPayoutPercent !== null
                 ? $fixedPayoutPercent
                 : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate));
+            // Normalize every existing 90% payout rule to 87%, including
+            // category rules, individual PI rules, and explicitly fixed rates.
+            if (abs($rate - 90.0) < 0.000001) {
+                $rate = 87.0;
+            }
 
             $lines[] = [
                 'type_id' => (int) $type->type_id,
