@@ -2,6 +2,7 @@
 
 namespace App\Services\Appraisal;
 
+use App\Services\Eve\ExcludedMissionOre;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
