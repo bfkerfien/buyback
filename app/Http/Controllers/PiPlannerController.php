@@ -194,6 +194,7 @@ class PiPlannerController extends Controller
                         'name' => $input['name'],
                         'jita_buy' => $input['buy_price'],
                         'lowest_percent' => null,
+                        'lowest_recipes' => [],
                         'recipes' => 0,
                         'target_complete' => true,
                     ];
@@ -203,9 +204,13 @@ class PiPlannerController extends Controller
                     $p1Targets[$id]['target_complete'] = false;
                 } else {
                     $current = (float) $input['target_buy_percent'];
-                    $p1Targets[$id]['lowest_percent'] = $p1Targets[$id]['lowest_percent'] === null
-                        ? $current
-                        : min($p1Targets[$id]['lowest_percent'], $current);
+                    $currentRecipe = $recipe['name'] ?: $recipe['output_name'];
+                    if ($p1Targets[$id]['lowest_percent'] === null || $current < $p1Targets[$id]['lowest_percent']) {
+                        $p1Targets[$id]['lowest_percent'] = $current;
+                        $p1Targets[$id]['lowest_recipes'] = [$currentRecipe];
+                    } elseif (abs($current - $p1Targets[$id]['lowest_percent']) < 0.0001) {
+                        $p1Targets[$id]['lowest_recipes'][] = $currentRecipe;
+                    }
                 }
             }
         }
@@ -227,6 +232,7 @@ class PiPlannerController extends Controller
                     'name' => $p1Item->type_name,
                     'jita_buy' => $price?->buy_price !== null ? (float) $price->buy_price : null,
                     'lowest_percent' => null,
+                    'lowest_recipes' => [],
                     'recipes' => 0,
                     'target_complete' => false,
                 ];
