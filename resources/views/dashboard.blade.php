@@ -194,7 +194,10 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <p class="muted" style="line-height:1.7">Create a copy-ready list containing 10,000 units of every published asteroid ore type in the imported SDE, including compressed variants.</p>
 <button type="button" id="copy-compressed-ore">Copy 10,000 of every ore</button>
 <span id="compressed-ore-copy-status" class="muted" aria-live="polite" style="margin-left:10px"></span>
-<textarea id="compressed-ore-manifest" readonly style="margin-top:12px;min-height:180px">@foreach($oreTypes as $ore){{ $ore->type_name }}&#9;10000
+<textarea id="compressed-ore-manifest" readonly style="margin-top:12px;min-height:180px">@foreach($oreTypes as $ore)
+@if(!\\App\\Services\\Eve\\ExcludedMissionOre::isExcluded($ore->type_name, (int) $ore->type_id))
+{{ $ore->type_name }}&#9;10000
+@endif
 @endforeach</textarea>
 </section>
 <section class="panel">
