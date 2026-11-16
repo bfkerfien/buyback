@@ -28,25 +28,12 @@ final class AppraisalCalculator
             ->get(['t.type_id','t.type_name','t.group_id','t.portion_size','g.category_id','g.category_name'])
             ->keyBy(fn ($type) => mb_strtolower($type->type_name));
 
-        // Compressed Mercoxit is priced as its Morphite reprocessing output.
-        // One compressed unit represents 100 units of the corresponding base ore.
-        $compressedMercoxitBaseNames = collect($names)
-            ->filter(fn ($name) => preg_match('/^Compressed (?:Magma |Vitreous )?Mercoxit$/i', $name))
-            ->map(fn ($name) => preg_replace('/^Compressed /i', '', $name))
-            ->unique()->values();
-        $compressedMercoxitBaseTypes = $compressedMercoxitBaseNames->isEmpty()
-            ? collect()
-            : DB::table('eve_item_types')
-                ->where('published', true)->whereIn('type_name', $compressedMercoxitBaseNames)
-                ->get(['type_id', 'type_name', 'portion_size'])
-                ->keyBy(fn ($type) => mb_strtolower($type->type_name));
-
-        // Reprocessing recipes from CCP SDE are the source of truth for every ore.
-        // Include the uncompressed base-ore recipes for compressed Mercoxit.
-        $recipeTypeIds = $types->pluck('type_id')
-            ->merge($compressedMercoxitBaseTypes->pluck('type_id'))->unique()->values();
+        // Use each submitted ore type's own SDE reprocessing recipe and portion size.
+        // This matters for modern 1:1 compressed Mercoxit (100 units per batch)
+        // versus legacy Batch Compressed Mercoxit (1 unit per batch).
+        // CCP SDE recipes are authoritative for all ore types, including compressed variants.
         $oreMaterials = DB::table('eve_type_materials')
-            ->whereIn('type_id', $recipeTypeIds)
+            ->whereIn('type_id', $types->pluck('type_id'))
             ->get(['type_id', 'material_type_id', 'quantity'])
             ->groupBy('type_id');
         $mineralIds = $oreMaterials->flatten(1)->pluck('material_type_id')->unique()->values();
@@ -96,6 +83,184 @@ final class AppraisalCalculator
                     $unresolvedTypes[] = $item['name'] . ' (matching base Mercoxit type missing from SDE)';
                     continue;
                 }
+                $recipe = $oreMaterials->get($recipeType->type_id, collect());
+                $portionSize = max(1, (int) ($recipeType->portion_size ?? 1));
+                $refiningInputQuantity = $pricingQuantity;
+                $batches = intdiv($refiningInputQuantity, $portionSize);
+                if ($recipe->isEmpty() || $batches < 1) {
+                    $unresolvedTypes[] = $item['name'] . ' (missing SDE reprocessing recipe or incomplete batch quantity)';
+                    continue;
+                }
+
+                $refinedLineValue = 0.0;
+                foreach ($recipe as $material) {
+                    $mineral = $mineralTypes->get($material->material_type_id);
+                    if (!$mineral) {
+                        $unresolvedTypes[] = $item['name'] . ' (missing refined material type ID ' . $material->material_type_id . ')';
+                        continue 2;
+                    }
+                    $yieldedQuantity = (int) floor((int) $material->quantity * $batches * 0.90628);
+                    $mineralPrice = $this->jitaBuyPrice((int) $mineral->type_id, $regionId, 50000);
+                    if ($mineralPrice === null) {
+                        $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': no valid Jita buy price at 50,000-unit depth within 3% of the 7-day average)';
+                        continue 2;
+                    }
+                    $mineralValue = round($yieldedQuantity * $mineralPrice['price'], 2);
+                    $refinedLineValue += $mineralValue;
+                    $refinedMineralDetails[] = [
+                        'type_id' => (int) $mineral->type_id,
+                        'name' => $mineral->type_name,
+                        'quantity' => $yieldedQuantity,
+                        'unit_price' => $mineralPrice['price'],
+                        'value' => $mineralValue,
+                    ];
+                }
+                $refinedLineValue = round($refinedLineValue, 2);
+                $outputQuantity = array_sum(array_column($refinedMineralDetails, 'quantity'));
+                $valuationMode = 'reprocessed';
+                $unitPrice = $refinedLineValue / $pricingQuantity;
+                $price = (object) ['source' => 'sde-refined-outputs-50000-depth', 'observed_at' => now()];
+                $lineValue = $refinedLineValue;
+            } else {
+                $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
+                if ($side === 'sell') {
+                    $price = DB::table('market_price_snapshots')
+                        ->where('type_id', $type->type_id)->where('region_id', $regionId)
+                        ->whereNotNull($priceColumn)->where($priceColumn, '>', 0)
+                        ->orderByDesc('observed_at')->first(['buy_price','sell_price','source','observed_at']);
+                    $unitPrice = $price ? (float) $price->{$priceColumn} : null;
+                } else {
+                    $marketPrice = $this->jitaBuyPrice((int) $type->type_id, $regionId, 50000);
+                    $unitPrice = $marketPrice['price'] ?? null;
+                    $price = $marketPrice ? (object) ['source' => 'jita-50000-unit-depth', 'observed_at' => $marketPrice['observed_at']] : null;
+                }
+                if ($unitPrice === null || $unitPrice <= 0 || !$price) {
+                    $unpricedTypes[] = $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price)';
+                    continue;
+                }
+                $lineValue = round($unitPrice * $pricingQuantity, 2);
+            }
+
+            $effectiveCategoryId = $pricingType->category_id;
+            $effectiveCategoryName = $pricingType->category_name;
+            $payoutRule = $effectiveCategoryId ? $rules->get($effectiveCategoryId) : null;
+            // P1 planetary commodities use their individually configured appraisal
+            // buy percentage instead of the shared PI category payout percentage.
+            $piBuyRule = ((int) $type->category_id === 43 && (int) $type->group_id === 1042)
+                ? $piBuyRules->get($type->type_id)
+                : null;
+            // Mercoxit in every grade and Morphite have a fixed 87% buyback rate.
+            $special87PercentNames = [
+                'mercoxit',
+                'magma mercoxit',
+                'vitreous mercoxit',
+                'compressed mercoxit',
+                'compressed magma mercoxit',
+                'compressed vitreous mercoxit',
+                'morphite',
+            ];
+            $hasSpecial87Percent = in_array(mb_strtolower($type->type_name), $special87PercentNames, true);
+            $rate = (int) $type->category_id === 25
+                ? 87.0
+                : ($fixedPayoutPercent !== null
+                    ? $fixedPayoutPercent
+                    : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate)));
+            // Normalize every existing 90% payout rule to 87%, including
+            // category rules, individual PI rules, and explicitly fixed rates.
+            if (abs($rate - 90.0) < 0.000001) {
+                $rate = 87.0;
+            }
+
+            $lines[] = [
+                'type_id' => (int) $type->type_id,
+                'type_name' => $type->type_name,
+                'quantity' => (int) $item['quantity'],
+                // Equivalent value per submitted unit, including reprocessing conversions.
+                'unit_price' => round($lineValue / (int) $item['quantity'], 4),
+                'line_value' => $lineValue,
+                'payout_percent' => $rate,
+                'payout_value' => round($lineValue * $rate / 100, 2),
+                'category_id' => $effectiveCategoryId,
+                'category_name' => $effectiveCategoryName,
+                'rate_source' => $fixedPayoutPercent !== null ? 'fixed' : ($piBuyRule ? 'individual_pi' : ($payoutRule ? 'category' : 'default')),
+                'source' => $price->source,
+                'observed_at' => $price->observed_at,
+                'valuation_mode' => $valuationMode,
+                'output_type_id' => $valuationMode === 'reprocessed' ? (int) $pricingType->type_id : null,
+                'output_name' => $valuationMode === 'reprocessed' ? $pricingType->type_name : null,
+                'output_quantity' => $outputQuantity,
+                'conversion_ratio' => $conversionRatio,
+                'output_unit_price' => $unitPrice,
+                'refined_materials' => $refinedMineralDetails,
+            ];
+        }
+
+        $priceErrors = [];
+        if ($unresolvedTypes) {
+            $priceErrors[] = 'These item types are missing from the imported published EVE SDE: ' . implode(', ', array_unique($unresolvedTypes)) . '. Re-import CCP types.jsonl and taxonomy.';
+        }
+        if ($unpricedTypes) {
+            $priceErrors[] = 'These item types exist in the SDE but have no stored positive Jita ' . $side . ' price: ' . implode(', ', array_unique($unpricedTypes)) . '. Refresh their Jita prices before appraising.';
+        }
+        if ($priceErrors) {
+            throw ValidationException::withMessages(['inventory' => $priceErrors]);
+        }
+
+        if (!$lines) {
+            $message = $ignoreNonMatching
+                ? 'No priced ship hulls were found in that paste. Non-ship entries are ignored; paste one or more published ship hull names and quantities.'
+                : 'No recognized items were found to appraise.';
+            throw ValidationException::withMessages(['inventory' => [$message]]);
+        }
+
+        $gross = round(array_sum(array_column($lines, 'line_value')), 2);
+        $payout = round(array_sum(array_column($lines, 'payout_value')), 2);
+
+        return [
+            'lines' => $lines,
+            'gross_value' => $gross,
+            'fees' => round($gross - $payout, 2),
+            'payout_value' => $payout,
+            'price_side' => $side,
+            'payout_percent' => $fixedPayoutPercent !== null ? $fixedPayoutPercent : $defaultRate,
+            'region_id' => $regionId,
+        ];
+    }
+
+    private function jitaBuyPrice(int $typeId, string $regionId, int $requiredDepth): ?array
+    {
+        $latestBookAt = DB::table('market_order_book_snapshots')
+            ->where('type_id', $typeId)->where('region_id', $regionId)
+            ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
+            ->where('is_buy_order', true)->max('observed_at');
+        if (!$latestBookAt) return null;
+
+        $orders = DB::table('market_order_book_snapshots')
+            ->where('type_id', $typeId)->where('region_id', $regionId)
+            ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
+            ->where('is_buy_order', true)->where('observed_at', $latestBookAt)
+            ->orderByDesc('price')->get(['price', 'volume_remain']);
+        $remaining = $requiredDepth;
+        $price = null;
+        foreach ($orders as $order) {
+            if ((int) $order->volume_remain >= $remaining) { $price = (float) $order->price; break; }
+            $remaining -= (int) $order->volume_remain;
+        }
+        if ($price === null || $price <= 0) return null;
+
+        $average = (float) DB::table('market_price_snapshots')
+            ->where('type_id', $typeId)->where('region_id', $regionId)
+            ->where('source', 'esi-jita-4-4')->where('observed_at', '>=', now()->subDays(7))
+            ->whereNotNull('buy_price')->where('buy_price', '>', 0)->avg('buy_price');
+        if ($average <= 0 || abs($price - $average) / $average > 0.03) return null;
+
+        return ['price' => $price, 'observed_at' => $latestBookAt];
+    }
+}                // Every asteroid ore is valued from its own SDE refining recipe.
+                // Modern compressed ore keeps a 1:1 unit count and a normal 100-unit
+                // batch; legacy Batch Compressed Mercoxit has its own 1-unit batch.
+                // Yield is max-refine null-sec Tatara / T2 rig / RX-804 (90.628%).
+                $recipeType = $type;
                 $recipe = $oreMaterials->get($recipeType->type_id, collect());
                 $portionSize = max(1, (int) ($recipeType->portion_size ?? 1));
                 $refiningInputQuantity = $pricingQuantity;
