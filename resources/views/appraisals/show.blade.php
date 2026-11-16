@@ -32,6 +32,15 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @include('partials.site-header')
 <h1>{{ ($quote->appraisal_kind ?? 'standard') === 'ship' ? 'Ship Buyback Appraisal' : 'Appraisal result' }}</h1>
 @if(($quote->appraisal_kind ?? 'standard') === 'ship')<p class="muted">Public ship hull buyback · 80% payout · non-ship entries are excluded</p>@endif
+<section class="panel">
+<h2>EVE Contract Details</h2>
+<p class="muted">Copy each value into the matching field when creating your contract to My Eve Online.</p>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));">
+<div class="stat"><span class="muted">Appraisal serial number</span><strong id="contract-serial">EB-{{ str_pad((string)$quote->id, 6, '0', STR_PAD_LEFT) }}</strong><button class="why" type="button" onclick="copyContractValue('contract-serial',this)">Copy serial</button></div>
+<div class="stat"><span class="muted">Contract to</span><strong id="contract-recipient">My Eve Online</strong><button class="why" type="button" onclick="copyContractValue('contract-recipient',this)">Copy name</button></div>
+<div class="stat"><span class="muted">Contract price</span><strong id="contract-price">{{ number_format((float)$quote->payout_value, 2, '.', '') }}</strong><span class="sub">ISK</span><button class="why" type="button" onclick="copyContractValue('contract-price',this)">Copy price</button></div>
+</div>
+</section>
 <section class="panel"><div class="grid">
 <div class="stat"><span class="muted">Gross market value</span><strong>{{ number_format((float)$quote->gross_value, 2) }} ISK</strong></div>
 <div class="stat"><span class="muted">Service fees</span><strong>{{ number_format((float)$quote->fees, 2) }} ISK</strong></div>
@@ -48,4 +57,27 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @endforeach
 </tbody></table></div></section>
 <p class="muted">Quote reference: {{ $quote->public_token }} · Estimate only; this is not a completed purchase or payout.</p>
-</main><footer style="margin:28px auto 12px;text-align:center;color:#7f9ba5;font-size:12px">(c) 2027 My Eve Online</footer></body></html>
+</main><footer style="margin:28px auto 12px;text-align:center;color:#7f9ba5;font-size:12px">(c) 2027 My Eve Online</footer>
+<script>
+async function copyContractValue(elementId, button) {
+    const value = document.getElementById(elementId).textContent.trim();
+    try {
+        await navigator.clipboard.writeText(value);
+        const original = button.textContent;
+        button.textContent = 'Copied';
+        setTimeout(() => button.textContent = original, 1400);
+    } catch (error) {
+        const field = document.createElement('textarea');
+        field.value = value;
+        field.style.position = 'fixed';
+        field.style.opacity = '0';
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand('copy');
+        field.remove();
+        const original = button.textContent;
+        button.textContent = 'Copied';
+        setTimeout(() => button.textContent = original, 1400);
+    }
+}
+</script></body></html>
