@@ -64,5 +64,4 @@ docker compose ps
 printf '\nBuyback is running. Place the complete CCP SDE JSONL files in ./data, then run:\n'
 printf '  docker compose exec -T app php artisan buyback:repair-catalog /var/www/html/data\n'
 printf '  docker compose exec -T app php artisan buyback:import-type-materials /var/www/html/data/typeMaterials.jsonl\n'
-printf '  docker compose exec -T app php artisan buyback:import-planet-schematics /var/www/html/data/planetSchematics.jsonl\n'
 printf '  docker compose exec -T app php artisan buyback:refresh-jita-prices --all\n'
