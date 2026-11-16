@@ -28,9 +28,25 @@ final class AppraisalCalculator
             ->get(['t.type_id','t.type_name','t.group_id','t.portion_size','g.category_id','g.category_name'])
             ->keyBy(fn ($type) => mb_strtolower($type->type_name));
 
+        // Compressed Mercoxit is priced as its Morphite reprocessing output.
+        // One compressed unit represents 100 units of the corresponding base ore.
+        $compressedMercoxitBaseNames = collect($names)
+            ->filter(fn ($name) => preg_match('/^Compressed (?:Magma |Vitreous )?Mercoxit$/i', $name))
+            ->map(fn ($name) => preg_replace('/^Compressed /i', '', $name))
+            ->unique()->values();
+        $compressedMercoxitBaseTypes = $compressedMercoxitBaseNames->isEmpty()
+            ? collect()
+            : DB::table('eve_item_types')
+                ->where('published', true)->whereIn('type_name', $compressedMercoxitBaseNames)
+                ->get(['type_id', 'type_name', 'portion_size'])
+                ->keyBy(fn ($type) => mb_strtolower($type->type_name));
+
         // Reprocessing recipes from CCP SDE are the source of truth for every ore.
+        // Include the uncompressed base-ore recipes for compressed Mercoxit.
+        $recipeTypeIds = $types->pluck('type_id')
+            ->merge($compressedMercoxitBaseTypes->pluck('type_id'))->unique()->values();
         $oreMaterials = DB::table('eve_type_materials')
-            ->whereIn('type_id', $types->pluck('type_id'))
+            ->whereIn('type_id', $recipeTypeIds)
             ->get(['type_id', 'material_type_id', 'quantity'])
             ->groupBy('type_id');
         $mineralIds = $oreMaterials->flatten(1)->pluck('material_type_id')->unique()->values();
@@ -67,13 +83,23 @@ final class AppraisalCalculator
             $refinedLineValue = null;
             $refinedMineralDetails = [];
 
-            // Every asteroid ore, compressed or uncompressed, is valued from its
-            // SDE refined mineral outputs at the established max-refine yield:
-            // null-sec Tatara, T2 rig and RX-804 implant (90.628%).
+            // Every asteroid ore is valued from refined mineral outputs at the
+            // max-refine null-sec Tatara / T2 rig / RX-804 yield (90.628%).
+            // Compressed Mercoxit uses the matching uncompressed ore recipe and
+            // converts compressed units to base-ore units at 100:1 before refining.
             if ((int) $type->category_id === 25) {
-                $recipe = $oreMaterials->get($type->type_id, collect());
-                $portionSize = max(1, (int) ($type->portion_size ?? 1));
-                $batches = intdiv($pricingQuantity, $portionSize);
+                $isCompressedMercoxit = (bool) preg_match('/^Compressed (?:Magma |Vitreous )?Mercoxit$/i', $type->type_name);
+                $recipeType = $isCompressedMercoxit
+                    ? $compressedMercoxitBaseTypes->get(mb_strtolower(preg_replace('/^Compressed /i', '', $type->type_name)))
+                    : $type;
+                if (!$recipeType) {
+                    $unresolvedTypes[] = $item['name'] . ' (matching base Mercoxit type missing from SDE)';
+                    continue;
+                }
+                $recipe = $oreMaterials->get($recipeType->type_id, collect());
+                $portionSize = max(1, (int) ($recipeType->portion_size ?? 1));
+                $refiningInputQuantity = $isCompressedMercoxit ? $pricingQuantity * 100 : $pricingQuantity;
+                $batches = intdiv($refiningInputQuantity, $portionSize);
                 if ($recipe->isEmpty() || $batches < 1) {
                     $unresolvedTypes[] = $item['name'] . ' (missing SDE reprocessing recipe or incomplete batch quantity)';
                     continue;
