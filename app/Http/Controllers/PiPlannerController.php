@@ -222,7 +222,7 @@ class PiPlannerController extends Controller
         abort_unless($request->user()->isAdmin(), 403);
         $data = $request->validate([
             'type_id' => ['required', 'integer', 'min:1'],
-            'buy_percent' => ['required', 'numeric', 'min:80', 'max:100'],
+            'buy_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
         ]);
 
         $item = DB::table('eve_item_types as item')
