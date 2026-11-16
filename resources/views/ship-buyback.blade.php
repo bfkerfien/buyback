@@ -4,30 +4,10 @@
 <title>Ship Buyback · EveBuyback</title>
 <style>
 :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#071018;color:#eaf7f8;--cyan:#62d9e9;--amber:#ff9b45}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:26px;background:radial-gradient(ellipse at 12% 8%,rgba(29,185,205,.19),transparent 34%),radial-gradient(ellipse at 88% 14%,rgba(255,137,56,.13),transparent 30%),linear-gradient(135deg,#071018 0%,#0a1821 54%,#080f16 100%)}.wrap{max-width:1050px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:8px 0 28px}.eb-logo{width:320px;max-width:55vw;height:auto;object-fit:contain;filter:drop-shadow(0 0 18px rgba(18,216,242,.18))}.site-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 26px;border-bottom:1px solid #294a56;padding-bottom:10px}.site-tabs a{display:inline-flex;align-items:center;background:linear-gradient(145deg,#122630,#0b1820);color:#c5dbe0;text-decoration:none;border:1px solid #315665;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:650}.site-tabs a:hover{border-color:#62d9e9;color:#eaf7f8}.site-tabs a.active{background:linear-gradient(110deg,#62d9e9,#ffad58);color:#071018;border-color:transparent}.hero{background:linear-gradient(145deg,rgba(18,36,46,.97),rgba(9,21,29,.97));border:1px solid rgba(91,193,210,.25);border-radius:18px;padding:26px;margin:18px 0;box-shadow:0 18px 48px #0005}.eyebrow{color:var(--amber);font-weight:800;font-size:12px;letter-spacing:.14em;text-transform:uppercase}.hero h1{font-size:clamp(28px,5vw,42px);margin:9px 0}.hero p,.muted{color:#9bb5bf;font-size:13px;line-height:1.7}.rate{color:#ffbb70;font-weight:800}label{display:block;color:#c5dbe0;font-size:13px;margin:16px 0 7px}input,textarea{width:100%;background:#07131a;color:#eaf7f8;border:1px solid #315665;border-radius:9px;padding:12px;font:inherit}textarea{min-height:240px;resize:vertical;font-family:ui-monospace,monospace;font-size:13px}button{margin-top:16px;border:0;border-radius:9px;padding:13px 18px;background:linear-gradient(115deg,#ffb45f,#ff793f);color:#101820;font-weight:800;cursor:pointer}.error{margin:14px 0;padding:12px;border:1px solid #824b42;background:#351d1c;color:#ffc0ab;border-radius:9px}.footer{text-align:center;margin:28px auto 12px;color:#7f9ba5;font-size:12px}@media(max-width:650px){body{padding:14px}.top{align-items:flex-start;flex-direction:column}.eb-logo{width:270px;max-width:80vw}.hero{padding:18px}}
-</style><link rel="icon" type="image/png" href="{{ asset('evebuyback-logo.png') }}">
+.site-header{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;padding:12px 16px;margin:0 0 22px;background:rgba(7,19,27,.94);border:1px solid #315665;border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.28);position:relative;z-index:40}.site-brand{display:block;flex:0 1 250px}.site-header .eb-logo{display:block;width:250px;max-width:100%;height:auto}.site-nav{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.site-nav>a{display:inline-flex;align-items:center;padding:9px 11px;border:1px solid #315665;border-radius:8px;text-decoration:none;color:#dffaff!important;font-size:13px;font-weight:700;background:#102630}.site-nav>a:hover{border-color:#62d9e9;background:#163440}.site-account{color:#9bb5bf;font-size:12px;padding:0 6px}.site-logout{margin:0}.site-logout button{padding:9px 12px;font-size:12px}@media(max-width:700px){.site-header{align-items:flex-start}.site-brand{flex-basis:180px}.site-header .eb-logo{width:180px}.site-nav{justify-content:flex-start;width:100%}}</style><link rel="icon" type="image/png" href="{{ asset('evebuyback-logo.png') }}">
 </head><body><div class="wrap">
-<header class="top"><a href="{{ route('home') }}"><img class="eb-logo" src="{{ asset('evebuyback-logo.png') }}" alt="EveBuyback"></a></header>
-<nav class="site-tabs" aria-label="Buyback sections">
-@auth
-<a href="{{ route('dashboard') }}">New Appraisals</a>
-<a href="{{ route('dashboard', ['tab' => 'tab-contracts']) }}">Appraisals &amp; Contracts</a>
-@else
-<a href="{{ route('home') }}">New Appraisals</a>
-<a href="{{ route('login.eve') }}">Appraisals &amp; Contracts</a>
-@endauth
-<a class="active" href="{{ route('ship-buyback.index') }}" aria-current="page">Ship Buyback</a>
-@auth
-@if(auth()->user()->isAdmin())
-<a href="{{ route('dashboard', ['tab' => 'tab-marketbaiters']) }}">Marketbaiters Comparison</a>
-<a href="{{ route('dashboard', ['tab' => 'tab-admin']) }}">Admin</a>
-<a href="{{ route('dashboard', ['tab' => 'tab-admin-tools']) }}">Admin Tools</a>
-<a href="{{ route('dashboard', ['tab' => 'tab-ore-refining']) }}">Ore Refining</a>
-@endif
-<a href="{{ route('dashboard', ['tab' => 'tab-how-to']) }}">How To</a>
-@else
-<a href="{{ route('login.eve') }}">Sign in with EVE</a>
-@endauth
-</nav>
+@include('partials.site-header')
+
 @auth
 <form method="post" action="{{ route('logout') }}" style="text-align:right;margin:-14px 0 18px">@csrf<button type="submit" style="margin:0;padding:8px 12px;font-size:12px">Sign out</button></form>
 @endauth
