@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\\Http\\Controllers;
 
-use Illuminate\Support\Facades\DB;
-use Illuminate\View\View;
+use Illuminate\\Support\\Facades\\DB;
+use Illuminate\\View\\View;
 
 class OreValueController extends Controller
 {
@@ -11,6 +11,7 @@ class OreValueController extends Controller
     {
         // Maximum-skill null-sec Tatara with T2 reprocessing rig and RX-804 implant.
         $quantity = 10000;
+        $piQuantity = 1000;
         $yieldPercent = 90.628;
         $taxPercent = 0.01;
         $regionId = (string) config('buyback.region_id', '10000002');
@@ -20,7 +21,13 @@ class OreValueController extends Controller
             ->where('region_id', $regionId)
             ->groupBy('type_id');
 
-        // Include every published asteroid ore type, compressed and uncompressed.
+        // These are the SDE mission/NPE ore variants, rather than normal mineable ore.
+        // Exclude the entire group so the comparison stays focused on regular asteroid ore.
+        $missionOres = [
+            'Augumene', 'Banidine', 'Geodite', 'Green Arisite', 'Lyavite',
+            'Mercium', 'Oeryl', 'Pithix', 'Polygypsum', 'Zuthrine',
+        ];
+
         $records = DB::table('eve_item_types as ore')
             ->join('eve_item_groups as groups', 'groups.group_id', '=', 'ore.group_id')
             ->leftJoin('eve_type_materials as materials', 'materials.type_id', '=', 'ore.type_id')
@@ -31,6 +38,7 @@ class OreValueController extends Controller
             ->leftJoin('market_price_snapshots as mineral_price', 'mineral_price.id', '=', 'mineral_latest.latest_id')
             ->where('groups.category_name', 'Asteroid')
             ->where('ore.published', true)
+            ->whereNotIn('ore.type_name', $missionOres)
             ->orderBy('ore.type_name')
             ->get([
                 'ore.type_id as ore_type_id', 'ore.type_name as ore_name', 'ore.portion_size',
@@ -112,9 +120,48 @@ class OreValueController extends Controller
         $rows = collect(array_values($ores))->sortBy('name')->values();
         $pricedCount = $rows->filter(fn ($row) => $row['ore_market_value'] !== null && $row['has_complete_mineral_prices'])->count();
         $latestObservedAt = $rows->pluck('ore_price_at')->filter()->max();
+        $oreSaleValueTotal = round($rows->sum(fn ($row) => $row['ore_market_value'] ?? 0), 2);
+
+        // Category 43 is Planetary Commodities in the CCP SDE: all marketable PI tiers.
+        // Price each commodity as a 1,000-unit lot, using the same regional buy snapshots.
+        $piRecords = DB::table('eve_item_types as item')
+            ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
+            ->leftJoinSub($latestPrices, 'item_latest', fn ($join) => $join->on('item_latest.type_id', '=', 'item.type_id'))
+            ->leftJoin('market_price_snapshots as item_price', 'item_price.id', '=', 'item_latest.latest_id')
+            ->where('groups.category_id', 43)
+            ->where('item.published', true)
+            ->orderBy('groups.group_name')
+            ->orderBy('item.type_name')
+            ->get([
+                'item.type_id',
+                'item.type_name',
+                'groups.group_name',
+                'item_price.buy_price',
+                'item_price.observed_at',
+            ]);
+
+        $piItems = $piRecords->map(function ($record) use ($piQuantity) {
+            $unitPrice = $record->buy_price !== null ? (float) $record->buy_price : null;
+
+            return [
+                'type_id' => (int) $record->type_id,
+                'name' => $record->type_name,
+                'tier' => $record->group_name,
+                'quantity' => $piQuantity,
+                'unit_buy_price' => $unitPrice,
+                'market_value' => $unitPrice !== null ? round($unitPrice * $piQuantity, 2) : null,
+                'observed_at' => $record->observed_at,
+            ];
+        })->values();
+
+        $piPricedCount = $piItems->filter(fn ($item) => $item['market_value'] !== null)->count();
+        $piBasketValue = round($piItems->sum(fn ($item) => $item['market_value'] ?? 0), 2);
+        $combinedSaleValueTotal = round($oreSaleValueTotal + $piBasketValue, 2);
 
         return view('ore-values.index', compact(
-            'rows', 'quantity', 'yieldPercent', 'taxPercent', 'pricedCount', 'latestObservedAt'
+            'rows', 'quantity', 'yieldPercent', 'taxPercent', 'pricedCount', 'latestObservedAt',
+            'piItems', 'piQuantity', 'piPricedCount', 'piBasketValue', 'oreSaleValueTotal',
+            'combinedSaleValueTotal'
         ));
     }
 }
