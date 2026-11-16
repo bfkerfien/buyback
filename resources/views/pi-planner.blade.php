@@ -4,6 +4,19 @@
 :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#071018;color:#eaf7f8}*{box-sizing:border-box}body{margin:0;padding:24px;background:radial-gradient(ellipse at 12% 8%,rgba(29,185,205,.19),transparent 34%),radial-gradient(ellipse at 88% 14%,rgba(255,137,56,.13),transparent 30%),linear-gradient(135deg,#071018,#0a1821 54%,#080f16);min-height:100vh}main{max-width:1200px;margin:auto}.panel{background:#101e27;border:1px solid #294a56;border-radius:14px;padding:20px;margin:18px 0}h1,h2{color:#f1fbfc}.muted{color:#9bb5bf;font-size:13px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 16px;border-bottom:1px solid #294a56;padding-bottom:10px}.tab,button{background:#ff9b45;color:#111820;border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}.tab{background:#09151c;color:#c5dbe0;border:1px solid #315665}.tab.active{background:#ff9b45;color:#111820}.tab-panel{display:none}.tab-panel.active{display:block}.recipe{background:#09151c;border:1px solid #294a56;border-radius:10px;padding:15px;margin:12px 0}.recipe-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.inputs{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px;margin:12px 0}.material{padding:10px;background:#102630;border-radius:8px;font-size:13px}.material strong{display:block;margin-top:5px}.result{color:#8de4a8;font-weight:700}.qty{max-width:180px;background:#09151c;color:#eaf7f8;border:1px solid #315665;border-radius:8px;padding:9px}.empty{padding:18px;border:1px dashed #52717b;border-radius:10px;color:#9bb5bf}@media(max-width:650px){body{padding:12px}}
 </style></head><body><main>
 <header style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><div><h1>Planetary Industry Planner</h1><p class="muted">Production recipes imported from the CCP EVE SDE. Select a product quantity to calculate exact schematic input requirements.</p></div><a href="{{ route('dashboard') }}" style="color:#62d9e9">← Back to Buyback</a></header>
+@if(session('status'))<div class="panel">{{ session('status') }}</div>@endif
+@if($errors->any())<div class="panel">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif
+<section class="panel">
+<h2>Customs tax settings</h2>
+<p class="muted">Set the PI import and export rates. Import tax uses EVE's 50% import taxable-value multiplier; export tax uses 100% of the product's taxable value. These rates are included in every production profit/loss calculation.</p>
+<form method="post" action="{{ route('ore-values.pi-taxes') }}" style="display:flex;gap:14px;flex-wrap:wrap;align-items:end">
+@csrf
+<input type="hidden" name="return_to" value="pi-planner">
+<label class="muted">Import tax %<br><input class="qty" type="number" name="import_tax_percent" min="0" max="100" step="0.01" required value="{{ number_format($importTaxPercent,2,'.','') }}"></label>
+<label class="muted">Export tax %<br><input class="qty" type="number" name="export_tax_percent" min="0" max="100" step="0.01" required value="{{ number_format($exportTaxPercent,2,'.','') }}"></label>
+<button type="submit">Save tax rates</button>
+</form>
+</section>
 <nav class="tabs" role="tablist" aria-label="PI production stages">
 <button class="tab active" type="button" data-stage="p1-p2">P1 → P2</button>
 <button class="tab" type="button" data-stage="p2-p3">P2 → P3</button>
@@ -45,13 +58,17 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 <div class="result">Runs required: <span class="runs">{{ 10 }}</span> · Output: <span class="output-total">{{ number_format($recipe['output_quantity'] * 10) }}</span> {{ $recipe['output_name'] }}</div>
 <div class="panel" style="margin-top:12px">
 <strong>Jita production comparison · per schematic run</strong>
-<div class="muted">Input production cost: @if($recipe['input_cost'] !== null) {{ number_format($recipe['input_cost'], 2) }} ISK @else missing input buy price @endif</div>
-<div class="muted">Finished {{ $recipe['output_name'] }} buy price: @if($recipe['output_buy_price'] !== null) {{ number_format($recipe['output_buy_price'], 2) }} ISK each @else price unavailable @endif</div>
-<div class="muted">Value of {{ $recipe['output_quantity'] }} finished units at buy orders: @if($recipe['output_buy_value'] !== null) {{ number_format($recipe['output_buy_value'], 2) }} ISK @else price unavailable @endif</div>
+<div class="muted">Input materials at Jita buy orders: @if($recipe['input_cost'] !== null) {{ number_format($recipe['input_cost'], 2) }} ISK @else missing input buy price @endif</div>
+<div class="muted">Import tax ({{ number_format($importTaxPercent,2) }}% configured; EVE 50% multiplier): @if($recipe['import_tax'] !== null) {{ number_format($recipe['import_tax'], 2) }} ISK @else unavailable @endif</div>
+<div class="muted">Total production cost including import tax: @if($recipe['total_production_cost'] !== null) {{ number_format($recipe['total_production_cost'], 2) }} ISK @else unavailable @endif</div>
+<div class="muted">Finished {{ $recipe['output_name'] }} Jita buy price: @if($recipe['output_buy_price'] !== null) {{ number_format($recipe['output_buy_price'], 2) }} ISK each @else price unavailable @endif</div>
+<div class="muted">Gross value of {{ $recipe['output_quantity'] }} finished units: @if($recipe['output_buy_value'] !== null) {{ number_format($recipe['output_buy_value'], 2) }} ISK @else price unavailable @endif</div>
+<div class="muted">Export tax ({{ number_format($exportTaxPercent,2) }}% configured): @if($recipe['export_tax'] !== null) {{ number_format($recipe['export_tax'], 2) }} ISK @else unavailable @endif</div>
+<div class="muted">Net sale value after export tax: @if($recipe['net_sale_value'] !== null) {{ number_format($recipe['net_sale_value'], 2) }} ISK @else unavailable @endif</div>
 @if($recipe['profit_loss'] !== null)
-<div class="result" style="color:{{ $recipe['profit_loss'] >= 0 ? '#8de4a8' : '#ff9b8f' }}">@if($recipe['profit_loss'] >= 0) Production advantage @else Production loss @endif: {{ number_format(abs($recipe['profit_loss']), 2) }} ISK per run</div>
+<div class="result" style="color:{{ $recipe['profit_loss'] >= 0 ? '#8de4a8' : '#ff9b8f' }}">@if($recipe['profit_loss'] >= 0) PROFIT @else LOSS @endif: {{ number_format(abs($recipe['profit_loss']), 2) }} ISK per run — compare against buying {{ $recipe['output_name'] }} directly</div>
 @else
-<div class="muted">Profit/loss unavailable until all input and output Jita buy prices have been refreshed.</div>
+<div class="muted">Profit/loss unavailable until all input and output Jita buy prices are available.</div>
 @endif
 </div>
 </article>
