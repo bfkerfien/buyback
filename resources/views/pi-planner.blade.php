@@ -83,6 +83,7 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 </article>
 @endforeach
 @endif
+@include('partials.pi-p1-appraisal-buy-prices')
 </div></section>
 @endforeach
 <details class="panel" id="p1-appraisal-buy-prices"><summary style="cursor:pointer;color:#62d9e9;font-weight:700">Individual P1 appraisal buy prices and saved rules</summary><div style="padding-top:12px">
@@ -129,7 +130,7 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 @endforeach
 </tbody></table></div>
 @endif
-</div></details>
+
 </main>
 <script>
 (()=> {
