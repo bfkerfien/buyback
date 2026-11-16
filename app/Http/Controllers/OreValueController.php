@@ -170,6 +170,13 @@ class OreValueController extends Controller
             'P3' => 1040,
             'P4' => 1041,
         ];
+        // PI customs taxable values per unit, in ISK, from the in-game tier schedule.
+        $piTaxableValues = [
+            1042 => 400.0,       // P1
+            1034 => 7200.0,      // P2
+            1040 => 60000.0,     // P3
+            1041 => 1200000.0,   // P4
+        ];
 
         $schematics = DB::table('eve_planet_schematics as schematic')
             ->join('eve_item_types as product', 'product.type_id', '=', 'schematic.product_type_id')
@@ -195,6 +202,7 @@ class OreValueController extends Controller
         $schematicInputs = $schematicIds
             ? DB::table('eve_planet_schematic_inputs as input')
                 ->join('eve_item_types as input_type', 'input_type.type_id', '=', 'input.type_id')
+                ->leftJoin('eve_item_groups as input_group', 'input_group.group_id', '=', 'input_type.group_id')
                 ->leftJoinSub($latestPrices, 'input_latest', fn ($join) => $join->on('input_latest.type_id', '=', 'input.type_id'))
                 ->leftJoin('market_price_snapshots as input_price', 'input_price.id', '=', 'input_latest.latest_id')
                 ->whereIn('input.schematic_id', $schematicIds)
@@ -204,6 +212,8 @@ class OreValueController extends Controller
                     'input.type_id',
                     'input.quantity',
                     'input_type.type_name',
+                    'input_group.category_id as input_category_id',
+                    'input_group.group_id as input_tier_group_id',
                     'input_price.buy_price as unit_buy_price',
                 ])
                 ->groupBy('schematic_id')
@@ -219,14 +229,24 @@ class OreValueController extends Controller
             $inputRows = collect($schematicInputs->get($schematic->schematic_id, []));
             $inputs = [];
             $inputsCost = 0.0;
+            $importTaxValue = 0.0;
             $completePrices = $inputRows->isNotEmpty() && $schematic->output_unit_price !== null;
+            $outputTaxableValue = $piTaxableValues[(int) $schematic->tier_group_id] ?? null;
+            if ($outputTaxableValue === null) {
+                $completePrices = false;
+            }
             foreach ($inputRows as $input) {
                 $unitPrice = $input->unit_buy_price !== null ? (float) $input->unit_buy_price : null;
                 $lineCost = $unitPrice !== null ? round($unitPrice * (int) $input->quantity, 2) : null;
-                if ($lineCost === null) {
+                $inputTaxableValue = (int) $input->input_category_id === 43
+                    ? ($piTaxableValues[(int) $input->input_tier_group_id] ?? null)
+                    : null;
+                if ($lineCost === null || $inputTaxableValue === null) {
                     $completePrices = false;
                 } else {
                     $inputsCost += $lineCost;
+                    // PI customs import fees are half the export taxable value times the configured rate.
+                    $importTaxValue += $inputTaxableValue * (int) $input->quantity * $importTaxPercent / 100 * 0.5;
                 }
                 $inputs[] = [
                     'name' => $input->type_name,
@@ -241,9 +261,9 @@ class OreValueController extends Controller
                 ? round($outputUnitPrice * (int) $schematic->product_quantity, 2)
                 : null;
             $inputsCost = round($inputsCost, 2);
-            $importTax = $completePrices ? round($inputsCost * $importTaxPercent / 100, 2) : null;
+            $importTax = $completePrices ? round($importTaxValue, 2) : null;
             $exportTax = $completePrices && $outputRevenue !== null
-                ? round($outputRevenue * $exportTaxPercent / 100, 2)
+                ? round($outputTaxableValue * (int) $schematic->product_quantity * $exportTaxPercent / 100, 2)
                 : null;
             $landedInputCost = $completePrices ? round($inputsCost + $importTax, 2) : null;
             $netProfit = $completePrices && $outputRevenue !== null
