@@ -21,6 +21,16 @@ class PiPlannerController extends Controller
             ->get(['price.type_id', 'price.buy_price', 'price.sell_price', 'price.observed_at'])
             ->keyBy('type_id');
 
+        $taxSettings = DB::table('pi_tax_settings')->where('id', 1)->first();
+        $importTaxPercent = (float) ($taxSettings->import_tax_percent ?? 0);
+        $exportTaxPercent = (float) ($taxSettings->export_tax_percent ?? 0);
+        $piTaxableValues = [
+            1042 => 400.0,
+            1034 => 7200.0,
+            1040 => 60000.0,
+            1041 => 1200000.0,
+        ];
+
         $recipes = DB::table('eve_planet_schematics as s')
             ->join('eve_item_types as output', 'output.type_id', '=', 's.product_type_id')
             ->join('eve_item_groups as output_group', 'output_group.group_id', '=', 'output.group_id')
@@ -36,7 +46,7 @@ class PiPlannerController extends Controller
             ->orderBy('output.type_name')
             ->get()
             ->groupBy('schematic_id')
-            ->map(function ($rows) use ($prices) {
+            ->map(function ($rows) use ($prices, $importTaxPercent, $exportTaxPercent, $piTaxableValues) {
                 $first = $rows->first();
                 $outputPrice = $prices->get($first->product_type_id);
                 $inputs = $rows->filter(fn ($r) => $r->input_type_id !== null)->map(function ($r) use ($prices) {
@@ -55,9 +65,32 @@ class PiPlannerController extends Controller
                 $inputCost = $inputs->contains(fn ($input) => $input['run_cost'] === null)
                     ? null
                     : (float) $inputs->sum('run_cost');
+                $inputTax = 0.0;
+                $inputTaxComplete = true;
+                foreach ($rows->filter(fn ($r) => $r->input_type_id !== null) as $inputRow) {
+                    $inputGroupId = DB::table('eve_item_types')->where('type_id', $inputRow->input_type_id)->value('group_id');
+                    $taxableValue = $piTaxableValues[(int) $inputGroupId] ?? null;
+                    if ($taxableValue === null) {
+                        $inputTaxComplete = false;
+                        break;
+                    }
+                    $inputTax += $taxableValue * (int) $inputRow->input_quantity * $importTaxPercent / 100 * 0.5;
+                }
+                $outputGroupId = DB::table('eve_item_types')->where('type_id', $first->product_type_id)->value('group_id');
+                $outputTaxableValue = $piTaxableValues[(int) $outputGroupId] ?? null;
+                $exportTax = $outputTaxableValue !== null
+                    ? $outputTaxableValue * (int) $first->product_quantity * $exportTaxPercent / 100
+                    : null;
+                $inputTax = $inputTaxComplete ? round($inputTax, 2) : null;
                 $outputUnitBuyPrice = $outputPrice?->buy_price !== null ? (float) $outputPrice->buy_price : null;
                 $outputBuyValue = $outputUnitBuyPrice !== null
                     ? $outputUnitBuyPrice * (int) $first->product_quantity
+                    : null;
+                $totalProductionCost = $inputCost !== null && $inputTax !== null
+                    ? round($inputCost + $inputTax, 2)
+                    : null;
+                $netSaleValue = $outputBuyValue !== null && $exportTax !== null
+                    ? round($outputBuyValue - $exportTax, 2)
                     : null;
 
                 return [
@@ -73,12 +106,16 @@ class PiPlannerController extends Controller
                     'output_price_observed_at' => $outputPrice?->observed_at,
                     'inputs' => $inputs,
                     'input_cost' => $inputCost,
-                    'profit_loss' => $inputCost !== null && $outputBuyValue !== null
-                        ? $outputBuyValue - $inputCost
+                    'import_tax' => $inputTax,
+                    'export_tax' => $exportTax,
+                    'total_production_cost' => $totalProductionCost,
+                    'net_sale_value' => $netSaleValue,
+                    'profit_loss' => $totalProductionCost !== null && $netSaleValue !== null
+                        ? round($netSaleValue - $totalProductionCost, 2)
                         : null,
                 ];
             })->values();
 
-        return view('pi-planner', ['recipes' => $recipes]);
+        return view('pi-planner', compact('recipes', 'importTaxPercent', 'exportTaxPercent'));
     }
 }
