@@ -174,25 +174,30 @@ class PiPlannerController extends Controller
             })->values();
 
         // One row per P1 input, using the lowest recommended percentage across
-        // every P1 -> P2 recipe that consumes it.
+        // every P1 -> P2 recipe that consumes it. If any consuming recipe has no
+        // feasible target, do not offer a misleading aggregate Set action.
         $p1Targets = [];
         foreach ($recipes->filter(fn ($recipe) => strcasecmp($recipe['output_group'], 'Refined Commodities - Tier 2') === 0) as $recipe) {
             foreach ($recipe['inputs'] as $input) {
-                if (!isset($input['target_buy_percent'])) {
-                    continue;
-                }
                 $id = (int) $input['id'];
                 if (!isset($p1Targets[$id])) {
                     $p1Targets[$id] = [
                         'type_id' => $id,
                         'name' => $input['name'],
                         'jita_buy' => $input['buy_price'],
-                        'lowest_percent' => (float) $input['target_buy_percent'],
-                        'recipes' => 1,
+                        'lowest_percent' => null,
+                        'recipes' => 0,
+                        'target_complete' => true,
                     ];
+                }
+                $p1Targets[$id]['recipes']++;
+                if (!isset($input['target_buy_percent'])) {
+                    $p1Targets[$id]['target_complete'] = false;
                 } else {
-                    $p1Targets[$id]['lowest_percent'] = min($p1Targets[$id]['lowest_percent'], (float) $input['target_buy_percent']);
-                    $p1Targets[$id]['recipes']++;
+                    $current = (float) $input['target_buy_percent'];
+                    $p1Targets[$id]['lowest_percent'] = $p1Targets[$id]['lowest_percent'] === null
+                        ? $current
+                        : min($p1Targets[$id]['lowest_percent'], $current);
                 }
             }
         }
@@ -202,6 +207,7 @@ class PiPlannerController extends Controller
                 $rule = $savedPiRules->get($item['type_id']);
                 $item['saved_percent'] = $rule ? (float) $rule->buy_percent : null;
                 $item['is_set'] = $rule !== null;
+                $item['can_set'] = $item['target_complete'] && $item['lowest_percent'] !== null;
                 return $item;
             })
             ->sortBy('name')
