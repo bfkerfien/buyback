@@ -40,7 +40,7 @@ class PiPlannerController extends Controller
             ->select(
                 's.schematic_id', 's.name as schematic_name', 's.cycle_time',
                 's.product_type_id', 's.product_quantity',
-                'output.type_name as product_name', 'output_group.group_name as product_group', 'output_group.group_id as output_group_id',
+                'output.type_name as product_name', 'output.volume as output_volume', 'output_group.group_name as product_group', 'output_group.group_id as output_group_id',
                 'i.type_id as input_type_id', 'i.quantity as input_quantity',
                 'input.type_name as input_name', 'input_group.group_id as input_group_id'
             )
@@ -85,17 +85,21 @@ class PiPlannerController extends Controller
                 $outputBuyValue = $outputUnitBuyPrice !== null
                     ? $outputUnitBuyPrice * (int) $first->product_quantity
                     : null;
+                $transportVolume = $first->output_volume !== null
+                    ? (float) $first->output_volume * (int) $first->product_quantity
+                    : null;
+                $transportFee = $transportVolume !== null ? round($transportVolume * 320, 2) : null;
                 $totalProductionCost = $inputCost !== null && $inputTax !== null
                     ? round($inputCost + $inputTax, 2)
                     : null;
-                $netSaleValue = $outputBuyValue !== null && $exportTax !== null
-                    ? round($outputBuyValue - $exportTax, 2)
+                $netSaleValue = $outputBuyValue !== null && $exportTax !== null && $transportFee !== null
+                    ? round($outputBuyValue - $exportTax - $transportFee, 2)
                     : null;
                 // Maximum common percentage of current Jita buy prices payable for every input
                 // while keeping the all-in production cost (including both customs fees)
                 // at or below 82% of the P2 output's gross Jita buy value.
-                $targetMaterialBudget = $outputBuyValue !== null && $inputTax !== null && $exportTax !== null
-                    ? round(($outputBuyValue * 0.82) - $inputTax - $exportTax, 2)
+                $targetMaterialBudget = $outputBuyValue !== null && $inputTax !== null && $exportTax !== null && $transportFee !== null
+                    ? round(($outputBuyValue * 0.82) - $inputTax - $exportTax - $transportFee, 2)
                     : null;
                 $targetBuyPercent = $targetMaterialBudget !== null && $inputCost !== null && $inputCost > 0
                     ? round(($targetMaterialBudget / $inputCost) * 100, 2)
@@ -111,6 +115,8 @@ class PiPlannerController extends Controller
                     'output_quantity' => (int) $first->product_quantity,
                     'output_buy_price' => $outputUnitBuyPrice,
                     'output_buy_value' => $outputBuyValue,
+                    'output_volume' => $transportVolume,
+                    'transport_fee' => $transportFee,
                     'output_price_observed_at' => $outputPrice?->observed_at,
                     'inputs' => $inputs,
                     'input_cost' => $inputCost,
