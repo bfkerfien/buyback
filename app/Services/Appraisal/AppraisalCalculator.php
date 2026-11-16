@@ -9,6 +9,17 @@ final class AppraisalCalculator
 {
     public function calculate(array $parsedItems, ?string $requiredCategoryName = null, ?float $fixedPayoutPercent = null, bool $ignoreNonMatching = false): array
     {
+        // Mission-only ores and special variants are never accepted for buyback.
+        $parsedItems = array_values(array_filter(
+            $parsedItems,
+            fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
+        ));
+        if (!$parsedItems) {
+            throw ValidationException::withMessages([
+                'inventory' => 'Mission-only ores and excluded special ore variants are not accepted for buyback.',
+            ]);
+        }
+
         $names = array_column($parsedItems, 'name');
         $types = DB::table('eve_item_types as t')
             ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
