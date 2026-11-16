@@ -34,7 +34,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <nav class="tabs" role="tablist" aria-label="Buyback sections">
 <button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="tab-appraisals" data-tab="tab-appraisals">New Appraisals</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-contracts" data-tab="tab-contracts">Appraisals &amp; Contracts</button>
-<a class="tab" href="{{ route('ship-buyback.index') }}" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;text-decoration:none">Ship Buyback · 80%</a>
+<a class="tab" href="{{ route('ship-buyback.index') }}" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;text-decoration:none">Ship Buyback</a>
 @if($admin)
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-marketbaiters" data-tab="tab-marketbaiters">Marketbaiters Comparison</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin" data-tab="tab-admin">Admin</button>
@@ -73,7 +73,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <td><a href="{{ route('appraisals.show',$appraisal->public_token) }}">#{{ substr($appraisal->public_token,0,12) }}</a></td>
 <td>{{ $appraisal->character_name }}</td>
 <td>{{ $appraisal->origin_system ?: '—' }}</td>
-<td>{{ $appraisal->appraisal_kind === 'ship' ? 'Ship Buyback · 80%' : 'Standard' }}</td>
+<td>{{ $appraisal->appraisal_kind === 'ship' ? 'Ship Buyback' : 'Standard' }}</td>
 <td>{{ number_format((float)$appraisal->payout_value,2) }} ISK</td>
 <td>{{ \Illuminate\Support\Carbon::parse($appraisal->created_at)->timezone(config('app.timezone'))->format('M j, Y g:i A') }}</td>
 <td><form class="inline" method="post" action="{{ route('appraisals.destroy',$appraisal->id) }}" onsubmit="return confirm('Permanently delete this appraisal and its item details? This cannot be undone.')">@csrf @method('DELETE')<button type="submit" style="background:#8f3940;color:#fff">Delete</button></form></td>
