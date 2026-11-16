@@ -86,7 +86,7 @@ final class AppraisalCalculator
             // Every asteroid ore is valued from refined mineral outputs at the
             // max-refine null-sec Tatara / T2 rig / RX-804 yield (90.628%).
             // Compressed Mercoxit uses the matching uncompressed ore recipe and
-            // converts compressed units to base-ore units at 100:1 before refining.
+            // treats the submitted compressed quantity as a 1:1 Mercoxit quantity.
             if ((int) $type->category_id === 25) {
                 $isCompressedMercoxit = (bool) preg_match('/^Compressed (?:Magma |Vitreous )?Mercoxit$/i', $type->type_name);
                 $recipeType = $isCompressedMercoxit
@@ -98,7 +98,7 @@ final class AppraisalCalculator
                 }
                 $recipe = $oreMaterials->get($recipeType->type_id, collect());
                 $portionSize = max(1, (int) ($recipeType->portion_size ?? 1));
-                $refiningInputQuantity = $isCompressedMercoxit ? $pricingQuantity * 100 : $pricingQuantity;
+                $refiningInputQuantity = $pricingQuantity;
                 $batches = intdiv($refiningInputQuantity, $portionSize);
                 if ($recipe->isEmpty() || $batches < 1) {
                     $unresolvedTypes[] = $item['name'] . ' (missing SDE reprocessing recipe or incomplete batch quantity)';
