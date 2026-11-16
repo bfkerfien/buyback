@@ -11,9 +11,9 @@
 </nav>
 @php
 $stages = [
-'p1-p2' => ['title' => 'P1 → P2', 'group' => 'Specialized Commodities', 'description' => 'Combine P1 refined commodities into P2 specialized commodities.'],
-'p2-p3' => ['title' => 'P2 → P3', 'group' => 'Advanced Commodities', 'description' => 'Combine P2 specialized commodities into P3 advanced commodities.'],
-'p3-p4' => ['title' => 'P3 → P4', 'group' => 'High-Tech Commodities', 'description' => 'Combine P3 advanced commodities into P4 high-tech commodities.'],
+'p1-p2' => ['title' => 'P1 → P2', 'group' => 'Refined Commodities - Tier 2', 'description' => 'Combine P1 basic commodities into P2 refined commodities.'],
+'p2-p3' => ['title' => 'P2 → P3', 'group' => 'Specialized Commodities - Tier 3', 'description' => 'Combine P2 refined commodities into P3 specialized commodities.'],
+'p3-p4' => ['title' => 'P3 → P4', 'group' => 'Advanced Commodities - Tier 4', 'description' => 'Combine P3 specialized commodities into P4 advanced commodities.'],
 ];
 @endphp
 @foreach($stages as $key => $stage)
