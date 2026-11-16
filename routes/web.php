@@ -23,7 +23,7 @@ Route::post('/ship-buyback', [AppraisalController::class, 'storeShipBuyback'])->
 Route::get('/q/{token}', [AppraisalController::class, 'show'])->whereAlphaNumeric('token')->name('appraisals.show');
 
 Route::middleware(['auth', 'active'])->group(function () {
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');\n    Route::get('/pi-planner', [PiPlannerController::class, 'index'])->name('pi-planner.index');
     Route::get('/link-character/eve', [EveSsoController::class, 'linkCharacter'])->name('login.eve.link');
     Route::delete('/appraisals/{quote}', [AppraisalVisibilityController::class, 'destroy'])->whereNumber('quote')->name('appraisals.destroy');
     Route::delete('/appraisals/{quote}/hide', [AppraisalVisibilityController::class, 'hide'])->whereNumber('quote')->name('appraisals.hide');
