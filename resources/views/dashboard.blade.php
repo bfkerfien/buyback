@@ -103,10 +103,9 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <td>{{ $contract['other_party_name'] }}</td>
 <td>{{ !empty($contract['date_issued']) ? \Illuminate\Support\Carbon::parse($contract['date_issued'])->timezone(config('app.timezone'))->format('M j, Y g:i A') : '—' }}</td>
 <td>
-@if($contract['price'] > 0)Price: {{ number_format($contract['price'],2) }} ISK<br>@endif
-@if($contract['reward'] > 0)Reward: {{ number_format($contract['reward'],2) }} ISK<br>@endif
-@if($contract['collateral'] > 0)Collateral: {{ number_format($contract['collateral'],2) }} ISK@endif
-@if($contract['price'] <= 0 && $contract['reward'] <= 0 && $contract['collateral'] <= 0)—@endif
+{{ $contract['price'] > 0 ? 'Price: '.number_format($contract['price'],2).' ISK' : '' }}@if($contract['price'] > 0 && ($contract['reward'] > 0 || $contract['collateral'] > 0))<br>@endif
+{{ $contract['reward'] > 0 ? 'Reward: '.number_format($contract['reward'],2).' ISK' : '' }}@if($contract['reward'] > 0 && $contract['collateral'] > 0)<br>@endif
+{{ $contract['collateral'] > 0 ? 'Collateral: '.number_format($contract['collateral'],2).' ISK' : '' }}{{ $contract['price'] <= 0 && $contract['reward'] <= 0 && $contract['collateral'] <= 0 ? '—' : '' }}
 </td>
 </tr>
 @empty
