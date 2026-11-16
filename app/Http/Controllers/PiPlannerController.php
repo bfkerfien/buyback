@@ -40,7 +40,7 @@ class PiPlannerController extends Controller
             ->select(
                 's.schematic_id', 's.name as schematic_name', 's.cycle_time',
                 's.product_type_id', 's.product_quantity',
-                'output.type_name as product_name', 'output_group.group_name as product_group',
+                'output.type_name as product_name', 'output_group.group_name as product_group', 'output_group.group_id as output_group_id',
                 'i.type_id as input_type_id', 'i.quantity as input_quantity',
                 'input.type_name as input_name', 'input_group.group_id as input_group_id'
             )
@@ -76,8 +76,7 @@ class PiPlannerController extends Controller
                     }
                     $inputTax += $taxableValue * (int) $inputRow->input_quantity * $importTaxPercent / 100 * 0.5;
                 }
-                $outputGroupId = DB::table('eve_item_types')->where('type_id', $first->product_type_id)->value('group_id');
-                $outputTaxableValue = $piTaxableValues[(int) $outputGroupId] ?? null;
+                $outputTaxableValue = $piTaxableValues[(int) $first->output_group_id] ?? null;
                 $exportTax = $outputTaxableValue !== null
                     ? $outputTaxableValue * (int) $first->product_quantity * $exportTaxPercent / 100
                     : null;
@@ -91,6 +90,15 @@ class PiPlannerController extends Controller
                     : null;
                 $netSaleValue = $outputBuyValue !== null && $exportTax !== null
                     ? round($outputBuyValue - $exportTax, 2)
+                    : null;
+                // Maximum common percentage of current Jita buy prices payable for every input
+                // while keeping the all-in production cost (including both customs fees)
+                // at or below 82% of the P2 output's gross Jita buy value.
+                $targetMaterialBudget = $outputBuyValue !== null && $inputTax !== null && $exportTax !== null
+                    ? round(($outputBuyValue * 0.82) - $inputTax - $exportTax, 2)
+                    : null;
+                $targetBuyPercent = $targetMaterialBudget !== null && $inputCost !== null && $inputCost > 0
+                    ? round(($targetMaterialBudget / $inputCost) * 100, 2)
                     : null;
 
                 return [
@@ -110,6 +118,8 @@ class PiPlannerController extends Controller
                     'export_tax' => $exportTax,
                     'total_production_cost' => $totalProductionCost,
                     'net_sale_value' => $netSaleValue,
+                    'target_material_budget' => $targetMaterialBudget,
+                    'target_buy_percent' => $targetBuyPercent,
                     'profit_loss' => $totalProductionCost !== null && $netSaleValue !== null
                         ? round($netSaleValue - $totalProductionCost, 2)
                         : null,
