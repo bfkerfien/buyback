@@ -85,6 +85,36 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 @endif
 </div></section>
 @endforeach
+<section class="panel" id="p1-appraisal-buy-prices">
+<h2>Individual P1 appraisal buy prices</h2>
+<p class="muted">Each P1 commodity appears once. The recommended percentage is the lowest target calculated across every P2 recipe that uses that input. Press Set to use that percentage as the individual appraisal payout rate for this commodity, replacing the shared PI category rate. The setting is saved until changed.</p>
+@if(session('status'))<div class="result" style="margin:10px 0">{{ session('status') }}</div>@endif
+@if($p1BuyTargets->isEmpty())
+<div class="empty">No P1 buy targets are available yet. Check that P1 Jita prices and all P1 → P2 recipe prices are loaded.</div>
+@else
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;min-width:650px">
+<thead><tr><th style="text-align:left;padding:10px;border-bottom:1px solid #294a56">P1 commodity</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Jita buy</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Lowest recipe target</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Current appraisal rate</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Action</th></tr></thead>
+<tbody>
+@foreach($p1BuyTargets as $item)
+<tr>
+<td style="padding:10px;border-bottom:1px solid #294a56">{{ $item['name'] }} <span class="muted">({{ $item['recipes'] }} recipe{{ $item['recipes'] === 1 ? '' : 's' }})</span></td>
+<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">{{ $item['jita_buy'] !== null ? number_format($item['jita_buy'],2).' ISK' : 'No price' }}</td>
+<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">{{ number_format($item['lowest_percent'],2) }}%</td>
+<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">@if($item['is_set']) {{ number_format($item['saved_percent'],2) }}% @else <span class="muted">Shared PI rate</span> @endif</td>
+<td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">
+<form method="post" action="{{ route('pi-planner.p1-buy-rule') }}" style="margin:0">
+@csrf
+<input type="hidden" name="type_id" value="{{ $item['type_id'] }}">
+<input type="hidden" name="buy_percent" value="{{ number_format($item['lowest_percent'],2,'.','') }}">
+<button type="submit" style="padding:7px 12px">{{ $item['is_set'] ? 'Update' : 'Set' }}</button>
+</form>
+</td>
+</tr>
+@endforeach
+</tbody></table></div>
+@endif
+</section>
 </main>
 <script>
 (()=> {
