@@ -41,6 +41,9 @@ final class AppraisalCalculator
             ->keyBy(fn ($type) => mb_strtolower(mb_substr($type->type_name, strlen('Compressed '))));
 
         $oreRules = DB::table('appraisal_ore_valuation_rules')->get()->keyBy('ore_type_id');
+        $typeIdsByName = DB::table('eve_item_types')->where('published', true)
+            ->whereIn('type_name', collect($names)->map(fn ($name) => preg_replace('/^Compressed /i', '', $name))->unique()->values())
+            ->pluck('type_id', 'type_name');
         $outputIds = $oreRules->where('valuation_mode', 'reprocessed')->pluck('output_type_id')->filter()->unique()->values();
         $outputTypes = $outputIds->isEmpty() ? collect() : DB::table('eve_item_types as t')
             ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
@@ -77,6 +80,21 @@ final class AppraisalCalculator
 
             $oreRule = $oreRules->get($type->type_id);
             $usesCompressedOrePrice = false;
+
+            // Compressed Mercoxit variants are valued through their Morphite
+            // reprocessing yield, not through a market price for the compressed
+            // variant. A compressed unit represents 100 units of its base ore.
+            $isCompressedMercoxit = (bool) preg_match('/^Compressed .+Mercoxit/i', $type->type_name);
+            if ($isCompressedMercoxit) {
+                $baseOreName = preg_replace('/^Compressed /i', '', $type->type_name);
+                $baseOreId = $typeIdsByName->get($baseOreName);
+                $oreRule = $baseOreId ? $oreRules->get($baseOreId) : null;
+                if (!$oreRule || $oreRule->valuation_mode !== 'reprocessed') {
+                    $mercoxitId = DB::table('eve_item_types')->where('published', true)->where('type_name', 'Mercoxit')->value('type_id');
+                    $oreRule = $mercoxitId ? $oreRules->get($mercoxitId) : null;
+                }
+            }
+
             if ($oreRule && $oreRule->valuation_mode === 'reprocessed') {
                 $pricingType = $outputTypes->get($oreRule->output_type_id);
                 if (!$pricingType) {
@@ -85,6 +103,9 @@ final class AppraisalCalculator
                 }
 
                 $conversionRatio = (float) $oreRule->output_quantity_per_input;
+                if ($isCompressedMercoxit) {
+                    $conversionRatio *= 100;
+                }
                 $outputQuantity = (int) floor($pricingQuantity * $conversionRatio + 0.00000001);
                 if ($outputQuantity < 1) {
                     $unresolved[] = $item['name'] . ' (reprocessed output rounds to zero)';
@@ -98,7 +119,7 @@ final class AppraisalCalculator
                 $usesCompressedOrePrice = true;
             }
 
-            // Buyback valuation is the marginal Jita buy price at 250,000 units
+            // Buyback valuation is the marginal Jita buy price at 50,000 units
             // of visible station buy-order depth, not the best single order.
             // That depth price must remain within 3% of the 7-day average stored
             // Jita buy snapshot price; otherwise treat the market as anomalous.
@@ -131,7 +152,7 @@ final class AppraisalCalculator
                         ->get(['price', 'volume_remain'])
                     : collect();
 
-                $remainingDepth = 250000;
+                $remainingDepth = 50000;
                 $unitPrice = null;
                 foreach ($depthOrders as $order) {
                     $volume = (int) $order->volume_remain;
@@ -161,7 +182,7 @@ final class AppraisalCalculator
                 }
 
                 $price = $unitPrice !== null ? (object) [
-                    'source' => 'jita-250000-unit-depth',
+                    'source' => 'jita-50000-unit-depth',
                     'observed_at' => $latestBookAt,
                 ] : null;
             }
