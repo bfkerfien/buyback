@@ -8,6 +8,7 @@ use App\Http\Controllers\EveSsoController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OreValueController;
 use App\Http\Controllers\PayoutRuleController;
+use App\Http\Controllers\PiPlannerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => auth()->check() ? redirect()->route('dashboard') : view('welcome', ['appName' => 'EveBuyback']))->name('home');
