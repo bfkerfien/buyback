@@ -28,6 +28,18 @@ final class AppraisalCalculator
             ->get(['t.type_id','t.type_name','t.group_id','g.category_id','g.category_name'])
             ->keyBy(fn ($type) => mb_strtolower($type->type_name));
 
+        // Uncompressed asteroid ores are valued from their matching compressed ore's
+        // Jita buy order, at 10% of that compressed unit price. Only published
+        // asteroid-ore types with an exact "Compressed {name}" SDE counterpart qualify.
+        $compressedNames = collect($names)->map(fn ($name) => 'Compressed ' . $name)->unique()->values();
+        $compressedOreTypes = DB::table('eve_item_types as t')
+            ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->where('g.category_id', 25)
+            ->whereIn('t.type_name', $compressedNames)
+            ->get(['t.type_id','t.type_name','t.group_id','g.category_id','g.category_name'])
+            ->keyBy(fn ($type) => mb_strtolower(mb_substr($type->type_name, strlen('Compressed '))));
+
         $oreRules = DB::table('appraisal_ore_valuation_rules')->get()->keyBy('ore_type_id');
         $outputIds = $oreRules->where('valuation_mode', 'reprocessed')->pluck('output_type_id')->filter()->unique()->values();
         $outputTypes = $outputIds->isEmpty() ? collect() : DB::table('eve_item_types as t')
@@ -64,6 +76,7 @@ final class AppraisalCalculator
             $conversionRatio = null;
 
             $oreRule = $oreRules->get($type->type_id);
+            $usesCompressedOrePrice = false;
             if ($oreRule && $oreRule->valuation_mode === 'reprocessed') {
                 $pricingType = $outputTypes->get($oreRule->output_type_id);
                 if (!$pricingType) {
@@ -80,6 +93,9 @@ final class AppraisalCalculator
 
                 $pricingQuantity = $outputQuantity;
                 $valuationMode = 'reprocessed';
+            } elseif ((int) $type->category_id === 25 && $compressedOreTypes->has(mb_strtolower($type->type_name))) {
+                $pricingType = $compressedOreTypes->get(mb_strtolower($type->type_name));
+                $usesCompressedOrePrice = true;
             }
 
             // Buyback valuation is the marginal Jita buy price at 250,000 units
@@ -148,6 +164,10 @@ final class AppraisalCalculator
                     'source' => 'jita-250000-unit-depth',
                     'observed_at' => $latestBookAt,
                 ] : null;
+            }
+
+            if ($usesCompressedOrePrice && $unitPrice !== null) {
+                $unitPrice *= 0.10;
             }
 
             if ($unitPrice === null || $unitPrice <= 0 || !$price) {
