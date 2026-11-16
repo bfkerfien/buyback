@@ -32,6 +32,62 @@ class PayoutRuleController extends Controller
         return back()->with('status','Buyback rate saved for the '.$category->category_name.' category.');
     }
 
+    public function storeMineralPricing(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $data = $request->validate([
+            'type_id' => ['required', 'integer', 'min:1'],
+            'buy_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
+            'price_depth' => ['required', 'integer', 'min:1', 'max:2000000000'],
+        ]);
+
+        $material = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.type_id', $data['type_id'])->where('t.published', true)
+            ->where(function ($query) use ($data) {
+                $query->where('g.group_name', 'Mineral')
+                    ->orWhereExists(function ($moon) use ($data) {
+                        $moon->select(DB::raw(1))->from('eve_type_materials as m')
+                            ->join('eve_item_types as ore', 'ore.type_id', '=', 'm.type_id')
+                            ->join('eve_item_groups as og', 'og.group_id', '=', 'ore.group_id')
+                            ->whereColumn('m.material_type_id', 't.type_id')
+                            ->where('og.group_name', 'like', '%Moon%');
+                    });
+            })
+            ->first(['t.type_id', 't.type_name']);
+
+        if (!$material) {
+            throw ValidationException::withMessages(['type_id' => ['That item is not a published standard or moon-ore refining material.']]);
+        }
+
+        foreach ([
+            'mineral_buy_percent_' . $material->type_id => (string) $data['buy_percent'],
+            'mineral_buy_depth_' . $material->type_id => (string) $data['price_depth'],
+        ] as $key => $value) {
+            DB::table('buyback_system_status')->updateOrInsert(
+                ['status_key' => $key],
+                ['status_value' => $value]
+            );
+        }
+
+        DB::table('audit_logs')->insert([
+            'user_id' => $request->user()->id,
+            'action' => 'mineral_buyback_setting.saved',
+            'subject_type' => 'eve_refining_material',
+            'subject_id' => $material->type_id,
+            'details' => json_encode([
+                'material' => $material->type_name,
+                'buy_percent' => (float) $data['buy_percent'],
+                'price_depth' => (int) $data['price_depth'],
+            ]),
+            'ip_address' => $request->ip(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', $material->type_name . ' buy percentage and Jita depth saved.');
+    }
+
     public function destroy(Request $request, int $categoryId): RedirectResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
