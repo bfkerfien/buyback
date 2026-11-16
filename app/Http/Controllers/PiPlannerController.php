@@ -36,12 +36,13 @@ class PiPlannerController extends Controller
             ->join('eve_item_groups as output_group', 'output_group.group_id', '=', 'output.group_id')
             ->leftJoin('eve_planet_schematic_inputs as i', 'i.schematic_id', '=', 's.schematic_id')
             ->leftJoin('eve_item_types as input', 'input.type_id', '=', 'i.type_id')
+            ->leftJoin('eve_item_groups as input_group', 'input_group.group_id', '=', 'input.group_id')
             ->select(
                 's.schematic_id', 's.name as schematic_name', 's.cycle_time',
                 's.product_type_id', 's.product_quantity',
                 'output.type_name as product_name', 'output_group.group_name as product_group',
                 'i.type_id as input_type_id', 'i.quantity as input_quantity',
-                'input.type_name as input_name'
+                'input.type_name as input_name', 'input_group.group_id as input_group_id'
             )
             ->orderBy('output.type_name')
             ->get()
@@ -68,8 +69,7 @@ class PiPlannerController extends Controller
                 $inputTax = 0.0;
                 $inputTaxComplete = true;
                 foreach ($rows->filter(fn ($r) => $r->input_type_id !== null) as $inputRow) {
-                    $inputGroupId = DB::table('eve_item_types')->where('type_id', $inputRow->input_type_id)->value('group_id');
-                    $taxableValue = $piTaxableValues[(int) $inputGroupId] ?? null;
+                    $taxableValue = $piTaxableValues[(int) $inputRow->input_group_id] ?? null;
                     if ($taxableValue === null) {
                         $inputTaxComplete = false;
                         break;
