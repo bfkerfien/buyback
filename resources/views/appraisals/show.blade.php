@@ -40,6 +40,19 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <div class="stat"><span class="muted">Contract to</span><strong id="contract-recipient">My Eve Online</strong><button class="why" type="button" onclick="copyContractValue('contract-recipient',this)">Copy name</button></div>
 <div class="stat"><span class="muted">Contract price</span><strong id="contract-price">{{ number_format((float)$quote->payout_value, 2, '.', '') }}</strong><span class="sub">ISK</span><button class="why" type="button" onclick="copyContractValue('contract-price',this)">Copy price</button></div>
 </div>
+<div class="details open" style="display:block;margin-top:16px">
+<strong>How to create the EVE contract</strong>
+<ol style="line-height:1.8;padding-left:22px">
+<li>In EVE, open <strong>Contracts</strong> and choose <strong>Create Contract</strong>.</li>
+<li>Select <strong>Item Exchange</strong>.</li>
+<li>Add the items from this appraisal that you are selling.</li>
+<li>Set the contract recipient to <strong>My Eve Online</strong> using the Copy name button above.</li>
+<li>Set the price you are asking to the amount shown above. Use the Copy price button.</li>
+<li>Paste the appraisal serial from the Copy serial button into the contract <strong>Description / Info</strong> field.</li>
+<li>Review the items, recipient, price and serial number, then submit the contract.</li>
+</ol>
+<p class="muted">The contract should be issued specifically to My Eve Online, not left as a public contract. The serial in the description lets us match the EVE contract to this appraisal.</p>
+</div>
 </section>
 <section class="panel"><div class="grid">
 <div class="stat"><span class="muted">Gross market value</span><strong>{{ number_format((float)$quote->gross_value, 2) }} ISK</strong></div>
