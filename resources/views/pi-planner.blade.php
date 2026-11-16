@@ -34,10 +34,26 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 <label class="muted">Desired output<br><input class="qty target-quantity" type="number" min="1" step="1" value="{{ $recipe['output_quantity'] * 10 }}"></label></div>
 <div class="inputs">
 @foreach($recipe['inputs'] as $input)
-<div class="material" data-input data-quantity="{{ $input['quantity'] }}" data-name="{{ $input['name'] }}">{{ $input['name'] }}<strong class="input-total">{{ number_format($input['quantity'] * 10) }}</strong><span class="muted">per 10 runs basis</span></div>
+<div class="material" data-input data-quantity="{{ $input['quantity'] }}" data-name="{{ $input['name'] }}">
+{{ $input['name'] }}
+<strong class="input-total">{{ number_format($input['quantity'] * 10) }}</strong>
+<span class="muted">{{ $input['quantity'] }} per run · Jita buy: @if($input['buy_price'] !== null) {{ number_format($input['buy_price'], 2) }} ISK each @else price unavailable @endif</span>
+@if($input['run_cost'] !== null)<span class="muted">Cost per run: {{ number_format($input['run_cost'], 2) }} ISK</span>@endif
+</div>
 @endforeach
 </div>
 <div class="result">Runs required: <span class="runs">{{ 10 }}</span> · Output: <span class="output-total">{{ number_format($recipe['output_quantity'] * 10) }}</span> {{ $recipe['output_name'] }}</div>
+<div class="panel" style="margin-top:12px">
+<strong>Jita production comparison · per schematic run</strong>
+<div class="muted">Input production cost: @if($recipe['input_cost'] !== null) {{ number_format($recipe['input_cost'], 2) }} ISK @else missing input buy price @endif</div>
+<div class="muted">Finished {{ $recipe['output_name'] }} buy price: @if($recipe['output_buy_price'] !== null) {{ number_format($recipe['output_buy_price'], 2) }} ISK each @else price unavailable @endif</div>
+<div class="muted">Value of {{ $recipe['output_quantity'] }} finished units at buy orders: @if($recipe['output_buy_value'] !== null) {{ number_format($recipe['output_buy_value'], 2) }} ISK @else price unavailable @endif</div>
+@if($recipe['profit_loss'] !== null)
+<div class="result" style="color:{{ $recipe['profit_loss'] >= 0 ? '#8de4a8' : '#ff9b8f' }}">@if($recipe['profit_loss'] >= 0) Production advantage @else Production loss @endif: {{ number_format(abs($recipe['profit_loss']), 2) }} ISK per run</div>
+@else
+<div class="muted">Profit/loss unavailable until all input and output Jita buy prices have been refreshed.</div>
+@endif
+</div>
 </article>
 @endforeach
 @endif
