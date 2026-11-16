@@ -29,7 +29,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <link rel="icon" type="image/png" href="{{ asset('evebuyback-logo.png') }}">
 </head>
 <body><div class="wrap">
-<header class="top"><img class="eb-logo" style="width:360px" src="{{ asset('evebuyback-logo.png') }}" alt="EveBuyback"><div class="tag">EVE ONLINE · BUYBACK OPERATIONS</div><nav style="display:flex;gap:8px;align-items:center"><a href="{{ route('ship-buyback.index') }}" style="color:#eaf7f8;border:1px solid #386675;border-radius:9px;padding:9px 13px;text-decoration:none">Ship Buyback · 80%</a><a href="{{ route('login.eve') }}" style="color:#eaf7f8;border:1px solid #386675;border-radius:9px;padding:9px 13px;text-decoration:none">Sign in with EVE</a></nav></header>
+<header class="top"><img class="eb-logo" style="width:360px" src="{{ asset('evebuyback-logo.png') }}" alt="EveBuyback"><div class="tag">EVE ONLINE · BUYBACK OPERATIONS</div><nav style="display:flex;gap:8px;align-items:center"><a href="{{ route('ship-buyback.index') }}" style="color:#eaf7f8;border:1px solid #386675;border-radius:9px;padding:9px 13px;text-decoration:none">Ship Buyback</a><a href="{{ route('login.eve') }}" style="color:#eaf7f8;border:1px solid #386675;border-radius:9px;padding:9px 13px;text-decoration:none">Sign in with EVE</a></nav></header>
 <section class="hero" style="max-width:850px;text-align:left;background:#101e27;border:1px solid #294a56;border-radius:18px;padding:26px;box-shadow:0 25px 90px #0005">
 <h1 style="font-size:30px;letter-spacing:0;text-align:center;margin:0 0 18px">Buyback instructions</h1>
 <ol style="color:#c5dbe0;line-height:1.9;padding-left:24px;margin:0">
