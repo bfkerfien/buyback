@@ -9,7 +9,7 @@ use Throwable;
 
 class RefreshJitaPrices extends Command
 {
-    protected $signature = 'buyback:refresh-jita-prices {type_ids?* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4}';
+    protected $signature = 'buyback:refresh-jita-prices {type_ids?* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4} {--pi : Refresh every input and output type used by imported PI schematics}';
     protected $description = 'Fetch best buy and sell orders at Jita IV - Moon 4 from EVE ESI.';
 
     public function handle(): int
@@ -24,6 +24,24 @@ class RefreshJitaPrices extends Command
             array_map('intval', $this->argument('type_ids')),
             fn (int $id) => $id > 0
         )));
+
+        if ($this->option('pi')) {
+            if ($this->option('all') || $typeIds) {
+                $this->error('Use --pi by itself, without --all or explicit type IDs.');
+                return self::FAILURE;
+            }
+
+            $typeIds = array_merge(
+                DB::table('eve_planet_schematics')->pluck('product_type_id')->all(),
+                DB::table('eve_planet_schematic_inputs')->pluck('type_id')->all()
+            );
+            $typeIds = array_values(array_unique(array_filter(array_map('intval', $typeIds), fn (int $id) => $id > 0)));
+            if (!$typeIds) {
+                $this->error('No PI recipe types are imported yet.');
+                return self::FAILURE;
+            }
+            $this->info('Refreshing Jita buy/sell prices for '.count($typeIds).' PI input and output types...');
+        }
 
         if ($this->option('all')) {
             if ($typeIds) {
