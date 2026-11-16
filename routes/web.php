@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn () => auth()->check() ? redirect()->route('dashboard') : view('welcome', ['appName' => 'EveBuyback']))->name('home');
 Route::get('/ore-values', [OreValueController::class, 'index'])->middleware(['auth', 'active', 'admin'])->name('ore-values.index');
+Route::post('/ore-values/pi-taxes', [OreValueController::class, 'updateTaxes'])->middleware(['auth', 'active', 'admin'])->name('ore-values.pi-taxes');
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'service' => 'buyback', 'timestamp' => now()->toIso8601String()]))->name('health');
 Route::get('/login/eve', [EveSsoController::class, 'redirect'])->name('login.eve');
 Route::get('/auth/eve/callback', [EveSsoController::class, 'callback'])->name('auth.eve.callback');
