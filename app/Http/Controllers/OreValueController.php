@@ -1,13 +1,15 @@
 <?php
 
-namespace App\\Http\\Controllers;
+namespace App\Http\Controllers;
 
-use Illuminate\\Support\\Facades\\DB;
-use Illuminate\\View\\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class OreValueController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         // Maximum-skill null-sec Tatara with T2 reprocessing rig and RX-804 implant.
         $quantity = 10000;
@@ -21,11 +23,10 @@ class OreValueController extends Controller
             ->where('region_id', $regionId)
             ->groupBy('type_id');
 
-        // These are the SDE mission/NPE ore variants, rather than normal mineable ore.
-        // Exclude the entire group so the comparison stays focused on regular asteroid ore.
+        // Mission/NPE-only ore variants are excluded from the normal asteroid basket.
         $missionOres = [
-            'Augumene', 'Banidine', 'Geodite', 'Green Arisite', 'Lyavite',
-            'Mercium', 'Oeryl', 'Pithix', 'Polygypsum', 'Zuthrine',
+            'Arisite', 'Augumene', 'Banidine', 'Geodite', 'Green Arisite',
+            'Lyavite', 'Mercium', 'Oeryl', 'Pithix', 'Polygypsum', 'Zuthrine',
         ];
 
         $records = DB::table('eve_item_types as ore')
@@ -122,15 +123,14 @@ class OreValueController extends Controller
         $latestObservedAt = $rows->pluck('ore_price_at')->filter()->max();
         $oreSaleValueTotal = round($rows->sum(fn ($row) => $row['ore_market_value'] ?? 0), 2);
 
-        // Category 43 is Planetary Commodities in the CCP SDE: all marketable PI tiers.
-        // Price each commodity as a 1,000-unit lot, using the same regional buy snapshots.
+        // CCP SDE category 43 contains the marketable Planetary Commodities (P1-P4).
         $piRecords = DB::table('eve_item_types as item')
             ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
             ->leftJoinSub($latestPrices, 'item_latest', fn ($join) => $join->on('item_latest.type_id', '=', 'item.type_id'))
             ->leftJoin('market_price_snapshots as item_price', 'item_price.id', '=', 'item_latest.latest_id')
             ->where('groups.category_id', 43)
             ->where('item.published', true)
-            ->orderBy('groups.group_name')
+            ->orderBy('groups.group_id')
             ->orderBy('item.type_name')
             ->get([
                 'item.type_id',
@@ -158,10 +158,168 @@ class OreValueController extends Controller
         $piBasketValue = round($piItems->sum(fn ($item) => $item['market_value'] ?? 0), 2);
         $combinedSaleValueTotal = round($oreSaleValueTotal + $piBasketValue, 2);
 
+        $piTaxSettings = DB::table('pi_tax_settings')->where('id', 1)->first();
+        $importTaxPercent = (float) ($piTaxSettings->import_tax_percent ?? 0);
+        $exportTaxPercent = (float) ($piTaxSettings->export_tax_percent ?? 0);
+
+        // PI group IDs from the CCP SDE: P1 Basic, P2 Refined, P3 Specialized, P4 Advanced.
+        $tierGroups = [
+            'P2' => 1034,
+            'P3' => 1040,
+            'P4' => 1041,
+        ];
+
+        $schematics = DB::table('eve_planet_schematics as schematic')
+            ->join('eve_item_types as product', 'product.type_id', '=', 'schematic.product_type_id')
+            ->join('eve_item_groups as product_group', 'product_group.group_id', '=', 'product.group_id')
+            ->leftJoinSub($latestPrices, 'product_latest', fn ($join) => $join->on('product_latest.type_id', '=', 'product.type_id'))
+            ->leftJoin('market_price_snapshots as product_price', 'product_price.id', '=', 'product_latest.latest_id')
+            ->where('product_group.category_id', 43)
+            ->whereIn('product_group.group_id', array_values($tierGroups))
+            ->where('product.published', true)
+            ->orderBy('product.type_name')
+            ->get([
+                'schematic.schematic_id',
+                'schematic.name as schematic_name',
+                'schematic.cycle_time',
+                'schematic.product_type_id',
+                'schematic.product_quantity',
+                'product.type_name as product_name',
+                'product_group.group_id as tier_group_id',
+                'product_price.buy_price as output_unit_price',
+            ]);
+
+        $schematicIds = $schematics->pluck('schematic_id')->all();
+        $schematicInputs = $schematicIds
+            ? DB::table('eve_planet_schematic_inputs as input')
+                ->join('eve_item_types as input_type', 'input_type.type_id', '=', 'input.type_id')
+                ->leftJoinSub($latestPrices, 'input_latest', fn ($join) => $join->on('input_latest.type_id', '=', 'input.type_id'))
+                ->leftJoin('market_price_snapshots as input_price', 'input_price.id', '=', 'input_latest.latest_id')
+                ->whereIn('input.schematic_id', $schematicIds)
+                ->orderBy('input_type.type_name')
+                ->get([
+                    'input.schematic_id',
+                    'input.type_id',
+                    'input.quantity',
+                    'input_type.type_name',
+                    'input_price.buy_price as unit_buy_price',
+                ])
+                ->groupBy('schematic_id')
+            : collect();
+
+        $piProfitability = ['P2' => [], 'P3' => [], 'P4' => []];
+        foreach ($schematics as $schematic) {
+            $tier = array_search((int) $schematic->tier_group_id, $tierGroups, true);
+            if ($tier === false) {
+                continue;
+            }
+
+            $inputRows = collect($schematicInputs->get($schematic->schematic_id, []));
+            $inputs = [];
+            $inputsCost = 0.0;
+            $completePrices = $inputRows->isNotEmpty() && $schematic->output_unit_price !== null;
+            foreach ($inputRows as $input) {
+                $unitPrice = $input->unit_buy_price !== null ? (float) $input->unit_buy_price : null;
+                $lineCost = $unitPrice !== null ? round($unitPrice * (int) $input->quantity, 2) : null;
+                if ($lineCost === null) {
+                    $completePrices = false;
+                } else {
+                    $inputsCost += $lineCost;
+                }
+                $inputs[] = [
+                    'name' => $input->type_name,
+                    'quantity' => (int) $input->quantity,
+                    'unit_price' => $unitPrice,
+                    'line_cost' => $lineCost,
+                ];
+            }
+
+            $outputUnitPrice = $schematic->output_unit_price !== null ? (float) $schematic->output_unit_price : null;
+            $outputRevenue = $outputUnitPrice !== null
+                ? round($outputUnitPrice * (int) $schematic->product_quantity, 2)
+                : null;
+            $inputsCost = round($inputsCost, 2);
+            $importTax = $completePrices ? round($inputsCost * $importTaxPercent / 100, 2) : null;
+            $exportTax = $completePrices && $outputRevenue !== null
+                ? round($outputRevenue * $exportTaxPercent / 100, 2)
+                : null;
+            $landedInputCost = $completePrices ? round($inputsCost + $importTax, 2) : null;
+            $netProfit = $completePrices && $outputRevenue !== null
+                ? round($outputRevenue - $inputsCost - $importTax - $exportTax, 2)
+                : null;
+            $profitPercent = $netProfit !== null && $landedInputCost > 0
+                ? round($netProfit / $landedInputCost * 100, 2)
+                : null;
+
+            $piProfitability[$tier][] = [
+                'schematic_id' => (int) $schematic->schematic_id,
+                'name' => $schematic->product_name,
+                'quantity' => (int) $schematic->product_quantity,
+                'cycle_time' => (int) $schematic->cycle_time,
+                'inputs' => $inputs,
+                'inputs_cost' => $inputsCost,
+                'output_unit_price' => $outputUnitPrice,
+                'output_revenue' => $outputRevenue,
+                'import_tax' => $importTax,
+                'export_tax' => $exportTax,
+                'net_profit' => $netProfit,
+                'profit_percent' => $profitPercent,
+                'complete_prices' => $completePrices,
+            ];
+        }
+
+        foreach ($piProfitability as $tier => $tierRows) {
+            $maxAbsPercent = collect($tierRows)
+                ->pluck('profit_percent')
+                ->filter(fn ($value) => $value !== null)
+                ->map(fn ($value) => abs((float) $value))
+                ->max() ?: 0;
+            foreach ($piProfitability[$tier] as &$row) {
+                $row['chart_width'] = $row['profit_percent'] !== null && $maxAbsPercent > 0
+                    ? min(50, abs($row['profit_percent']) / $maxAbsPercent * 50)
+                    : 0;
+                $row['is_profit'] = $row['profit_percent'] !== null && $row['profit_percent'] >= 0;
+            }
+            unset($row);
+            $piProfitability[$tier] = collect($piProfitability[$tier])
+                ->sortByDesc(fn ($row) => $row['profit_percent'] ?? -INF)
+                ->values()
+                ->all();
+        }
+
+        $activePiTier = strtoupper((string) $request->query('tier', 'P2'));
+        if (!in_array($activePiTier, ['P2', 'P3', 'P4'], true)) {
+            $activePiTier = 'P2';
+        }
+
         return view('ore-values.index', compact(
             'rows', 'quantity', 'yieldPercent', 'taxPercent', 'pricedCount', 'latestObservedAt',
             'piItems', 'piQuantity', 'piPricedCount', 'piBasketValue', 'oreSaleValueTotal',
-            'combinedSaleValueTotal'
+            'combinedSaleValueTotal', 'piTaxSettings', 'importTaxPercent', 'exportTaxPercent',
+            'piProfitability', 'activePiTier'
         ));
+    }
+
+    public function updateTaxes(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'import_tax_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'export_tax_percent' => ['required', 'numeric', 'min:0', 'max:100'],
+            'tier' => ['nullable', 'in:P2,P3,P4'],
+        ]);
+
+        DB::table('pi_tax_settings')->updateOrInsert(
+            ['id' => 1],
+            [
+                'import_tax_percent' => $validated['import_tax_percent'],
+                'export_tax_percent' => $validated['export_tax_percent'],
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
+
+        $tier = $validated['tier'] ?? 'P2';
+        return redirect(route('ore-values.index') . '?tier=' . urlencode($tier))
+            ->with('status', 'PI import and export tax settings saved.');
     }
 }
