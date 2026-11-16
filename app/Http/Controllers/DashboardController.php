@@ -123,7 +123,21 @@ class DashboardController extends Controller
             ->where('t.published', true)->where('g.category_name', 'Material')->where('g.group_name', 'Mineral')
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
         $oreValuationRules = $admin ? DB::table('appraisal_ore_valuation_rules')->orderBy('ore_name')->get() : collect();
+        $mineralPricingSettings = $admin
+            ? DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key')
+            : collect();
+        $moonMineralTypes = $admin ? DB::table('eve_type_materials as m')
+            ->join('eve_item_types as ore', 'ore.type_id', '=', 'm.type_id')
+            ->join('eve_item_groups as og', 'og.group_id', '=', 'ore.group_id')
+            ->join('eve_item_types as material', 'material.type_id', '=', 'm.material_type_id')
+            ->join('eve_item_groups as mg', 'mg.group_id', '=', 'material.group_id')
+            ->where('ore.published', true)->where('material.published', true)
+            ->where('og.group_name', 'like', '%Moon%')
+            ->where('mg.group_name', '<>', 'Mineral')
+            ->distinct()->orderBy('material.type_name')
+            ->get(['material.type_id', 'material.type_name', 'mg.group_name'])
+            : collect();
 
-        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'oreValuationRules'));
+        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'oreValuationRules', 'mineralPricingSettings', 'moonMineralTypes'));
     }
 }
