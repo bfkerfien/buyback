@@ -102,7 +102,7 @@ No CCP SDE reprocessing recipe found for this ore.
 </section>
 <section class="panel" id="pi-profitability">
 <h2 style="margin:0 0 6px">PI production profitability · admin</h2>
-<p class="muted">Each recipe is valued per schematic cycle. Inputs and output use Jita buy prices. Customs taxes use EVE's fixed taxable values per PI tier: import fees are half the configured rate on imported input value; export fees use the full configured rate on the finished output. Profit percentage is net profit divided by input cost plus import tax.</p>
+<p class="muted">Each recipe is valued per schematic cycle. Input costs and output revenue use Jita buy prices. Customs charges use EVE's fixed taxable value per PI unit (P1 400 ISK, P2 7,200 ISK, P3 60,000 ISK, P4 1,200,000 ISK): import fees are 50% of taxable value × your import rate; export fees are 100% of taxable value × your export rate. This assumes customs-office/launchpad exports, not the 1.5× Command Center launch surcharge. ROI is net profit divided by input cost plus import tax.</p>
 @if(session('status'))<div class="notice" style="margin:10px 0">{{ session('status') }}</div>@endif
 @if($errors->any())<div class="notice" style="margin:10px 0">@foreach($errors->all() as $error)<div>{{ $error }}</div>@endforeach</div>@endif
 <form method="post" action="{{ route('ore-values.pi-taxes') }}" class="panel" style="margin:12px 0;padding:14px">
