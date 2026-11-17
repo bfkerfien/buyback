@@ -46,7 +46,7 @@ final class AppraisalCalculator
                 ? trim(mb_substr($type->type_name, mb_strlen('Compressed ')))
                 : null;
             $baseType = $baseName !== null ? $baseOreTypes->get(mb_strtolower($baseName)) : null;
-            return [(int) $type->type_id => (int) ($baseType?->type_id ?? $type->type_id)];
+            return [(int) $type->type_id => (int) ($baseType?->type_id ?? (str_starts_with(mb_strtolower($type->type_name), 'compressed ') ? 0 : $type->type_id))];
         });
         $oreMaterials = DB::table('eve_type_materials')
             ->whereIn('type_id', $oreRecipeTypeIds->values()->unique())
@@ -81,6 +81,11 @@ final class AppraisalCalculator
 
             $pricingType = $type;
             $pricingQuantity = (int) $item['quantity'];
+            if (str_starts_with(mb_strtolower($type->type_name), 'compressed ')
+                && (int) $oreRecipeTypeIds->get((int) $type->type_id, 0) === 0) {
+                $unresolvedTypes[] = $item['name'] . ' (matching uncompressed ore recipe is missing from the SDE)';
+                continue;
+            }
             $valuationMode = 'market';
             $outputQuantity = null;
             $conversionRatio = null;
