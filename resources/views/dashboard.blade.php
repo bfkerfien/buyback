@@ -88,38 +88,32 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </section>
 
 <section class="panel">
-<h2>Latest 10 contracts with My Eve Online</h2>
+<h2>Latest 10 contracts issued to My Eve Online</h2>
 @if($contractCharacter)
-<p class="muted">Showing the latest EVE contracts returned for the linked character <strong>{{ $contractCharacter->name }}</strong>.</p>
+<p class="muted">Showing contracts issued by your linked EVE character <strong>{{ $contractCharacter->name }}</strong> to My Eve Online, newest first.</p>
 @if($contractBoardStatus !== 'ready')
 <p class="muted">{{ $contractBoardMessage }}</p>
-<a href="{{ route('login.eve.link') }}">Reauthorize / link My Eve Online</a>
+@if($contractBoardStatus === 'reauthorize')
+<a href="{{ route('login.eve.link') }}">Reauthorize your linked EVE character</a>
+@endif
 @else
-<div style="overflow-x:auto"><table><thead><tr><th>Contract</th><th>Type</th><th>Status</th><th>Availability</th><th>Other party</th><th>Issued</th><th>Price / reward</th></tr></thead><tbody>
+<div style="overflow-x:auto"><table><thead><tr><th>Description</th><th>Date Issued</th><th class="right">Price</th><th>Status</th></tr></thead><tbody>
 @forelse($myEveContracts as $contract)
 <tr>
-<td>#{{ $contract['contract_id'] }}</td>
-<td>{{ ucwords(str_replace('_',' ',$contract['type'])) }}</td>
-<td>{{ ucwords(str_replace('_',' ',$contract['status'])) }}</td>
-<td>{{ ucfirst($contract['availability']) }}</td>
-<td>{{ $contract['other_party_name'] }}</td>
+<td>{{ $contract['description'] !== '' ? $contract['description'] : '—' }}</td>
 <td>{{ !empty($contract['date_issued']) ? \Illuminate\Support\Carbon::parse($contract['date_issued'])->timezone(config('app.timezone'))->format('M j, Y g:i A') : '—' }}</td>
-<td>
-{{ $contract['price'] > 0 ? 'Price: '.number_format($contract['price'],2).' ISK' : '' }}@if($contract['price'] > 0 && ($contract['reward'] > 0 || $contract['collateral'] > 0))<br>@endif
-{{ $contract['reward'] > 0 ? 'Reward: '.number_format($contract['reward'],2).' ISK' : '' }}@if($contract['reward'] > 0 && $contract['collateral'] > 0)<br>@endif
-{{ $contract['collateral'] > 0 ? 'Collateral: '.number_format($contract['collateral'],2).' ISK' : '' }}{{ $contract['price'] <= 0 && $contract['reward'] <= 0 && $contract['collateral'] <= 0 ? '—' : '' }}
-</td>
+<td class="right">{{ number_format((float)$contract['price'],2) }} ISK</td>
+<td>{{ $contract['status'] }}</td>
 </tr>
 @empty
-<tr><td colspan="7">No EVE contracts were returned for My Eve Online.</td></tr>
+<tr><td colspan="4">No contracts issued to My Eve Online were found for this character.</td></tr>
 @endforelse
 </tbody></table></div>
 @endif
 @else
 <p class="muted">{{ $contractBoardMessage }}</p>
-<a href="{{ route('login.eve.link') }}">Link My Eve Online to this account</a>
-@endif
-</section>
+<a href="{{ route('login.eve.link') }}">Link your EVE character</a>
+@endif</section>
 </section>
 @if($admin)
 <section class="tab-panel" id="tab-admin" role="tabpanel" hidden>
