@@ -81,6 +81,41 @@ class PayoutRuleController extends Controller
         return back()->with('status', $material->type_name . ' buy percentage and Jita depth saved.');
     }
 
+    public function storeGasPricing(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $data = $request->validate([
+            'uncompressed_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
+            'compressed_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
+            'price_depth' => ['required', 'integer', 'min:1', 'max:2000000000'],
+        ]);
+
+        $settings = [
+            'gas_uncompressed_percent' => (string) $data['uncompressed_percent'],
+            'gas_compressed_percent' => (string) $data['compressed_percent'],
+            'gas_buy_depth' => (string) $data['price_depth'],
+        ];
+        foreach ($settings as $key => $value) {
+            DB::table('buyback_system_status')->updateOrInsert(
+                ['status_key' => $key],
+                ['status_value' => $value]
+            );
+        }
+
+        DB::table('audit_logs')->insert([
+            'user_id' => $request->user()->id,
+            'action' => 'gas_buyback_settings.saved',
+            'subject_type' => 'compressed_gas_market',
+            'subject_id' => null,
+            'details' => json_encode($data),
+            'ip_address' => $request->ip(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Gas buyback percentages and compressed-gas Jita unit depth saved.');
+    }
+
     public function storeIcePricing(Request $request): RedirectResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
