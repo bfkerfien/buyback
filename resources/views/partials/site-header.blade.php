@@ -31,6 +31,7 @@
     </div>
 </header>
 
+@unless(request()->routeIs('dashboard'))
 <nav class="site-nav" aria-label="Main site navigation">
     <a href="{{ route('home') }}">Home</a>
     <a href="{{ route('ship-buyback.index') }}">Ship Buyback</a>
@@ -44,6 +45,7 @@
         @endif
     @endauth
 </nav>
+@endunless
 
 <style>
 .evaluation-banner{display:flex;align-items:center;overflow:hidden;min-height:48px;margin:0 0 14px;padding:0 14px;background:#ffd84d;color:#111;border:1px solid #e4b923;border-radius:9px;font-size:15px;font-weight:900;letter-spacing:.025em}
