@@ -1,15 +1,15 @@
-<details class="panel p1-appraisal-buy-prices"><summary style="cursor:pointer;color:#62d9e9;font-weight:700">Individual P1 appraisal buy prices and saved rules</summary><div style="padding-top:12px">
-<h2>Individual P1 appraisal buy prices</h2>
-<p class="muted">Each P1 commodity appears once. The recommended percentage is the lowest target calculated across every P2 recipe that uses that input. Press Set to use that percentage as the individual appraisal payout rate for this commodity, replacing the shared PI category rate. The setting is saved until changed.</p>
+<details class="panel p1-appraisal-buy-prices"><summary style="cursor:pointer;color:#62d9e9;font-weight:700">Individual {{ $tier }} appraisal buy prices and saved rules</summary><div style="padding-top:12px">
+<h2>Individual {{ $tier }} appraisal buy prices</h2>
+<p class="muted">Each {{ $tier }} commodity appears once. The recommended percentage is the lowest target calculated across every P2 recipe that uses that input. Press Set to use that percentage as the individual appraisal payout rate for this commodity, replacing the shared PI category rate. The setting is saved until changed.</p>
 @if(session('status'))<div class="result" style="margin:10px 0">{{ session('status') }}</div>@endif
-@if($p1BuyTargets->isEmpty())
-<div class="empty">No P1 buy targets are available yet. Check that P1 Jita prices and all P1 → P2 recipe prices are loaded.</div>
+@if($tierBuyTargets->isEmpty())
+<div class="empty">No {{ $tier }} buy targets are available yet. Check that {{ $tier }} Jita prices and all {{ $tier }} → P2 recipe prices are loaded.</div>
 @else
 <div style="overflow-x:auto">
 <table style="width:100%;border-collapse:collapse;min-width:650px">
-<thead><tr><th style="text-align:left;padding:10px;border-bottom:1px solid #294a56">P1 commodity</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Jita buy</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Lowest recipe target</th><th style="text-align:left;padding:10px;border-bottom:1px solid #294a56">Lowest-target recipe</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Current appraisal rate</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Action</th></tr></thead>
+<thead><tr><th style="text-align:left;padding:10px;border-bottom:1px solid #294a56">{{ $tier }} commodity</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Jita buy</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Lowest recipe target</th><th style="text-align:left;padding:10px;border-bottom:1px solid #294a56">Lowest-target recipe</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Current appraisal rate</th><th style="text-align:right;padding:10px;border-bottom:1px solid #294a56">Action</th></tr></thead>
 <tbody>
-@foreach($p1BuyTargets as $item)
+@foreach($tierBuyTargets as $item)
 <tr>
 <td style="padding:10px;border-bottom:1px solid #294a56">{{ $item['name'] }} <span class="muted">({{ $item['recipes'] }} recipe{{ $item['recipes'] === 1 ? '' : 's' }})</span></td>
 <td style="padding:10px;text-align:right;border-bottom:1px solid #294a56">{{ $item['jita_buy'] !== null ? number_format($item['jita_buy'],2).' ISK' : 'No price' }}</td>
