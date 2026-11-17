@@ -153,8 +153,17 @@ class DashboardController extends Controller
         $iceTypes = $admin ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
-            ->whereIn('g.group_name', ['Ice', 'Compressed Ice'])
             ->where('t.type_name', 'like', 'Compressed %')
+            ->where(function ($query) {
+                $query->where('g.group_name', 'like', '%ice%')
+                    ->orWhere('g.category_name', 'like', '%ice%')
+                    ->orWhereIn('t.type_name', [
+                        'Compressed Clear Icicle', 'Compressed Glacial Mass', 'Compressed Blue Ice',
+                        'Compressed White Glaze', 'Compressed Enriched Clear Icicle',
+                        'Compressed Smooth Glacial Mass', 'Compressed Thick Blue Ice',
+                        'Compressed Pristine White Glaze',
+                    ]);
+            })
             ->orderBy('t.type_name')
             ->get(['t.type_id', 't.type_name'])
             : collect();
