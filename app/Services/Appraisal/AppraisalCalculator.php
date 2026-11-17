@@ -120,6 +120,25 @@ final class AppraisalCalculator
                 'liquid ozone',
             ], true);
 
+            // Regional/faction ice is identified by its SDE reprocessing recipe
+            // containing one of the four faction isotope products. Both the base
+            // ore and its enriched/IV-Grade variant then use the same refined-output
+            // valuation path as asteroid and moon ore. Standard ice without an
+            // isotope output (Glare Crust, Dark Glitter, Gelidus, Krystallos)
+            // retains its individually configured direct-market valuation.
+            $iceRecipeTypeId = (int) $oreRecipeTypeIds->get((int) $type->type_id, (int) $type->type_id);
+            $iceRecipe = $oreMaterials->get($iceRecipeTypeId, collect());
+            $factionIsotopeNames = [
+                'helium isotopes',
+                'hydrogen isotopes',
+                'nitrogen isotopes',
+                'oxygen isotopes',
+            ];
+            $hasFactionIsotopeOutput = $isIce && $iceRecipe->contains(function ($material) use ($mineralTypes, $factionIsotopeNames) {
+                $output = $mineralTypes->get((int) $material->material_type_id);
+                return $output && in_array(mb_strtolower($output->type_name), $factionIsotopeNames, true);
+            });
+
             // Every gas type is valued against the live Jita buy book for its
             // compressed counterpart. Only the configured payout percentage differs
             // between compressed and uncompressed inventory submissions.
@@ -144,6 +163,29 @@ final class AppraisalCalculator
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
                 $valuationMode = 'gas_market';
+            } elseif ($isIce && !$hasFactionIsotopeOutput) {
+                // Standard ice without faction isotope outputs is valued directly
+                // from its own live Jita buy orders, preserving its individual rate.
+                $typeId = (int) $type->type_id;
+                $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $typeId, 1000));
+                $marketPrice = $this->liveJitaOrderPrice($typeId, $regionId, $depth, true);
+
+                if ($marketPrice === null) {
+                    $unpricedTypes[] = $item['name']
+                        . ' (insufficient live Jita buy volume at configured '
+                        . number_format($depth) . '-unit quantity)';
+                    continue;
+                }
+
+                $unitPrice = $marketPrice['price'];
+                $price = (object) [
+                    'source' => 'live-esi-jita-buy-' . $depth . '-unit-quantity',
+                    'observed_at' => $marketPrice['observed_at'],
+                ];
+                $lineValue = round($unitPrice * $pricingQuantity, 2);
+                $customPayoutPercent = (float) $icePricingSettings->get('ice_buy_percent_' . $typeId, 87);
+                $customRateSource = 'individual_ice';
+                $valuationMode = 'ice_market';
             } elseif ($isIceProduct) {
                 // Refined ice outputs (isotopes, Heavy Water, Liquid Ozone and
                 // Strontium Clathrates) remain directly valued from their own
