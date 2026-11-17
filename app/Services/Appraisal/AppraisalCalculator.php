@@ -258,8 +258,29 @@ final class AppraisalCalculator
                         'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000,
                         'Megacyte' => 500000, 'Morphite' => 45000,
                     ];
-                    $depth = max(1, (int) $mineralPricingSettings->get('mineral_buy_depth_' . $mineralId, $defaultDepths[$mineral->type_name] ?? 50000));
-                    $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
+                    // Ice refining outputs have their own admin-configured buyback
+                    // percentage and Jita depth. In particular, Heavy Water must use
+                    // ice_buy_percent_<typeId>; previously the ore-refining path
+                    // ignored that setting and always fell back to mineral pricing.
+                    $isIceRefiningProduct = in_array(mb_strtolower($mineral->type_name), [
+                        'heavy water',
+                        'liquid ozone',
+                        'strontium clathrates',
+                        'nitrogen isotopes',
+                        'oxygen isotopes',
+                        'hydrogen isotopes',
+                        'helium isotopes',
+                    ], true);
+
+                    if ($isIceRefiningProduct) {
+                        $defaultIcePercent = mb_strtolower($mineral->type_name) === 'heavy water' ? 10 : 100;
+                        $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $mineralId, 1000));
+                        $buyPercent = (float) $icePricingSettings->get('ice_buy_percent_' . $mineralId, $defaultIcePercent);
+                    } else {
+                        $depth = max(1, (int) $mineralPricingSettings->get('mineral_buy_depth_' . $mineralId, $defaultDepths[$mineral->type_name] ?? 50000));
+                        $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
+                    }
+
                     $mineralPrice = $this->liveJitaOrderPrice($mineralId, $regionId, $depth, true);
                     if ($mineralPrice === null) {
                         $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': insufficient Jita buy volume at configured ' . number_format($depth) . '-unit depth)';
