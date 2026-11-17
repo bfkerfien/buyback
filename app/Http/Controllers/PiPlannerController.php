@@ -144,77 +144,86 @@ class PiPlannerController extends Controller
                 ];
             })->values();
 
-        // One row per P1 input, using the lowest recommended percentage across
-        // every P1 -> P2 recipe that consumes it. If any consuming recipe has no
-        // feasible target, do not offer a misleading aggregate Set action.
-        $p1Targets = [];
-        foreach ($recipes->filter(fn ($recipe) => strcasecmp($recipe['output_group'], 'Refined Commodities - Tier 2') === 0) as $recipe) {
-            foreach ($recipe['inputs'] as $input) {
-                $id = (int) $input['id'];
-                if (!isset($p1Targets[$id])) {
-                    $p1Targets[$id] = [
-                        'type_id' => $id,
-                        'name' => $input['name'],
-                        'jita_buy' => $input['buy_price'],
-                        'lowest_percent' => null,
-                        'lowest_recipes' => [],
-                        'recipes' => 0,
-                        'target_complete' => true,
-                    ];
-                }
-                $p1Targets[$id]['recipes']++;
-                if (!isset($input['target_buy_percent'])) {
-                    $p1Targets[$id]['target_complete'] = false;
-                } else {
-                    $current = (float) $input['target_buy_percent'];
-                    $currentRecipe = $recipe['name'] ?: $recipe['output_name'];
-                    if ($p1Targets[$id]['lowest_percent'] === null || $current < $p1Targets[$id]['lowest_percent']) {
-                        $p1Targets[$id]['lowest_percent'] = $current;
-                        $p1Targets[$id]['lowest_recipes'] = [$currentRecipe];
-                    } elseif (abs($current - $p1Targets[$id]['lowest_percent']) < 0.0001) {
-                        $p1Targets[$id]['lowest_recipes'][] = $currentRecipe;
+        // Build one individual appraisal target list for the input tier of each stage.
+        $stageTargetConfig = [
+            'p1-p2' => ['input_group_id' => 1042, 'input_group_name' => 'P1'],
+            'p2-p3' => ['input_group_id' => 1034, 'input_group_name' => 'P2'],
+            'p3-p4' => ['input_group_id' => 1040, 'input_group_name' => 'P3'],
+        ];
+        $savedPiRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
+        $tierBuyTargets = [];
+
+        foreach ($stageTargetConfig as $stageKey => $config) {
+            $groupId = $config['input_group_id'];
+            $targets = [];
+
+            foreach ($recipes->filter(fn ($recipe) => in_array($recipe['output_group'], [
+                $stageKey === 'p1-p2' ? 'Refined Commodities - Tier 2' : '',
+                $stageKey === 'p2-p3' ? 'Specialized Commodities - Tier 3' : '',
+                $stageKey === 'p3-p4' ? 'Advanced Commodities - Tier 4' : '',
+            ], true)) as $recipe) {
+                foreach ($recipe['inputs'] as $input) {
+                    $inputGroup = DB::table('eve_item_types as item')
+                        ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
+                        ->where('item.type_id', $input['id'])
+                        ->value('groups.group_id');
+                    if ((int) $inputGroup !== $groupId) {
+                        continue;
+                    }
+                    $id = (int) $input['id'];
+                    if (!isset($targets[$id])) {
+                        $targets[$id] = [
+                            'type_id' => $id, 'name' => $input['name'], 'jita_buy' => $input['buy_price'],
+                            'lowest_percent' => null, 'lowest_recipes' => [], 'recipes' => 0, 'target_complete' => true,
+                        ];
+                    }
+                    $targets[$id]['recipes']++;
+                    if (!isset($input['target_buy_percent'])) {
+                        $targets[$id]['target_complete'] = false;
+                    } else {
+                        $current = (float) $input['target_buy_percent'];
+                        $recipeName = $recipe['name'] ?: $recipe['output_name'];
+                        if ($targets[$id]['lowest_percent'] === null || $current < $targets[$id]['lowest_percent']) {
+                            $targets[$id]['lowest_percent'] = $current;
+                            $targets[$id]['lowest_recipes'] = [$recipeName];
+                        } elseif (abs($current - $targets[$id]['lowest_percent']) < 0.0001) {
+                            $targets[$id]['lowest_recipes'][] = $recipeName;
+                        }
                     }
                 }
             }
-        }
-        // Include every published P1 commodity from the SDE, even if no loaded
-        // schematic currently consumes it; those rows remain unset until calculable.
-        $p1Catalog = DB::table('eve_item_types as item')
-            ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
-            ->where('groups.category_id', 43)
-            ->where('groups.group_id', 1042)
-            ->where('item.published', true)
-            ->orderBy('item.type_name')
-            ->get(['item.type_id', 'item.type_name']);
-        foreach ($p1Catalog as $p1Item) {
-            $id = (int) $p1Item->type_id;
-            if (!isset($p1Targets[$id])) {
-                $price = $prices->get($id);
-                $p1Targets[$id] = [
-                    'type_id' => $id,
-                    'name' => $p1Item->type_name,
-                    'jita_buy' => $price?->buy_price !== null ? (float) $price->buy_price : null,
-                    'lowest_percent' => null,
-                    'lowest_recipes' => [],
-                    'recipes' => 0,
-                    'target_complete' => false,
-                ];
+
+            $catalog = DB::table('eve_item_types as item')
+                ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
+                ->where('groups.category_id', 43)
+                ->where('groups.group_id', $groupId)
+                ->where('item.published', true)
+                ->orderBy('item.type_name')
+                ->get(['item.type_id', 'item.type_name']);
+            foreach ($catalog as $catalogItem) {
+                $id = (int) $catalogItem->type_id;
+                if (!isset($targets[$id])) {
+                    $price = $prices->get($id);
+                    $targets[$id] = [
+                        'type_id' => $id, 'name' => $catalogItem->type_name,
+                        'jita_buy' => $price?->buy_price !== null ? (float) $price->buy_price : null,
+                        'lowest_percent' => null, 'lowest_recipes' => [], 'recipes' => 0, 'target_complete' => false,
+                    ];
+                }
             }
+
+            $tierBuyTargets[$stageKey] = collect(array_values($targets))
+                ->map(function ($item) use ($savedPiRules) {
+                    $rule = $savedPiRules->get($item['type_id']);
+                    $item['saved_percent'] = $rule ? (float) $rule->buy_percent : null;
+                    $item['is_set'] = $rule !== null;
+                    $item['can_set'] = $item['target_complete'] && $item['lowest_percent'] !== null;
+                    return $item;
+                })
+                ->sortBy('name')->values();
         }
 
-        $savedPiRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
-        $p1BuyTargets = collect(array_values($p1Targets))
-            ->map(function ($item) use ($savedPiRules) {
-                $rule = $savedPiRules->get($item['type_id']);
-                $item['saved_percent'] = $rule ? (float) $rule->buy_percent : null;
-                $item['is_set'] = $rule !== null;
-                $item['can_set'] = $item['target_complete'] && $item['lowest_percent'] !== null;
-                return $item;
-            })
-            ->sortBy('name')
-            ->values();
-
-        return view('pi-planner', compact('recipes', 'importTaxPercent', 'exportTaxPercent', 'targetProfitPercent', 'p1BuyTargets'));
+        return view('pi-planner', compact('recipes', 'importTaxPercent', 'exportTaxPercent', 'targetProfitPercent', 'tierBuyTargets'));
     }
 
     public function setP1BuyRule(Request $request): RedirectResponse
@@ -230,7 +239,7 @@ class PiPlannerController extends Controller
             ->where('item.type_id', $data['type_id'])
             ->where('item.published', true)
             ->where('groups.category_id', 43)
-            ->where('groups.group_id', 1042)
+            ->whereIn('groups.group_id', [1042, 1034, 1040])
             ->first(['item.type_id', 'item.type_name']);
         abort_unless($item, 404);
 
