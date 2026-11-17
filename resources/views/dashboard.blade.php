@@ -151,7 +151,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <details class="pricing-settings"><summary>Standard mineral buyback settings</summary><div class="pricing-settings-content">
 <p class="muted">Each mineral has its own buy percentage and cumulative Jita buy-order quantity. The calculator uses the price at that unit in the live Jita buy book. Save each mineral independently.</p>
 @php($standardMineralDepths = ['Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000, 'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000, 'Megacyte' => 500000, 'Morphite' => 45000])
-<div style="overflow-x:auto"><table><thead><tr><th>Mineral</th><th>Buy percentage</th><th>Jita unit depth</th><th>Save</th></tr></thead><tbody>
+<div style="overflow-x:auto"><table><thead><tr><th>Mineral</th><th>Buy percentage</th><th>Jita buy quantity (units)</th><th>Save</th></tr></thead><tbody>
 @foreach($mineralTypes as $mineral)
 @php($buyPercentKey = 'mineral_buy_percent_'.$mineral->type_id)
 @php($buyDepthKey = 'mineral_buy_depth_'.$mineral->type_id)
@@ -181,7 +181,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </tbody></table></div>
 </div></details>
 <details class="pricing-settings"><summary>Ice & Ice Products buyback settings</summary>
-<p class="muted">Every compressed ice type and each ice product has its own buy percentage and cumulative Jita buy-order depth. All default to 1,000 units of depth. Changes apply to subsequent appraisals. Market prices below are the latest recorded Jita snapshots; appraisals use live ESI order books.</p>
+<p class="muted">Every compressed ice type and each ice product has its own buy percentage and adjustable Jita buy quantity. The quantity is cumulative buy-order volume used to select the marginal Jita buy price. Default: 1,000 units. Changes apply to subsequent appraisals.</p>
 @php($icePricingRows = $iceTypes->concat($iceProductTypes)->unique('type_id')->sortBy('type_name'))
 <div style="display:grid;gap:8px">
 @forelse($icePricingRows as $iceProduct)
@@ -207,7 +207,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <input name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $buyPercent }}" required style="margin:4px 0 0">
 </label>
 <label class="muted">Jita unit depth
-<input name="price_depth" type="number" min="1" max="2000000000" step="1" value="{{ $icePricingSettings->get($depthKey, 1000) }}" required style="margin:4px 0 0">
+<input name="price_depth" aria-label="{{ $iceProduct->type_name }} Jita buy quantity in units" type="number" min="1" max="2000000000" step="1" value="{{ $icePricingSettings->get($depthKey, 1000) }}" required style="margin:4px 0 0">
 </label>
 <div class="muted">Latest Jita buy<br><strong>{{ $priceSnapshot ? number_format((float) $priceSnapshot->buy_price, 2) . ' ISK' : 'No snapshot' }}</strong></div>
 <div class="muted">Effective buy price<br><strong>{{ $effectiveBuyPrice !== null ? number_format($effectiveBuyPrice, 2) . ' ISK' : '—' }}</strong></div>
