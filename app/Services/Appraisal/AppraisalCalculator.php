@@ -144,7 +144,7 @@ final class AppraisalCalculator
                 $depth = max(1, (int) $gasPricingSettings->get('gas_buy_depth', 50000));
                 $marketPrice = $this->snapshotJitaPrice((int) $compressedGasType->type_id, $regionId, 'buy');
                 if ($marketPrice === null) {
-                    $unpricedTypes[] = $item['name'] . ' (insufficient Jita buy volume for its compressed gas reference at configured ' . number_format($depth) . '-unit depth)';
+                    $unpricedTypes[] = $item['name'] . ' (no stored Jita buy-price snapshot for its compressed gas reference)';
                     $unpricedItemReasons[$item['name']] = 'No stored compressed-gas Jita buy-price snapshot is available yet.';
                     continue;
                 }
@@ -170,15 +170,14 @@ final class AppraisalCalculator
                 $valuationMode = 'gas_market';
             } elseif ($isIce && !$hasFactionIsotopeOutput) {
                 // Standard ice without faction isotope outputs is valued directly
-                // from its own live Jita buy orders, preserving its individual rate.
+                // from its stored Jita buy-price snapshot, preserving its individual rate.
                 $typeId = (int) $type->type_id;
                 $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $typeId, 1000));
                 $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
-                        . ' (insufficient live Jita buy volume at configured '
-                        . number_format($depth) . '-unit quantity)';
+                        . ' (no stored Jita buy-price snapshot is available yet)';
                     $unpricedItemReasons[$item['name']] = 'No stored Jita buy-price snapshot is available yet.';
                     continue;
                 }
@@ -290,7 +289,7 @@ final class AppraisalCalculator
 
                     $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy');
                     if ($mineralPrice === null) {
-                        $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': insufficient Jita buy volume at configured ' . number_format($depth) . '-unit depth)';
+                        $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': no stored Jita buy-price snapshot)';
                         $unpricedItemReasons[$item['name']] = 'Missing Jita price for refined output ' . $mineral->type_name . '.';
                         continue 2;
                     }
@@ -307,6 +306,7 @@ final class AppraisalCalculator
                         'unit_price' => $mineralPrice['price'],
                         'buy_percent' => $buyPercent,
                         'price_depth' => $depth,
+                        'observed_at' => $mineralPrice['observed_at'],
                         'volume_m3' => $shippingVolume,
                         'shipping_cost' => $shippingCost,
                         'gross_value' => $grossMineralValue,
@@ -318,7 +318,7 @@ final class AppraisalCalculator
                 $outputName = count($refinedMineralDetails) === 1 ? $refinedMineralDetails[0]['name'] : 'refined minerals';
                 $valuationMode = 'reprocessed';
                 $unitPrice = $refinedLineValue / $pricingQuantity;
-                $price = (object) ['source' => 'database-snapshot-refined-outputs', 'observed_at' => now()];
+                $price = (object) ['source' => 'database-snapshot-refined-outputs', 'observed_at' => collect($refinedMineralDetails)->pluck('observed_at')->filter()->max()];
                 $lineValue = $refinedLineValue;
             } else {
                 $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
