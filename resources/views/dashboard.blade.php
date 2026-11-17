@@ -185,18 +185,26 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @php($iceVariantGroups = $iceTypes->groupBy(function ($ice) { $base = mb_strtolower(preg_replace('/^Compressed /i', '', $ice->type_name)); if (in_array($base, ['enriched clear icicle', 'smooth glacial mass', 'thick blue ice', 'pristine white glaze'], true)) return 'Enriched faction variants (+15% isotope yield)'; if (in_array($base, ['clear icicle', 'white glaze', 'blue ice', 'glacial mass'], true)) return 'Standard faction ice'; return 'Standard nullsec ice'; }))
 @forelse($iceVariantGroups as $variantLabel => $variantIceTypes)
 <h3 style="margin-top:18px">{{ $variantLabel }}</h3>
-<div style="overflow-x:auto"><table><thead><tr><th>Compressed ice</th><th>Buyback percentage</th><th>Save</th></tr></thead><tbody>
+<div style="display:grid;gap:8px">
 @foreach($variantIceTypes as $ice)
 @php($baseIceName = preg_replace('/^Compressed /i', '', $ice->type_name))
 @php($specialIce = in_array(mb_strtolower($baseIceName), ['white glaze', 'pristine white glaze'], true))
 @php($iceRateKey = 'ice_buy_percent_'.$ice->type_id)
-<tr>
-<td>{{ $ice->type_name }}</td>
-<td>@if($specialIce)<span class="muted">Refined-output rates below</span>@else<input form="ice-rate-{{ $ice->type_id }}" aria-label="{{ $ice->type_name }} buyback percentage" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $icePricingSettings->get($iceRateKey, 87) }}" required style="max-width:140px;margin:0"><form id="ice-rate-{{ $ice->type_id }}" method="post" action="{{ route('admin.ice-pricing.store') }}">@csrf<input type="hidden" name="type_id" value="{{ $ice->type_id }}"></form>@endif</td>
-<td>@unless($specialIce)<button form="ice-rate-{{ $ice->type_id }}" type="submit">Save</button>@else<span class="muted">Configured below</span>@endunless</td>
-</tr>
+@if($specialIce)
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px;border-bottom:1px solid #294a56"><span>{{ $ice->type_name }}</span><span class="muted">Refined-output rates below</span></div>
+@else
+<form method="post" action="{{ route('admin.ice-pricing.store') }}" style="display:grid;grid-template-columns:minmax(180px,1.5fr) minmax(120px,1fr) auto;gap:12px;align-items:center;padding:10px;border-bottom:1px solid #294a56">
+@csrf
+<input type="hidden" name="type_id" value="{{ $ice->type_id }}">
+<strong>{{ $ice->type_name }}</strong>
+<label class="muted">Buyback percentage (%)
+<input name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $icePricingSettings->get($iceRateKey, 87) }}" required style="margin:4px 0 0">
+</label>
+<button type="submit">Save</button>
+</form>
+@endif
 @endforeach
-</tbody></table></div>
+</div>
 @empty
 <p class="muted">No compressed ice types found in the imported SDE Ice group. Re-import the current CCP SDE types and taxonomy.</p>
 @endforelse
