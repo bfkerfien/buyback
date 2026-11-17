@@ -171,6 +171,17 @@ final class AppraisalCalculator
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
             }
 
+            // Customer-facing equivalent rate is calculated only for asteroid ore:
+            // compare the actual mineral-based offer per submitted ore unit with
+            // the current best Jita buy order for that same ore type. This is display
+            // metadata only; it never changes the mineral valuation or payout.
+            $oreJitaBuyPrice = null;
+            $effectiveRatePercent = null;
+            if ((int) $type->category_id === 25 && $valuationMode === 'reprocessed') {
+                $oreMarket = $this->jitaBuyPrice((int) $type->type_id, $regionId, 1, false);
+                $oreJitaBuyPrice = $oreMarket['price'] ?? null;
+            }
+
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
             $payoutRule = $effectiveCategoryId ? $rules->get($effectiveCategoryId) : null;
@@ -201,6 +212,11 @@ final class AppraisalCalculator
                 $rate = 87.0;
             }
 
+            $payoutValue = round($lineValue * $rate / 100, 2);
+            if ($oreJitaBuyPrice !== null && $oreJitaBuyPrice > 0 && $pricingQuantity > 0) {
+                $effectiveRatePercent = round(($payoutValue / ($pricingQuantity * $oreJitaBuyPrice)) * 100, 4);
+            }
+
             $lines[] = [
                 'type_id' => (int) $type->type_id,
                 'type_name' => $type->type_name,
@@ -209,7 +225,9 @@ final class AppraisalCalculator
                 'unit_price' => round($lineValue / (int) $item['quantity'], 4),
                 'line_value' => $lineValue,
                 'payout_percent' => $rate,
-                'payout_value' => round($lineValue * $rate / 100, 2),
+                'payout_value' => $payoutValue,
+                'ore_jita_buy_price' => $oreJitaBuyPrice,
+                'effective_rate_percent' => $effectiveRatePercent,
                 'category_id' => $effectiveCategoryId,
                 'category_name' => $effectiveCategoryName,
                 'rate_source' => $fixedPayoutPercent !== null ? 'fixed' : ($piBuyRule ? 'individual_pi' : ($payoutRule ? 'category' : 'default')),
