@@ -11,10 +11,8 @@ class CharacterContracts
     private const CONTRACT_SCOPE = 'esi-contracts.read_character_contracts.v1';
 
     /**
-     * Retrieve contracts issued by this character to the configured buyback recipient.
-     *
-     * EVE's assignee_id is the contract's "To" party. Only outstanding and
-     * completed contracts addressed to the named recipient are returned.
+     * Retrieve the latest contracts issued by this character to the configured buyback recipient.
+     * EVE's assignee_id is the contract's "To" party.
      *
      * @return array{status:string,message:?string,contracts:array<int,array<string,mixed>>}
      */
@@ -57,8 +55,10 @@ class CharacterContracts
                     if (!in_array($status, ['outstanding', 'in_progress', 'finished', 'finished_issuer', 'finished_contractor'], true)) {
                         continue;
                     }
+                    // Only contracts created by the currently authenticated character
+                    // and addressed to the My Eve Online recipient are buyback submissions.
                     $assigneeId = (int) ($contract['assignee_id'] ?? 0);
-                    if ($assigneeId > 0) {
+                    if ((int) ($contract['issuer_id'] ?? 0) === $characterId && $assigneeId > 0) {
                         $all[] = $contract;
                     }
                 }
@@ -85,6 +85,7 @@ class CharacterContracts
                 $completed = str_starts_with($rawStatus, 'finished');
                 return [
                     'contract_id' => (int) ($contract['contract_id'] ?? 0),
+                    'description' => trim((string) ($contract['description'] ?? '')),
                     'character_name' => $character->name,
                     'type' => (string) ($contract['type'] ?? 'unknown'),
                     'status' => $completed ? 'Completed' : 'Outstanding',
