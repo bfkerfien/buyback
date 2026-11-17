@@ -36,6 +36,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/admin/appraisals/{quote}/restore', [AppraisalVisibilityController::class, 'restore'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.restore');
     Route::post('/admin/appraisal-rates', [PayoutRuleController::class, 'store'])->middleware('admin')->name('admin.appraisal-rates.store');
     Route::post('/admin/mineral-pricing', [PayoutRuleController::class, 'storeMineralPricing'])->middleware('admin')->name('admin.mineral-pricing.store');
+    Route::post('/admin/ice-pricing', [PayoutRuleController::class, 'storeIcePricing'])->middleware('admin')->name('admin.ice-pricing.store');
     Route::delete('/admin/appraisal-rates/{categoryId}', [PayoutRuleController::class, 'destroy'])->middleware('admin')->whereNumber('categoryId')->name('admin.appraisal-rates.destroy');
     Route::post('/admin/appraisal-ore-rules', [PayoutRuleController::class, 'storeOre'])->middleware('admin')->name('admin.appraisal-ore-rules.store');
     Route::delete('/admin/appraisal-ore-rules/{typeId}', [PayoutRuleController::class, 'destroyOre'])->middleware('admin')->whereNumber('typeId')->name('admin.appraisal-ore-rules.destroy');
