@@ -21,9 +21,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command('buyback:refresh-jita-prices --all')
+        $schedule->command('buyback:refresh-jita-prices --fast')
             ->everyFifteenMinutes()
             ->withoutOverlapping(20);
+
+        $schedule->command('buyback:refresh-jita-prices --ships')
+            ->everyTwoHours()
+            ->withoutOverlapping(110);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
     })
