@@ -58,6 +58,7 @@ class PiPlannerController extends Controller
                     $unitBuyPrice = $price?->buy_price !== null ? (float) $price->buy_price : null;
                     return [
                         'id' => (int) $r->input_type_id,
+                        'group_id' => (int) $r->input_group_id,
                         'name' => $r->input_name ?: ('Type #' . $r->input_type_id),
                         'quantity' => (int) $r->input_quantity,
                         'buy_price' => $unitBuyPrice,
@@ -163,11 +164,7 @@ class PiPlannerController extends Controller
                 $stageKey === 'p3-p4' ? 'Advanced Commodities - Tier 4' : '',
             ], true)) as $recipe) {
                 foreach ($recipe['inputs'] as $input) {
-                    $inputGroup = DB::table('eve_item_types as item')
-                        ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
-                        ->where('item.type_id', $input['id'])
-                        ->value('groups.group_id');
-                    if ((int) $inputGroup !== $groupId) {
+                    if ((int) ($input['group_id'] ?? 0) !== $groupId) {
                         continue;
                     }
                     $id = (int) $input['id'];
