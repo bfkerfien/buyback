@@ -64,6 +64,13 @@ final class AppraisalCalculator
         $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
         $mineralPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key');
         $icePricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key');
+        $gasPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key');
+        $compressedGasTypes = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->where('g.group_name', 'Compressed Gas')
+            ->get(['t.type_id', 't.type_name'])
+            ->keyBy(fn ($gas) => mb_strtolower($gas->type_name));
         $unresolvedTypes = [];
         $unpricedTypes = [];
         $lines = [];
@@ -101,13 +108,41 @@ final class AppraisalCalculator
             $baseTypeName = str_starts_with(mb_strtolower($type->type_name), 'compressed ')
                 ? trim(mb_substr($type->type_name, mb_strlen('Compressed ')))
                 : $type->type_name;
+            $compressedGasName = str_starts_with(mb_strtolower($type->type_name), 'compressed ')
+                ? $type->type_name
+                : 'Compressed ' . $type->type_name;
+            $compressedGasType = $compressedGasTypes->get(mb_strtolower($compressedGasName));
+            $isGas = $compressedGasType !== null;
             $isSpecialWhiteGlaze = $isIce && in_array(mb_strtolower($baseTypeName), ['white glaze', 'pristine white glaze'], true);
             $isHeavyWater = mb_strtolower($type->type_name) === 'heavy water';
 
+            // Every gas type is valued against the live Jita buy book for its
+            // compressed counterpart. Only the configured payout percentage differs
+            // between compressed and uncompressed inventory submissions.
+            if ($isGas) {
+                $depth = max(1, (int) $gasPricingSettings->get('gas_buy_depth', 50000));
+                $marketPrice = $this->liveJitaOrderPrice((int) $compressedGasType->type_id, $regionId, $depth, true);
+                if ($marketPrice === null) {
+                    $unpricedTypes[] = $item['name'] . ' (insufficient Jita buy volume for its compressed gas reference at configured ' . number_format($depth) . '-unit depth)';
+                    continue;
+                }
+                $unitPrice = $marketPrice['price'];
+                $price = (object) [
+                    'source' => 'live-esi-compressed-gas-jita-buy-' . $depth . '-unit-depth',
+                    'observed_at' => $marketPrice['observed_at'],
+                ];
+                $lineValue = round($unitPrice * $pricingQuantity, 2);
+                $isCompressedGas = str_starts_with(mb_strtolower($type->type_name), 'compressed ');
+                $customPayoutPercent = (float) $gasPricingSettings->get(
+                    $isCompressedGas ? 'gas_compressed_percent' : 'gas_uncompressed_percent',
+                    $isCompressedGas ? 60 : 85
+                );
+                $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
+                $valuationMode = 'gas_market';
             // White Glaze and Pristine White Glaze use SDE ice products. Their
             // market-priced outputs have independent rates; Heavy Water uses an
             // admin-entered ISK/unit value (10% of Jita buy until configured).
-            if ($isSpecialWhiteGlaze) {
+            } elseif ($isSpecialWhiteGlaze) {
                 $recipeTypeId = (int) $oreRecipeTypeIds->get((int) $type->type_id, (int) $type->type_id);
                 $recipe = $oreMaterials->get($recipeTypeId, collect());
                 $baseType = $baseOreTypes->get(mb_strtolower($baseTypeName));
