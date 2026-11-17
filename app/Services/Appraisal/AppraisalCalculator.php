@@ -28,12 +28,28 @@ final class AppraisalCalculator
             ->get(['t.type_id','t.type_name','t.group_id','t.portion_size','g.category_id','g.category_name'])
             ->keyBy(fn ($type) => mb_strtolower($type->type_name));
 
-        // Use each submitted ore type's own SDE reprocessing recipe and portion size.
-        // This matters for modern 1:1 compressed Mercoxit (100 units per batch)
-        // versus legacy Batch Compressed Mercoxit (1 unit per batch).
-        // CCP SDE recipes are authoritative for all ore types, including compressed variants.
+        // Compressed ore is always valued from the mineral output of its
+        // corresponding uncompressed ore, never from the compressed ore market price.
+        // Keep the compressed type's SDE portion_size (for example, 100 units
+        // per refining batch) but use the base ore's mineral recipe and yields.
+        $compressedBaseNames = $types->filter(fn ($type) =>
+            str_starts_with(mb_strtolower($type->type_name), 'compressed ')
+        )->map(fn ($type) => trim(mb_substr($type->type_name, mb_strlen('Compressed '))))->unique()->values();
+        $baseOreTypes = $compressedBaseNames->isEmpty() ? collect() : DB::table('eve_item_types as t')
+            ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->whereIn('t.type_name', $compressedBaseNames)
+            ->get(['t.type_id', 't.type_name', 't.portion_size', 'g.category_id', 'g.category_name'])
+            ->keyBy(fn ($type) => mb_strtolower($type->type_name));
+        $oreRecipeTypeIds = $types->mapWithKeys(function ($type) use ($baseOreTypes) {
+            $baseName = str_starts_with(mb_strtolower($type->type_name), 'compressed ')
+                ? trim(mb_substr($type->type_name, mb_strlen('Compressed ')))
+                : null;
+            $baseType = $baseName !== null ? $baseOreTypes->get(mb_strtolower($baseName)) : null;
+            return [(int) $type->type_id => (int) ($baseType?->type_id ?? $type->type_id)];
+        });
         $oreMaterials = DB::table('eve_type_materials')
-            ->whereIn('type_id', $types->pluck('type_id'))
+            ->whereIn('type_id', $oreRecipeTypeIds->values()->unique())
             ->get(['type_id', 'material_type_id', 'quantity'])
             ->groupBy('type_id');
         $mineralIds = $oreMaterials->flatten(1)->pluck('material_type_id')->unique()->values();
@@ -74,9 +90,9 @@ final class AppraisalCalculator
             // Every asteroid ore is valued from refined mineral outputs at the
             // max-refine null-sec Tatara / T2 rig / RX-804 yield (90.628%).
             if ((int) $type->category_id === 25) {
-                $recipeType = $type;
-                $recipe = $oreMaterials->get($recipeType->type_id, collect());
-                $portionSize = max(1, (int) ($recipeType->portion_size ?? 1));
+                $recipeTypeId = (int) $oreRecipeTypeIds->get((int) $type->type_id, (int) $type->type_id);
+                $recipe = $oreMaterials->get($recipeTypeId, collect());
+                $portionSize = max(1, (int) ($type->portion_size ?? 1));
                 $refiningInputQuantity = $pricingQuantity;
                 $batches = intdiv($refiningInputQuantity, $portionSize);
                 if ($recipe->isEmpty() || $batches < 1) {
