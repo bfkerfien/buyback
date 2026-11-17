@@ -161,7 +161,17 @@ class DashboardController extends Controller
         $icePricingSettings = $admin
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key')
             : collect();
+        $compressedGasTypes = $admin ? DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->where('g.group_name', 'Compressed Gas')
+            ->orderBy('t.type_name')
+            ->get(['t.type_id', 't.type_name'])
+            : collect();
+        $gasPricingSettings = $admin
+            ? DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key')
+            : collect();
 
-        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'icePricingSettings'));
+        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'icePricingSettings', 'compressedGasTypes', 'gasPricingSettings'));
     }
 }
