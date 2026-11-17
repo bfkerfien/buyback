@@ -142,34 +142,47 @@ final class AppraisalCalculator
                     $isCompressedGas ? 60 : 85
                 );
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
-                $valuati            // Compressed ice and the four ice products are independently priced
-            // from their own live Jita buy books, with per-type payout and depth settings.
+                $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
+                $valuationMode = 'gas_market';
             } elseif ($isIce || $isIceProduct) {
+                // Ice buyback uses the latest Jita market snapshot's best buy price.
+                // This is the price shown in the Jita market feed and avoids pricing
+                // the entire appraisal at a much lower marginal order several thousand
+                // units down the live book. Configured depth remains the fallback when
+                // a usable market snapshot is not available.
                 $typeId = (int) $type->type_id;
-                $depth = max(1, (int) $icePricingSettings->get(
-                    'ice_buy_depth_' . $typeId,
-                    1000
-                ));
+                $snapshot = DB::table('market_price_snapshots')
+                    ->where('type_id', $typeId)
+                    ->where('region_id', $regionId)
+                    ->where('source', 'esi-jita-4-4')
+                    ->orderByDesc('id')
+                    ->first(['buy_price', 'observed_at']);
 
-                $marketPrice = $this->liveJitaOrderPrice(
-                    $typeId,
-                    $regionId,
-                    $depth,
-                    true
-                );
-
-                if ($marketPrice === null) {
-                    $unpricedTypes[] = $item['name']
-                        . ' (insufficient Jita buy volume at configured '
-                        . number_format($depth) . '-unit depth)';
-                    continue;
+                if ($snapshot && (float) $snapshot->buy_price > 0) {
+                    $unitPrice = (float) $snapshot->buy_price;
+                    $price = (object) [
+                        'source' => 'market-snapshot-jita-best-buy',
+                        'observed_at' => $snapshot->observed_at,
+                    ];
+                } else {
+                    $depth = max(1, (int) $icePricingSettings->get(
+                        'ice_buy_depth_' . $typeId,
+                        1000
+                    ));
+                    $marketPrice = $this->liveJitaOrderPrice($typeId, $regionId, $depth, true);
+                    if ($marketPrice === null) {
+                        $unpricedTypes[] = $item['name']
+                            . ' (no Jita buy snapshot or sufficient live buy volume at configured '
+                            . number_format($depth) . '-unit depth)';
+                        continue;
+                    }
+                    $unitPrice = $marketPrice['price'];
+                    $price = (object) [
+                        'source' => 'live-esi-jita-' . $depth . '-unit-depth-fallback',
+                        'observed_at' => $marketPrice['observed_at'],
+                    ];
                 }
 
-                $unitPrice = $marketPrice['price'];
-                $price = (object) [
-                    'source' => 'live-esi-jita-' . $depth . '-unit-depth',
-                    'observed_at' => $marketPrice['observed_at'],
-                ];
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
 
                 if ($isIce) {
@@ -199,11 +212,9 @@ final class AppraisalCalculator
                         'ice_buy_percent_' . $typeId,
                         $legacyPercent
                     );
-
                     $customRateSource = 'individual_ice_product';
                     $valuationMode = 'ice_product_market';
                 }
-ter_fixed_10_percent';
             } elseif ((int) $type->category_id === 25) {
                 $recipeTypeId = (int) $oreRecipeTypeIds->get((int) $type->type_id, (int) $type->type_id);
                 $recipe = $oreMaterials->get($recipeTypeId, collect());
