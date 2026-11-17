@@ -85,8 +85,9 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 @endif
 @php
 $tierLabel = ['p1-p2' => 'P1', 'p2-p3' => 'P2', 'p3-p4' => 'P3'][$key];
+$nextTierLabel = ['p1-p2' => 'P2', 'p2-p3' => 'P3', 'p3-p4' => 'P4'][$key];
 @endphp
-@include('partials.pi-p1-appraisal-buy-prices', ['tier' => $tierLabel, 'tierBuyTargets' => $tierBuyTargets[$key]])
+@include('partials.pi-p1-appraisal-buy-prices', ['tier' => $tierLabel, 'nextTier' => $nextTierLabel, 'tierBuyTargets' => $tierBuyTargets[$key]])
 </div></section>
 @endforeach
 </main>
