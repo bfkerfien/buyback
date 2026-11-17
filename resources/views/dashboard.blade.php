@@ -141,14 +141,14 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </section>
 <section class="tab-panel" id="tab-admin-tools" role="tabpanel" hidden>
 <section class="panel"><h2>Administration</h2><div class="grid"><div class="stat">Open jobs<strong>{{ $adminMetrics['open_jobs'] }}</strong></div><div class="stat">Registered users<strong>{{ $adminMetrics['users'] }}</strong></div></div>
-<details class="pricing-settings" open><summary>Category buyback rates</summary><div class="pricing-settings-content">
+<details class="pricing-settings"><summary>Category buyback rates</summary><div class="pricing-settings-content">
 <p class="muted">Set the percentage of Jita value paid for each EVE item category. Items inherit their category rate; categories without a rule use the default rate from BUYBACK_PAYOUT_PERCENT (currently {{ number_format((float)config('buyback.payout_percent'),2) }}%).</p>
 <form method="post" action="{{ route('admin.appraisal-rates.store') }}">@csrf
 <div class="row"><label>EVE item category<select name="category_id" required><option value="">Select category</option>@foreach($eveCategories as $category)<option value="{{ $category->category_id }}">{{ $category->category_name }}</option>@endforeach</select></label><label>Buyback rate (%)<input name="payout_percent" type="number" min="0.01" max="100" step="0.01" placeholder="80.00" required></label></div><button>Save category rate</button></form>
 <table><thead><tr><th>Category</th><th>Buyback rate</th><th>Action</th></tr></thead><tbody>@forelse($payoutRules as $rule)<tr><td>{{ $rule->category_name }}</td><td>{{ number_format((float)$rule->payout_percent,2) }}%</td><td><form class="inline" method="post" action="{{ route('admin.appraisal-rates.destroy',$rule->category_id) }}">@csrf @method('DELETE')<button style="background:#263b46;color:#eaf7f8">Remove</button></form></td></tr>@empty<tr><td colspan="3">No category-specific rates. All items use the default rate.</td></tr>@endforelse</tbody></table>
 <p class="muted">CCP SDE category data must be imported once before categories appear in this list.</p>
 </div></details>
-<details class="pricing-settings" open><summary>Standard mineral buyback settings</summary><div class="pricing-settings-content">
+<details class="pricing-settings"><summary>Standard mineral buyback settings</summary><div class="pricing-settings-content">
 <p class="muted">Each mineral has its own buy percentage and cumulative Jita buy-order quantity. The calculator uses the price at that unit in the live Jita buy book. Save each mineral independently.</p>
 @php($standardMineralDepths = ['Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000, 'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000, 'Megacyte' => 500000, 'Morphite' => 45000])
 <div style="overflow-x:auto"><table><thead><tr><th>Mineral</th><th>Buy percentage</th><th>Jita unit depth</th><th>Save</th></tr></thead><tbody>
@@ -164,7 +164,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @endforeach
 </tbody></table></div>
 </div></details>
-<details class="pricing-settings" open><summary>Moon-ore refined material settings</summary><div class="pricing-settings-content">
+<details class="pricing-settings"><summary>Moon-ore refined material settings</summary><div class="pricing-settings-content">
 <p class="muted">Every material found in the SDE refining recipes for moon ores appears here. Configure its buy percentage and cumulative Jita quantity independently. Defaults are 87% and 50,000 units until changed.</p>
 <div style="overflow-x:auto"><table><thead><tr><th>Refined material</th><th>Material group</th><th>Buy percentage</th><th>Jita unit depth</th><th>Save</th></tr></thead><tbody>
 @forelse($moonMineralTypes as $material)
@@ -180,7 +180,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @empty<tr><td colspan="5">No moon-ore refining materials found. Confirm the CCP SDE moon-ore groups and reprocessing recipes are imported.</td></tr>@endforelse
 </tbody></table></div>
 </div></details>
-<details class="pricing-settings" open><summary>Compressed ice buyback rates</summary><div class="pricing-settings-content">
+<details class="pricing-settings"><summary>Compressed ice buyback rates</summary><div class="pricing-settings-content">
 <p class="muted">Each compressed ice type has its own percentage of its live Jita buy price. Types are grouped by their SDE variant bonus; White Glaze and Pristine White Glaze use the refined-output settings below instead.</p>
 @php($iceVariantGroups = $iceTypes->groupBy(function ($ice) { $base = mb_strtolower(preg_replace('/^Compressed /i', '', $ice->type_name)); if (in_array($base, ['enriched clear icicle', 'smooth glacial mass', 'thick blue ice', 'pristine white glaze'], true)) return 'Enriched faction variants (+15% isotope yield)'; if (in_array($base, ['clear icicle', 'white glaze', 'blue ice', 'glacial mass'], true)) return 'Standard faction ice'; return 'Standard nullsec ice'; }))
 @forelse($iceVariantGroups as $variantLabel => $variantIceTypes)
@@ -201,7 +201,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <p class="muted">No compressed ice types found in the imported SDE Ice group. Re-import the current CCP SDE types and taxonomy.</p>
 @endforelse
 </div></details>
-<details class="pricing-settings" open><summary>White Glaze / Pristine White Glaze refined-output settings</summary><div class="pricing-settings-content">
+<details class="pricing-settings"><summary>White Glaze / Pristine White Glaze refined-output settings</summary><div class="pricing-settings-content">
 <p class="muted">The refined Nitrogen Isotopes, Liquid Ozone, and Strontium Clathrates are valued from live Jita buy prices at their individual percentages. Heavy Water uses the manual ISK-per-unit value below; leave it at 0 to use 10% of its live Jita buy price until you enter a manual value.</p>
 <form method="post" action="{{ route('admin.ice-pricing.store') }}">@csrf<input type="hidden" name="save_refined_settings" value="1">
 <div class="row">
@@ -211,7 +211,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <label>Heavy Water value (ISK per unit)<input name="heavy_water_unit_price" type="number" min="0" max="1000000000" step="0.01" value="{{ $icePricingSettings->get('ice_heavy_water_unit_price', 0) }}" required></label>
 </div><button type="submit">Save refined ice settings</button></form>
 </div></details>
-<details class="pricing-settings" open><summary>Gas buyback settings</summary><div class="pricing-settings-content">
+<details class="pricing-settings"><summary>Gas buyback settings</summary><div class="pricing-settings-content">
 <p class="muted">All gas is priced from the equivalent compressed gas type's live Jita buy orders. Uncompressed gas uses the uncompressed percentage; compressed gas uses the compressed percentage. Both use the same cumulative Jita buy-order unit depth below.</p>
 <form method="post" action="{{ route('admin.gas-pricing.store') }}">@csrf
 <div class="row">
