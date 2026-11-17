@@ -32,6 +32,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::delete('/appraisals/{quote}', [AppraisalVisibilityController::class, 'destroy'])->whereNumber('quote')->name('appraisals.destroy');
     Route::delete('/appraisals/{quote}/hide', [AppraisalVisibilityController::class, 'hide'])->whereNumber('quote')->name('appraisals.hide');
     Route::post('/admin/appraisals/purge', [AdminAppraisalController::class, 'purge'])->middleware('admin')->name('admin.appraisals.purge');
+    Route::post('/admin/appraisals/purge-archived', [AdminAppraisalController::class, 'purgeArchived'])->middleware('admin')->name('admin.appraisals.purge-archived');
     Route::post('/admin/appraisal-comparison', [AppraisalComparisonController::class, 'compare'])->middleware('admin')->name('admin.appraisal-comparison');
     Route::post('/admin/holo-comparison', [AppraisalComparisonController::class, 'compareHolo'])->middleware('admin')->name('admin.holo-comparison');
     Route::post('/admin/appraisals/{quote}/contract', [AppraisalVisibilityController::class, 'markContracted'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.contract');
