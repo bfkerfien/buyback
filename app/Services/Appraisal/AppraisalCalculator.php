@@ -97,7 +97,7 @@ final class AppraisalCalculator
             $refinedMineralDetails = [];
             $customPayoutPercent = null;
             $customRateSource = null;
-            $isIce = mb_strtolower((string) ($type->group_name ?? '')) === 'ice';
+            $isIce = in_array(mb_strtolower((string) ($type->group_name ?? '')), ['ice', 'compressed ice'], true);
             $baseTypeName = str_starts_with(mb_strtolower($type->type_name), 'compressed ')
                 ? trim(mb_substr($type->type_name, mb_strlen('Compressed ')))
                 : $type->type_name;
