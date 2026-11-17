@@ -73,6 +73,7 @@ final class AppraisalCalculator
             ->keyBy(fn ($gas) => mb_strtolower($gas->type_name));
         $unresolvedTypes = [];
         $unpricedTypes = [];
+        $unpricedItemReasons = [];
         $lines = [];
         $side = config('buyback.price_side', 'buy');
         $defaultRate = (float) config('buyback.payout_percent', 87);
@@ -147,6 +148,7 @@ final class AppraisalCalculator
                 $marketPrice = $this->liveJitaOrderPrice((int) $compressedGasType->type_id, $regionId, $depth, true);
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name'] . ' (insufficient Jita buy volume for its compressed gas reference at configured ' . number_format($depth) . '-unit depth)';
+                    $unpricedItemReasons[$item['name']] = 'No current compressed-gas Jita buy price at the configured depth.';
                     continue;
                 }
                 $unitPrice = $marketPrice['price'];
@@ -180,6 +182,7 @@ final class AppraisalCalculator
                     $unpricedTypes[] = $item['name']
                         . ' (insufficient live Jita buy volume at configured '
                         . number_format($depth) . '-unit quantity)';
+                    $unpricedItemReasons[$item['name']] = 'No current Jita buy price at the configured depth.';
                     continue;
                 }
 
@@ -290,6 +293,7 @@ final class AppraisalCalculator
                     $mineralPrice = $this->liveJitaOrderPrice($mineralId, $regionId, $depth, true);
                     if ($mineralPrice === null) {
                         $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': insufficient Jita buy volume at configured ' . number_format($depth) . '-unit depth)';
+                        $unpricedItemReasons[$item['name']] = 'Missing Jita price for refined output ' . $mineral->type_name . '.';
                         continue 2;
                     }
                     $grossMineralValue = round($yieldedQuantity * $mineralPrice['price'], 2);
@@ -331,6 +335,7 @@ final class AppraisalCalculator
                 }
                 if ($unitPrice === null || $unitPrice <= 0 || !$price) {
                     $unpricedTypes[] = $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price)';
+                    $unpricedItemReasons[$item['name']] = 'No current valid Jita market price is available.';
                     continue;
                 }
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
@@ -411,12 +416,43 @@ final class AppraisalCalculator
             ];
         }
 
+        // Keep every recognized item visible in the submitted appraisal. If its
+        // current market price is unavailable, save a zero-value line with an
+        // explicit marker so the member can exclude it and submit a fresh quote.
+        foreach ($unpricedItemReasons as $itemName => $reason) {
+            $type = $types->get(mb_strtolower($itemName));
+            if (!$type) continue;
+            $rate = (float) config('buyback.payout_percent', 87);
+            $lines[] = [
+                'type_id' => (int) $type->type_id,
+                'type_name' => $type->type_name,
+                'quantity' => (int) (collect($parsedItems)->firstWhere('name', $itemName)['quantity'] ?? 0),
+                'unit_price' => 0,
+                'line_value' => 0,
+                'payout_percent' => $rate,
+                'payout_value' => 0,
+                'ore_jita_buy_price' => null,
+                'effective_rate_percent' => null,
+                'category_id' => $type->category_id,
+                'category_name' => $type->category_name,
+                'rate_source' => 'missing_price',
+                'source' => 'missing-market-price',
+                'observed_at' => null,
+                'valuation_mode' => 'missing_price',
+                'output_type_id' => null,
+                'output_name' => null,
+                'output_quantity' => null,
+                'conversion_ratio' => null,
+                'output_unit_price' => 0,
+                'refined_materials' => [],
+                'missing_price' => true,
+                'missing_price_reason' => $reason,
+            ];
+        }
+
         $priceErrors = [];
         if ($unresolvedTypes) {
             $priceErrors[] = 'These item types are missing from the imported published EVE SDE: ' . implode(', ', array_unique($unresolvedTypes)) . '. Re-import CCP types.jsonl and taxonomy.';
-        }
-        if ($unpricedTypes) {
-            $priceErrors[] = 'These item types exist in the SDE but have no current positive Jita ' . $side . ' price: ' . implode(', ', array_unique($unpricedTypes)) . '. Refresh their Jita prices before appraising.';
         }
         if ($priceErrors) {
             throw ValidationException::withMessages(['inventory' => $priceErrors]);
