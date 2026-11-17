@@ -145,44 +145,34 @@ final class AppraisalCalculator
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
                 $valuationMode = 'gas_market';
             } elseif ($isIce || $isIceProduct) {
-                // Ice buyback uses the latest Jita market snapshot's best buy price.
-                // This is the price shown in the Jita market feed and avoids pricing
-                // the entire appraisal at a much lower marginal order several thousand
-                // units down the live book. Configured depth remains the fallback when
-                // a usable market snapshot is not available.
+                // Use the configured cumulative Jita buy-order quantity for each
+                // compressed ice type and ice product. The marginal price at that
+                // quantity is the actual appraisal price; do not substitute a
+                // cached best-price snapshot or a hard-coded 50,000-unit depth.
                 $typeId = (int) $type->type_id;
-                $snapshot = DB::table('market_price_snapshots')
-                    ->where('type_id', $typeId)
-                    ->where('region_id', $regionId)
-                    ->where('source', 'esi-jita-4-4')
-                    ->orderByDesc('id')
-                    ->first(['buy_price', 'observed_at']);
+                $depth = max(1, (int) $icePricingSettings->get(
+                    'ice_buy_depth_' . $typeId,
+                    1000
+                ));
+                $marketPrice = $this->liveJitaOrderPrice(
+                    $typeId,
+                    $regionId,
+                    $depth,
+                    true
+                );
 
-                if ($snapshot && (float) $snapshot->buy_price > 0) {
-                    $unitPrice = (float) $snapshot->buy_price;
-                    $price = (object) [
-                        'source' => 'market-snapshot-jita-best-buy',
-                        'observed_at' => $snapshot->observed_at,
-                    ];
-                } else {
-                    $depth = max(1, (int) $icePricingSettings->get(
-                        'ice_buy_depth_' . $typeId,
-                        1000
-                    ));
-                    $marketPrice = $this->liveJitaOrderPrice($typeId, $regionId, $depth, true);
-                    if ($marketPrice === null) {
-                        $unpricedTypes[] = $item['name']
-                            . ' (no Jita buy snapshot or sufficient live buy volume at configured '
-                            . number_format($depth) . '-unit depth)';
-                        continue;
-                    }
-                    $unitPrice = $marketPrice['price'];
-                    $price = (object) [
-                        'source' => 'live-esi-jita-' . $depth . '-unit-depth-fallback',
-                        'observed_at' => $marketPrice['observed_at'],
-                    ];
+                if ($marketPrice === null) {
+                    $unpricedTypes[] = $item['name']
+                        . ' (insufficient live Jita buy volume at configured '
+                        . number_format($depth) . '-unit quantity)';
+                    continue;
                 }
 
+                $unitPrice = $marketPrice['price'];
+                $price = (object) [
+                    'source' => 'live-esi-jita-buy-' . $depth . '-unit-quantity',
+                    'observed_at' => $marketPrice['observed_at'],
+                ];
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
 
                 if ($isIce) {
