@@ -17,7 +17,7 @@
         @auth
             <div class="site-character">
                 @if($siteCharacter)
-                    <img class="site-player-icon" src="https://images.evetech.net/characters/{{ $siteCharacter->character_id }}/portrait?size=64" alt="{{ $siteCharacter->name }}">
+                    <img class="site-player-icon" src="https://images.evetech.net/characters/{{ $siteCharacter->eve_character_id }}/portrait?size=64" alt="{{ $siteCharacter->name }}">
                     <span class="site-account">{{ $siteCharacter->name }}</span>
                 @else
                     <span class="site-player-icon site-player-placeholder" aria-label="Player account">♙</span>
