@@ -31,21 +31,25 @@
     </div>
 </header>
 
-@unless(request()->routeIs('dashboard'))
 <nav class="site-nav" aria-label="Main site navigation">
-    <a href="{{ route('home') }}">Home</a>
-    <a href="{{ route('ship-buyback.index') }}">Ship Buyback</a>
+    <a href="{{ route('home') }}" @if(request()->routeIs('home')) aria-current="page" @endif>Home</a>
     @auth
-        <a href="{{ route('dashboard') }}">Dashboard</a>
-        @if(auth()->user()->isAdmin())
-            <a href="{{ route('pi-planner.index') }}">Planetary Industry</a>
+        <a href="{{ route('dashboard') }}" @if(request()->routeIs('dashboard')) aria-current="page" @endif>Dashboard</a>
+    @endauth
+    <a href="{{ route('ship-buyback.index') }}" @if(request()->routeIs('ship-buyback.*')) aria-current="page" @endif>Ship Buyback</a>
+</nav>
+
+@auth
+    @if(auth()->user()->isAdmin())
+        <nav class="site-nav site-admin-nav" aria-label="Administration navigation">
+            <a href="{{ route('pi-planner.index') }}" @if(request()->routeIs('pi-planner.*')) aria-current="page" @endif>Planetary Industry</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-ore-refining']) }}">Ore Refining</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-marketbaiters']) }}">Marketbaiters</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-admin']) }}">Admin</a>
-        @endif
-    @endauth
-</nav>
-@endunless
+            <a href="{{ route('dashboard', ['tab' => 'tab-admin-tools']) }}">Admin Tools</a>
+        </nav>
+    @endif
+@endauth
 
 <style>
 .evaluation-banner{display:flex;align-items:center;overflow:hidden;min-height:48px;margin:0 0 14px;padding:0 14px;background:#ffd84d;color:#111;border:1px solid #e4b923;border-radius:9px;font-size:15px;font-weight:900;letter-spacing:.025em}
@@ -62,8 +66,10 @@
 .site-account{font-size:11px;color:#c5dbe0;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .site-link-character{font-size:11px;text-decoration:underline;color:#62d9e9!important;white-space:nowrap}
 .site-logout{margin:0}.site-logout button,.site-login{padding:9px 13px;font-size:12px;font-weight:700}
-.site-nav{display:flex;align-items:center;justify-content:flex-start;gap:8px;flex-wrap:wrap;padding:9px 12px;margin:0 0 20px;background:rgba(7,19,27,.78);border:1px solid #294a56;border-radius:11px}
+.site-nav{display:flex;align-items:center;justify-content:flex-start;gap:8px;flex-wrap:wrap;padding:9px 12px;margin:0 0 10px;background:rgba(7,19,27,.78);border:1px solid #294a56;border-radius:11px}
 .site-nav>a{display:inline-flex;align-items:center;padding:9px 12px;border:1px solid #315665;border-radius:8px;text-decoration:none;color:#dffaff!important;font-size:13px;font-weight:700;background:#102630}
-.site-nav>a:hover{border-color:#62d9e9;background:#163440}
+.site-nav>a:hover,.site-nav>a[aria-current="page"]{border-color:#62d9e9;background:#163440}
+.site-admin-nav{background:rgba(10,27,36,.88);border-color:rgba(255,155,69,.42);margin-bottom:20px}
+.site-admin-nav>a[aria-current="page"]{border-color:#ffad58;background:linear-gradient(110deg,#62d9e9,#ffad58);color:#071018!important}
 @media(max-width:700px){.site-header{align-items:center}.site-brand{flex-basis:180px}.site-header .eb-logo{width:180px}.site-nav{gap:6px}.site-nav>a{padding:8px 9px;font-size:12px}}
 </style>

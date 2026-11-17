@@ -32,20 +32,9 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 
 @if(session('status'))<p class="success">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="panel">{{ $errors->first() }}</div>@endif
-<nav class="tabs" role="tablist" aria-label="Buyback sections">
-<a class="tab" href="{{ route('home') }}" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;text-decoration:none">Home</a>
+<nav class="tabs" role="tablist" aria-label="Dashboard sections">
 <button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="tab-appraisals" data-tab="tab-appraisals">New Appraisals</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-contracts" data-tab="tab-contracts">Appraisals &amp; Contracts</button>
-<a class="tab" href="{{ route('ship-buyback.index') }}" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;text-decoration:none">Ship Buyback</a>
-<a class="tab" href="{{ route('pi-planner.index') }}" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;text-decoration:none">Planetary Industry</a>
-@if($admin)
-<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-marketbaiters" data-tab="tab-marketbaiters">Marketbaiters Comparison</button>
-<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin" data-tab="tab-admin">Admin</button>
-<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-admin-tools" data-tab="tab-admin-tools">Admin Tools</button>
-
-<button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-ore-refining" data-tab="tab-ore-refining">Ore Refining</button>
-@endif
-
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-how-to" data-tab="tab-how-to">How To</button>
 </nav>
 <section class="tab-panel active" id="tab-appraisals" role="tabpanel">
