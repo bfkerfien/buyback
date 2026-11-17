@@ -83,7 +83,9 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 </article>
 @endforeach
 @endif
+@if($key === 'p1-p2')
 @include('partials.pi-p1-appraisal-buy-prices')
+@endif
 </div></section>
 @endforeach
 </main>
