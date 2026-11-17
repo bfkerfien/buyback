@@ -33,6 +33,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @if(session('status'))<p class="success">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="panel">{{ $errors->first() }}</div>@endif
 <nav class="tabs" role="tablist" aria-label="Buyback sections">
+<a class="tab" href="{{ route('home') }}" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;text-decoration:none">Home</a>
 <button type="button" class="tab active" role="tab" aria-selected="true" aria-controls="tab-appraisals" data-tab="tab-appraisals">New Appraisals</button>
 <button type="button" class="tab" role="tab" aria-selected="false" aria-controls="tab-contracts" data-tab="tab-contracts">Appraisals &amp; Contracts</button>
 <a class="tab" href="{{ route('ship-buyback.index') }}" style="display:inline-flex;align-items:center;padding:10px 14px;border-radius:8px;text-decoration:none">Ship Buyback</a>
