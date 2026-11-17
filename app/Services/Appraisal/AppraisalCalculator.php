@@ -87,7 +87,7 @@ final class AppraisalCalculator
             $pricingQuantity = (int) $item['quantity'];
             if (str_starts_with(mb_strtolower($type->type_name), 'compressed ')
                 && (int) $oreRecipeTypeIds->get((int) $type->type_id, 0) === 0) {
-                $unresolvedTypes[] = $item['name'] . ' (matching uncompressed ore recipe is missing from the SDE)';
+                $unresolvedTypes[] = $item['name'] . ' (matching uncompressed base item is missing from the SDE)';
                 continue;
             }
             $valuationMode = 'market';
