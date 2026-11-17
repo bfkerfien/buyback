@@ -88,6 +88,8 @@ class AppraisalController extends Controller
                         'observed_at' => $line['observed_at'],
                         'payout_percent' => $line['payout_percent'],
                         'payout_value' => $line['payout_value'],
+                        'ore_jita_buy_price' => $line['ore_jita_buy_price'] ?? null,
+                        'effective_rate_percent' => $line['effective_rate_percent'] ?? null,
                         'category_id' => $line['category_id'],
                         'category_name' => $line['category_name'],
                         'rate_source' => $line['rate_source'],
