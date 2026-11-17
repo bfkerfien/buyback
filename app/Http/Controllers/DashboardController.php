@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use App\Services\Eve\CharacterContracts;
 use Illuminate\View\View;
 
@@ -55,8 +56,16 @@ class DashboardController extends Controller
             ? null
             : 'Link your EVE character to this Buyback account to display contracts issued to My Eve Online.';
 
-        if ($contractCharacter) {
-            $contractResult = app(CharacterContracts::class)->forRecipient($contractCharacter, 'My Eve Online', 10);
+        // Contract discovery calls EVE ESI and may need to scan multiple pages.
+        // Never block the normal dashboard (or unrelated admin tabs) on that
+        // external request. Only load the contract board when it is selected,
+        // and reuse the result briefly when users revisit it.
+        if ($contractCharacter && $request->query('tab') === 'tab-contracts') {
+            $contractResult = Cache::remember(
+                'buyback:dashboard:contracts:' . $contractCharacter->id,
+                now()->addMinutes(5),
+                fn () => app(CharacterContracts::class)->forRecipient($contractCharacter, 'My Eve Online', 10)
+            );
             $myEveContracts = collect($contractResult['contracts']);
             $contractBoardStatus = $contractResult['status'];
             $contractBoardMessage = $contractResult['message'];
