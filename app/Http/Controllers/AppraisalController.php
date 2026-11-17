@@ -101,6 +101,8 @@ class AppraisalController extends Controller
                         'conversion_ratio' => $line['conversion_ratio'],
                         'output_unit_price' => $line['output_unit_price'],
                         'refined_materials' => $line['refined_materials'] ?? [],
+                        'missing_price' => (bool) ($line['missing_price'] ?? false),
+                        'missing_price_reason' => $line['missing_price_reason'] ?? null,
                     ], JSON_THROW_ON_ERROR),
                     'created_at' => now(),
                     'updated_at' => now(),
