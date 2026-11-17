@@ -205,6 +205,21 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <label>Strontium Clathrates buy percentage (%)<input name="strontium_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $icePricingSettings->get('ice_refined_strontium_percent', 100) }}" required></label>
 <label>Heavy Water value (ISK per unit)<input name="heavy_water_unit_price" type="number" min="0" max="1000000000" step="0.01" value="{{ $icePricingSettings->get('ice_heavy_water_unit_price', 0) }}" required></label>
 </div><button type="submit">Save refined ice settings</button></form>
+<h2 style="margin-top:24px">Gas buyback settings</h2>
+<p class="muted">All gas is priced from the equivalent compressed gas type's live Jita buy orders. Uncompressed gas uses the uncompressed percentage; compressed gas uses the compressed percentage. Both use the same cumulative Jita buy-order unit depth below.</p>
+<form method="post" action="{{ route('admin.gas-pricing.store') }}">@csrf
+<div class="row">
+<label>Uncompressed gas buyback (%)<input name="uncompressed_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $gasPricingSettings->get('gas_uncompressed_percent', 85) }}" required></label>
+<label>Compressed gas buyback (%)<input name="compressed_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $gasPricingSettings->get('gas_compressed_percent', 60) }}" required></label>
+<label>Compressed gas Jita buy-order depth (units)<input name="price_depth" type="number" min="1" max="2000000000" step="1" value="{{ $gasPricingSettings->get('gas_buy_depth', 50000) }}" required></label>
+</div>
+<button type="submit">Save gas pricing settings</button>
+</form>
+@if($compressedGasTypes->isNotEmpty())
+<p class="muted" style="margin-top:12px">Compressed gas types included in the reference-price lookup: {{ $compressedGasTypes->count() }}. Each uncompressed type is matched to its exact “Compressed [name]” counterpart.</p>
+@else
+<p class="muted" style="margin-top:12px">No compressed gas types found. Confirm the current CCP SDE types and groups have been imported.</p>
+@endif
 </section>
 </section>
 <section class="tab-panel" id="tab-ore-refining" role="tabpanel" hidden>
