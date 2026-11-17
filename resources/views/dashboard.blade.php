@@ -176,6 +176,35 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </tr>
 @empty<tr><td colspan="5">No moon-ore refining materials found. Confirm the CCP SDE moon-ore groups and reprocessing recipes are imported.</td></tr>@endforelse
 </tbody></table></div>
+<h2 style="margin-top:24px">Compressed ice variant buyback settings</h2>
+<p class="muted">Each compressed ice type has its own percentage of its live Jita buy price. Types are grouped by their SDE variant bonus; White Glaze and Pristine White Glaze use the refined-output settings below instead.</p>
+@php($iceVariantGroups = $iceTypes->groupBy(function ($ice) { $base = preg_replace('/^Compressed /i', '', $ice->type_name); if (str_starts_with(mb_strtolower($base), 'pristine ')) return '+10% variants'; if (preg_match('/^(Enriched|Thick) /i', $base)) return '+5% variants'; return 'Standard variants'; }))
+@forelse($iceVariantGroups as $variantLabel => $variantIceTypes)
+<h3 style="margin-top:18px">{{ $variantLabel }}</h3>
+<div style="overflow-x:auto"><table><thead><tr><th>Compressed ice</th><th>Buyback percentage</th><th>Save</th></tr></thead><tbody>
+@foreach($variantIceTypes as $ice)
+@php($baseIceName = preg_replace('/^Compressed /i', '', $ice->type_name))
+@php($specialIce = in_array(mb_strtolower($baseIceName), ['white glaze', 'pristine white glaze'], true))
+@php($iceRateKey = 'ice_buy_percent_'.$ice->type_id)
+<tr>
+<td>{{ $ice->type_name }}</td>
+<td>@if($specialIce)<span class="muted">Refined-output rates below</span>@else<input form="ice-rate-{{ $ice->type_id }}" aria-label="{{ $ice->type_name }} buyback percentage" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $icePricingSettings->get($iceRateKey, 87) }}" required style="max-width:140px;margin:0"><form id="ice-rate-{{ $ice->type_id }}" method="post" action="{{ route('admin.ice-pricing.store') }}">@csrf<input type="hidden" name="type_id" value="{{ $ice->type_id }}"></form>@endif</td>
+<td>@unless($specialIce)<button form="ice-rate-{{ $ice->type_id }}" type="submit">Save</button>@else<span class="muted">Configured below</span>@endunless</td>
+</tr>
+@endforeach
+</tbody></table></div>
+@empty
+<p class="muted">No compressed ice types found in the imported SDE Ice group. Re-import the current CCP SDE types and taxonomy.</p>
+@endforelse
+<h2 style="margin-top:24px">White Glaze and Pristine White Glaze refined-output settings</h2>
+<p class="muted">The refined Nitrogen Isotopes, Liquid Ozone, and Strontium Clathrates are valued from live Jita buy prices at their individual percentages. Heavy Water uses the manual ISK-per-unit value below; leave it at 0 to use 10% of its live Jita buy price until you enter a manual value.</p>
+<form method="post" action="{{ route('admin.ice-pricing.store') }}">@csrf<input type="hidden" name="save_refined_settings" value="1">
+<div class="row">
+<label>Nitrogen Isotopes buy percentage (%)<input name="nitrogen_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $icePricingSettings->get('ice_refined_nitrogen_percent', 100) }}" required></label>
+<label>Liquid Ozone buy percentage (%)<input name="ozone_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $icePricingSettings->get('ice_refined_ozone_percent', 100) }}" required></label>
+<label>Strontium Clathrates buy percentage (%)<input name="strontium_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $icePricingSettings->get('ice_refined_strontium_percent', 100) }}" required></label>
+<label>Heavy Water value (ISK per unit)<input name="heavy_water_unit_price" type="number" min="0" max="1000000000" step="0.01" value="{{ $icePricingSettings->get('ice_heavy_water_unit_price', 0) }}" required></label>
+</div><button type="submit">Save refined ice settings</button></form>
 </section>
 </section>
 <section class="tab-panel" id="tab-ore-refining" role="tabpanel" hidden>
