@@ -4,10 +4,13 @@ namespace App\Services\Appraisal;
 
 use App\Services\Eve\ExcludedMissionOre;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
 final class AppraisalCalculator
 {
+    private array $liveOrderBooks = [];
+
     public function calculate(array $parsedItems, ?string $requiredCategoryName = null, ?float $fixedPayoutPercent = null, bool $ignoreNonMatching = false): array
     {
         // Mission-only ores and special variants are never accepted for buyback.
@@ -121,7 +124,7 @@ final class AppraisalCalculator
                     ];
                     $depth = max(1, (int) $mineralPricingSettings->get('mineral_buy_depth_' . $mineralId, $defaultDepths[$mineral->type_name] ?? 50000));
                     $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
-                    $mineralPrice = $this->jitaBuyPrice($mineralId, $regionId, $depth, false);
+                    $mineralPrice = $this->liveJitaOrderPrice($mineralId, $regionId, $depth, true);
                     if ($mineralPrice === null) {
                         $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': insufficient Jita buy volume at configured ' . number_format($depth) . '-unit depth)';
                         continue 2;
@@ -150,20 +153,18 @@ final class AppraisalCalculator
                 $outputName = count($refinedMineralDetails) === 1 ? $refinedMineralDetails[0]['name'] : 'refined minerals';
                 $valuationMode = 'reprocessed';
                 $unitPrice = $refinedLineValue / $pricingQuantity;
-                $price = (object) ['source' => 'sde-refined-outputs-50000-depth', 'observed_at' => now()];
+                $price = (object) ['source' => 'live-esi-refined-outputs', 'observed_at' => now()];
                 $lineValue = $refinedLineValue;
             } else {
                 $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
                 if ($side === 'sell') {
-                    $price = DB::table('market_price_snapshots')
-                        ->where('type_id', $type->type_id)->where('region_id', $regionId)
-                        ->whereNotNull($priceColumn)->where($priceColumn, '>', 0)
-                        ->orderByDesc('observed_at')->first(['buy_price','sell_price','source','observed_at']);
-                    $unitPrice = $price ? (float) $price->{$priceColumn} : null;
-                } else {
-                    $marketPrice = $this->jitaBuyPrice((int) $type->type_id, $regionId, 50000);
+                    $marketPrice = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 1, false);
                     $unitPrice = $marketPrice['price'] ?? null;
-                    $price = $marketPrice ? (object) ['source' => 'jita-50000-unit-depth', 'observed_at' => $marketPrice['observed_at']] : null;
+                    $price = $marketPrice ? (object) ['source' => 'live-esi-jita-4-4-sell-order', 'observed_at' => $marketPrice['observed_at']] : null;
+                } else {
+                    $marketPrice = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 50000, true);
+                    $unitPrice = $marketPrice['price'] ?? null;
+                    $price = $marketPrice ? (object) ['source' => 'live-esi-jita-50000-unit-depth', 'observed_at' => $marketPrice['observed_at']] : null;
                 }
                 if ($unitPrice === null || $unitPrice <= 0 || !$price) {
                     $unpricedTypes[] = $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price)';
@@ -179,24 +180,9 @@ final class AppraisalCalculator
             $oreJitaBuyPrice = null;
             $effectiveRatePercent = null;
             if ((int) $type->category_id === 25 && $valuationMode === 'reprocessed') {
-                // Prefer the live Jita IV - Moon 4 best buy order. If the order-book
-                // snapshot is absent (or has no buy orders), fall back to the latest
-                // ESI Jita price snapshot maintained by the same market refresh job.
-                $oreMarket = $this->jitaBuyPrice((int) $type->type_id, $regionId, 1, false);
+                // Fetch the current ESI order book for the submitted ore.
+                $oreMarket = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 1, true);
                 $oreJitaBuyPrice = $oreMarket['price'] ?? null;
-
-                if ($oreJitaBuyPrice === null) {
-                    $oreJitaBuyPrice = DB::table('market_price_snapshots')
-                        ->where('type_id', (int) $type->type_id)
-                        ->where('region_id', $regionId)
-                        ->where('source', 'esi-jita-4-4')
-                        ->whereNotNull('buy_price')
-                        ->where('buy_price', '>', 0)
-                        ->orderByDesc('observed_at')
-                        ->value('buy_price');
-
-                    $oreJitaBuyPrice = $oreJitaBuyPrice !== null ? (float) $oreJitaBuyPrice : null;
-                }
             }
 
             $effectiveCategoryId = $pricingType->category_id;
@@ -265,7 +251,7 @@ final class AppraisalCalculator
             $priceErrors[] = 'These item types are missing from the imported published EVE SDE: ' . implode(', ', array_unique($unresolvedTypes)) . '. Re-import CCP types.jsonl and taxonomy.';
         }
         if ($unpricedTypes) {
-            $priceErrors[] = 'These item types exist in the SDE but have no stored positive Jita ' . $side . ' price: ' . implode(', ', array_unique($unpricedTypes)) . '. Refresh their Jita prices before appraising.';
+            $priceErrors[] = 'These item types exist in the SDE but have no current positive Jita ' . $side . ' price: ' . implode(', ', array_unique($unpricedTypes)) . '. Refresh their Jita prices before appraising.';
         }
         if ($priceErrors) {
             throw ValidationException::withMessages(['inventory' => $priceErrors]);
@@ -292,35 +278,62 @@ final class AppraisalCalculator
         ];
     }
 
-    private function jitaBuyPrice(int $typeId, string $regionId, int $requiredDepth, bool $checkAverage = true): ?array
+    /**
+     * Price this appraisal from the current ESI order book, never from historical
+     * market snapshots or previously stored order-book rows. ESI may briefly cache
+     * its public market endpoint; the appraisal stores the returned price as history.
+     */
+    private function liveJitaOrderPrice(int $typeId, string $regionId, int $requiredDepth, bool $buyOrder): ?array
     {
-        $latestBookAt = DB::table('market_order_book_snapshots')
-            ->where('type_id', $typeId)->where('region_id', $regionId)
-            ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
-            ->where('is_buy_order', true)->max('observed_at');
-        if (!$latestBookAt) return null;
+        $key = $regionId . ':' . $typeId;
+        if (!array_key_exists($key, $this->liveOrderBooks)) {
+            $http = Http::withHeaders([
+                'User-Agent' => config('buyback.eve_user_agent'),
+                'X-Compatibility-Date' => config('buyback.esi_compatibility_date'),
+            ])->acceptJson()->timeout(30)->retry(2, 500);
 
-        $orders = DB::table('market_order_book_snapshots')
-            ->where('type_id', $typeId)->where('region_id', $regionId)
-            ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
-            ->where('is_buy_order', true)->where('observed_at', $latestBookAt)
-            ->orderByDesc('price')->get(['price', 'volume_remain']);
-        $remaining = $requiredDepth;
-        $price = null;
-        foreach ($orders as $order) {
-            if ((int) $order->volume_remain >= $remaining) { $price = (float) $order->price; break; }
-            $remaining -= (int) $order->volume_remain;
+            $stationId = (int) config('buyback.jita_station_id', 60003760);
+            $pages = 1;
+            $books = ['buy' => [], 'sell' => []];
+            try {
+                for ($page = 1; $page <= $pages; $page++) {
+                    $response = $http->get("https://esi.evetech.net/latest/markets/{$regionId}/orders/", [
+                        'order_type' => 'all',
+                        'type_id' => $typeId,
+                        'page' => $page,
+                    ])->throw();
+                    $pages = min(1000, max(1, (int) $response->header('X-Pages', 1)));
+                    foreach ($response->json() as $order) {
+                        if ((int) ($order['location_id'] ?? 0) !== $stationId) continue;
+                        $price = (float) ($order['price'] ?? 0);
+                        $volume = (int) ($order['volume_remain'] ?? 0);
+                        if ($price <= 0 || $volume < 1) continue;
+                        $side = (bool) ($order['is_buy_order'] ?? false) ? 'buy' : 'sell';
+                        $books[$side][] = ['price' => $price, 'volume' => $volume];
+                    }
+                }
+            } catch (\Throwable $exception) {
+                report($exception);
+                return null;
+            }
+
+            usort($books['buy'], fn (array $a, array $b) => $b['price'] <=> $a['price']);
+            usort($books['sell'], fn (array $a, array $b) => $a['price'] <=> $b['price']);
+            $this->liveOrderBooks[$key] = [
+                ...$books,
+                'observed_at' => now()->toDateTimeString(),
+            ];
         }
-        if ($price === null || $price <= 0) return null;
 
-        if ($checkAverage) {
-            $average = (float) DB::table('market_price_snapshots')
-                ->where('type_id', $typeId)->where('region_id', $regionId)
-                ->where('source', 'esi-jita-4-4')->where('observed_at', '>=', now()->subDays(7))
-                ->whereNotNull('buy_price')->where('buy_price', '>', 0)->avg('buy_price');
-            if ($average <= 0 || abs($price - $average) / $average > 0.03) return null;
+        $side = $buyOrder ? 'buy' : 'sell';
+        $remaining = max(1, $requiredDepth);
+        foreach ($this->liveOrderBooks[$key][$side] as $order) {
+            if ($order['volume'] >= $remaining) {
+                return ['price' => $order['price'], 'observed_at' => $this->liveOrderBooks[$key]['observed_at']];
+            }
+            $remaining -= $order['volume'];
         }
 
-        return ['price' => $price, 'observed_at' => $latestBookAt];
+        return null;
     }
 }
