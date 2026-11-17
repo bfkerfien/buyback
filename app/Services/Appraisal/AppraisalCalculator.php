@@ -4,13 +4,10 @@ namespace App\Services\Appraisal;
 
 use App\Services\Eve\ExcludedMissionOre;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
 final class AppraisalCalculator
 {
-    private array $liveOrderBooks = [];
-
     public function calculate(array $parsedItems, ?string $requiredCategoryName = null, ?float $fixedPayoutPercent = null, bool $ignoreNonMatching = false): array
     {
         // Mission-only ores and special variants are never accepted for buyback.
@@ -140,20 +137,20 @@ final class AppraisalCalculator
                 return $output && in_array(mb_strtolower($output->type_name), $factionIsotopeNames, true);
             });
 
-            // Every gas type is valued against the live Jita buy book for its
+            // Every gas type is valued against the stored Jita buy snapshot for its
             // compressed counterpart. Only the configured payout percentage differs
             // between compressed and uncompressed inventory submissions.
             if ($isGas) {
                 $depth = max(1, (int) $gasPricingSettings->get('gas_buy_depth', 50000));
-                $marketPrice = $this->liveJitaOrderPrice((int) $compressedGasType->type_id, $regionId, $depth, true);
+                $marketPrice = $this->snapshotJitaPrice((int) $compressedGasType->type_id, $regionId, 'buy');
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name'] . ' (insufficient Jita buy volume for its compressed gas reference at configured ' . number_format($depth) . '-unit depth)';
-                    $unpricedItemReasons[$item['name']] = 'No current compressed-gas Jita buy price at the configured depth.';
+                    $unpricedItemReasons[$item['name']] = 'No stored compressed-gas Jita buy-price snapshot is available yet.';
                     continue;
                 }
                 $unitPrice = $marketPrice['price'];
                 $price = (object) [
-                    'source' => 'live-esi-compressed-gas-jita-buy-' . $depth . '-unit-depth',
+                    'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-depth',
                     'observed_at' => $marketPrice['observed_at'],
                 ];
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
@@ -176,19 +173,19 @@ final class AppraisalCalculator
                 // from its own live Jita buy orders, preserving its individual rate.
                 $typeId = (int) $type->type_id;
                 $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $typeId, 1000));
-                $marketPrice = $this->liveJitaOrderPrice($typeId, $regionId, $depth, true);
+                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
                         . ' (insufficient live Jita buy volume at configured '
                         . number_format($depth) . '-unit quantity)';
-                    $unpricedItemReasons[$item['name']] = 'No current Jita buy price at the configured depth.';
+                    $unpricedItemReasons[$item['name']] = 'No stored Jita buy-price snapshot is available yet.';
                     continue;
                 }
 
                 $unitPrice = $marketPrice['price'];
                 $price = (object) [
-                    'source' => 'live-esi-jita-buy-' . $depth . '-unit-quantity',
+                    'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-quantity',
                     'observed_at' => $marketPrice['observed_at'],
                 ];
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
@@ -205,19 +202,19 @@ final class AppraisalCalculator
                     'ice_buy_depth_' . $typeId,
                     1000
                 ));
-                $marketPrice = $this->liveJitaOrderPrice($typeId, $regionId, $depth, true);
+                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
                         . ' (insufficient live Jita buy volume at configured '
                         . number_format($depth) . '-unit quantity)';
-                    $unpricedItemReasons[$item['name']] = 'No current Jita buy price at the configured depth.';
+                    $unpricedItemReasons[$item['name']] = 'No stored Jita buy-price snapshot is available yet.';
                     continue;
                 }
 
                 $unitPrice = $marketPrice['price'];
                 $price = (object) [
-                    'source' => 'live-esi-jita-buy-' . $depth . '-unit-quantity',
+                    'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-quantity',
                     'observed_at' => $marketPrice['observed_at'],
                 ];
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
@@ -291,7 +288,7 @@ final class AppraisalCalculator
                         $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
                     }
 
-                    $mineralPrice = $this->liveJitaOrderPrice($mineralId, $regionId, $depth, true);
+                    $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy');
                     if ($mineralPrice === null) {
                         $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': insufficient Jita buy volume at configured ' . number_format($depth) . '-unit depth)';
                         $unpricedItemReasons[$item['name']] = 'Missing Jita price for refined output ' . $mineral->type_name . '.';
@@ -321,22 +318,22 @@ final class AppraisalCalculator
                 $outputName = count($refinedMineralDetails) === 1 ? $refinedMineralDetails[0]['name'] : 'refined minerals';
                 $valuationMode = 'reprocessed';
                 $unitPrice = $refinedLineValue / $pricingQuantity;
-                $price = (object) ['source' => 'live-esi-refined-outputs', 'observed_at' => now()];
+                $price = (object) ['source' => 'database-snapshot-refined-outputs', 'observed_at' => now()];
                 $lineValue = $refinedLineValue;
             } else {
                 $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
                 if ($side === 'sell') {
-                    $marketPrice = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 1, false);
+                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'sell');
                     $unitPrice = $marketPrice['price'] ?? null;
-                    $price = $marketPrice ? (object) ['source' => 'live-esi-jita-4-4-sell-order', 'observed_at' => $marketPrice['observed_at']] : null;
+                    $price = $marketPrice ? (object) ['source' => 'database-snapshot-jita-sell', 'observed_at' => $marketPrice['observed_at']] : null;
                 } else {
-                    $marketPrice = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 50000, true);
+                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy');
                     $unitPrice = $marketPrice['price'] ?? null;
-                    $price = $marketPrice ? (object) ['source' => 'live-esi-jita-50000-unit-depth', 'observed_at' => $marketPrice['observed_at']] : null;
+                    $price = $marketPrice ? (object) ['source' => 'database-snapshot-jita-buy', 'observed_at' => $marketPrice['observed_at']] : null;
                 }
                 if ($unitPrice === null || $unitPrice <= 0 || !$price) {
                     $unpricedTypes[] = $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price)';
-                    $unpricedItemReasons[$item['name']] = 'No current valid Jita market price is available.';
+                    $unpricedItemReasons[$item['name']] = 'No stored Jita market-price snapshot is available yet.';
                     continue;
                 }
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
@@ -349,8 +346,8 @@ final class AppraisalCalculator
             $oreJitaBuyPrice = null;
             $effectiveRatePercent = null;
             if ((int) $type->category_id === 25 && !$isIce && $valuationMode === 'reprocessed') {
-                // Fetch the current ESI order book for the submitted ore.
-                $oreMarket = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 1, true);
+                // Read the latest stored Jita buy snapshot for display metadata.
+                $oreMarket = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy');
                 $oreJitaBuyPrice = $oreMarket['price'] ?? null;
             }
 
@@ -481,61 +478,28 @@ final class AppraisalCalculator
     }
 
     /**
-     * Price this appraisal from the current ESI order book, never from historical
-     * market snapshots or previously stored order-book rows. ESI may briefly cache
-     * its public market endpoint; the appraisal stores the returned price as history.
+     * Appraisals never call ESI. They use the newest scheduled market-price
+     * snapshot for the requested type, region, and side. A missing snapshot
+     * is reported as an unpriced item rather than triggering a live request.
      */
-    private function liveJitaOrderPrice(int $typeId, string $regionId, int $requiredDepth, bool $buyOrder): ?array
+    private function snapshotJitaPrice(int $typeId, string $regionId, string $side): ?array
     {
-        $key = $regionId . ':' . $typeId;
-        if (!array_key_exists($key, $this->liveOrderBooks)) {
-            $http = Http::withHeaders([
-                'User-Agent' => config('buyback.eve_user_agent'),
-                'X-Compatibility-Date' => config('buyback.esi_compatibility_date'),
-            ])->acceptJson()->timeout(30)->retry(2, 500);
+        $column = $side === 'sell' ? 'sell_price' : 'buy_price';
+        $snapshot = DB::table('market_price_snapshots')
+            ->where('type_id', $typeId)
+            ->where('region_id', $regionId)
+            ->whereNotNull($column)
+            ->where($column, '>', 0)
+            ->orderByDesc('id')
+            ->first(['id', $column, 'observed_at']);
 
-            $stationId = (int) config('buyback.jita_station_id', 60003760);
-            $pages = 1;
-            $books = ['buy' => [], 'sell' => []];
-            try {
-                for ($page = 1; $page <= $pages; $page++) {
-                    $response = $http->get("https://esi.evetech.net/latest/markets/{$regionId}/orders/", [
-                        'order_type' => 'all',
-                        'type_id' => $typeId,
-                        'page' => $page,
-                    ])->throw();
-                    $pages = min(1000, max(1, (int) $response->header('X-Pages', 1)));
-                    foreach ($response->json() as $order) {
-                        if ((int) ($order['location_id'] ?? 0) !== $stationId) continue;
-                        $price = (float) ($order['price'] ?? 0);
-                        $volume = (int) ($order['volume_remain'] ?? 0);
-                        if ($price <= 0 || $volume < 1) continue;
-                        $side = (bool) ($order['is_buy_order'] ?? false) ? 'buy' : 'sell';
-                        $books[$side][] = ['price' => $price, 'volume' => $volume];
-                    }
-                }
-            } catch (\Throwable $exception) {
-                report($exception);
-                return null;
-            }
-
-            usort($books['buy'], fn (array $a, array $b) => $b['price'] <=> $a['price']);
-            usort($books['sell'], fn (array $a, array $b) => $a['price'] <=> $b['price']);
-            $this->liveOrderBooks[$key] = [
-                ...$books,
-                'observed_at' => now()->toDateTimeString(),
-            ];
+        if (!$snapshot) {
+            return null;
         }
 
-        $side = $buyOrder ? 'buy' : 'sell';
-        $remaining = max(1, $requiredDepth);
-        foreach ($this->liveOrderBooks[$key][$side] as $order) {
-            if ($order['volume'] >= $remaining) {
-                return ['price' => $order['price'], 'observed_at' => $this->liveOrderBooks[$key]['observed_at']];
-            }
-            $remaining -= $order['volume'];
-        }
-
-        return null;
+        return [
+            'price' => (float) $snapshot->{$column},
+            'observed_at' => $snapshot->observed_at,
+        ];
     }
 }
