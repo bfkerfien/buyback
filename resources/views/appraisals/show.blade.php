@@ -31,6 +31,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <body><main>
 @include('partials.site-header')
 <h1>{{ ($quote->appraisal_kind ?? 'standard') === 'ship' ? 'Ship Buyback Appraisal' : 'Appraisal result' }}</h1>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px"><a href="{{ route('dashboard', ['tab' => 'tab-appraisals']) }}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:linear-gradient(115deg,#ffb45f,#ff793f);color:#101820!important;text-decoration:none;font-weight:800">＋ Create another appraisal</a><a href="{{ route('dashboard', ['tab' => 'tab-contracts']) }}" style="display:inline-block;padding:11px 16px;border-radius:8px;border:1px solid #315665;background:#102630;text-decoration:none;font-weight:700">View my appraisals</a></div>
 @if(($quote->appraisal_kind ?? 'standard') === 'ship')<p class="muted">Public ship hull buyback · 80% payout · non-ship entries are excluded</p>@endif
 <section class="panel">
 <h2>EVE Contract Details</h2>
