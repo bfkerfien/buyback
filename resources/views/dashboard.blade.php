@@ -182,22 +182,8 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </div></details>
 <details class="pricing-settings"><summary>Ice & Ice Products buyback settings</summary>
 <p class="muted">Every compressed ice type and each ice product has its own buy percentage and cumulative Jita buy-order depth. All default to 1,000 units of depth. Changes apply to subsequent appraisals. Market prices below are the latest recorded Jita snapshots; appraisals use live ESI order books.</p>
-
 @php($icePricingRows = $iceTypes->concat($iceProductTypes)->unique('type_id')->sortBy('type_name'))
-
-<div style="overflow-x:auto">
-<table>
-<thead>
-<tr>
-<th>Product</th>
-<th>Buy percentage</th>
-<th>Jita unit depth</th>
-<th>Latest Jita buy price</th>
-<th>Effective buy price</th>
-<th>Save</th>
-</tr>
-</thead>
-<tbody>
+<div style="display:grid;gap:8px">
 @forelse($icePricingRows as $iceProduct)
 @php($isCompressedIce = $iceTypes->contains(fn ($ice) => (int) $ice->type_id === (int) $iceProduct->type_id))
 @php($productName = mb_strtolower($iceProduct->type_name))
@@ -213,25 +199,23 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @php($buyPercent = (float) $icePricingSettings->get($rateKey, $legacyRateKey ? $icePricingSettings->get($legacyRateKey, $defaultBuyPercent) : $defaultBuyPercent))
 @php($priceSnapshot = $iceProductPrices->get($iceProduct->type_id))
 @php($effectiveBuyPrice = $priceSnapshot ? (float) $priceSnapshot->buy_price * $buyPercent / 100 : null)
-<tr>
-<td>
-<form id="ice-product-{{ $iceProduct->type_id }}" method="post" action="{{ route('admin.ice-pricing.store') }}">
+<form method="post" action="{{ route('admin.ice-pricing.store') }}" style="display:grid;grid-template-columns:minmax(180px,1.5fr) minmax(110px,.8fr) minmax(130px,1fr) minmax(130px,1fr) minmax(130px,1fr) auto;gap:12px;align-items:end;padding:10px;border-bottom:1px solid #294a56">
 @csrf
 <input type="hidden" name="type_id" value="{{ $iceProduct->type_id }}">
-{{ $iceProduct->type_name }}
+<strong style="align-self:center">{{ $iceProduct->type_name }}</strong>
+<label class="muted">Buy percentage (%)
+<input name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $buyPercent }}" required style="margin:4px 0 0">
+</label>
+<label class="muted">Jita unit depth
+<input name="price_depth" type="number" min="1" max="2000000000" step="1" value="{{ $icePricingSettings->get($depthKey, 1000) }}" required style="margin:4px 0 0">
+</label>
+<div class="muted">Latest Jita buy<br><strong>{{ $priceSnapshot ? number_format((float) $priceSnapshot->buy_price, 2) . ' ISK' : 'No snapshot' }}</strong></div>
+<div class="muted">Effective buy price<br><strong>{{ $effectiveBuyPrice !== null ? number_format($effectiveBuyPrice, 2) . ' ISK' : '—' }}</strong></div>
+<button type="submit">Save</button>
 </form>
-</td>
-<td><input form="ice-product-{{ $iceProduct->type_id }}" name="buy_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $buyPercent }}" required style="max-width:130px;margin:0"></td>
-<td><input form="ice-product-{{ $iceProduct->type_id }}" name="price_depth" type="number" min="1" max="2000000000" step="1" value="{{ $icePricingSettings->get($depthKey, 1000) }}" required style="max-width:150px;margin:0"></td>
-<td>{{ $priceSnapshot ? number_format((float) $priceSnapshot->buy_price, 2) . ' ISK' : 'No snapshot' }}</td>
-<td>{{ $effectiveBuyPrice !== null ? number_format($effectiveBuyPrice, 2) . ' ISK' : '—' }}</td>
-<td><button form="ice-product-{{ $iceProduct->type_id }}" type="submit">Save</button></td>
-</tr>
 @empty
-<tr><td colspan="6">No compressed ice or supported ice products were found in the imported SDE.</td></tr>
+<p class="muted">No compressed ice or supported ice products were found in the imported SDE.</p>
 @endforelse
-</tbody>
-</table>
 </div>
 </div></details>
 <details class="pricing-settings"><summary>Gas buyback settings</summary><div class="pricing-settings-content">
