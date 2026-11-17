@@ -34,7 +34,9 @@
 <nav class="site-nav" aria-label="Main site navigation">
     <a href="{{ route('home') }}" @if(request()->routeIs('home')) aria-current="page" @endif>Home</a>
     @auth
-        <a href="{{ route('dashboard') }}" @if(request()->routeIs('dashboard')) aria-current="page" @endif>Dashboard</a>
+        <a href="{{ route('dashboard', ['tab' => 'tab-appraisals']) }}" @if(request()->routeIs('dashboard') && request('tab', 'tab-appraisals') === 'tab-appraisals') aria-current="page" @endif>New Appraisals</a>
+        <a href="{{ route('dashboard', ['tab' => 'tab-contracts']) }}" @if(request()->routeIs('dashboard') && request('tab') === 'tab-contracts') aria-current="page" @endif>Appraisals &amp; Contracts</a>
+        <a href="{{ route('dashboard', ['tab' => 'tab-how-to']) }}" @if(request()->routeIs('dashboard') && request('tab') === 'tab-how-to') aria-current="page" @endif>How To</a>
     @endauth
     <a href="{{ route('ship-buyback.index') }}" @if(request()->routeIs('ship-buyback.*')) aria-current="page" @endif>Ship Buyback</a>
 </nav>
