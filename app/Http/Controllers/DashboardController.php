@@ -153,7 +153,7 @@ class DashboardController extends Controller
         $iceTypes = $admin ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
-            ->where('g.group_name', 'Ice')
+            ->whereIn('g.group_name', ['Ice', 'Compressed Ice'])
             ->where('t.type_name', 'like', 'Compressed %')
             ->orderBy('t.type_name')
             ->get(['t.type_id', 't.type_name'])
