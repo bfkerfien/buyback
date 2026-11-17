@@ -178,7 +178,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </tbody></table></div>
 <h2 style="margin-top:24px">Compressed ice variant buyback settings</h2>
 <p class="muted">Each compressed ice type has its own percentage of its live Jita buy price. Types are grouped by their SDE variant bonus; White Glaze and Pristine White Glaze use the refined-output settings below instead.</p>
-@php($iceVariantGroups = $iceTypes->groupBy(function ($ice) { $base = preg_replace('/^Compressed /i', '', $ice->type_name); if (str_starts_with(mb_strtolower($base), 'pristine ')) return '+10% variants'; if (preg_match('/^(Enriched|Thick) /i', $base)) return '+5% variants'; return 'Standard variants'; }))
+@php($iceVariantGroups = $iceTypes->groupBy(function ($ice) { $base = mb_strtolower(preg_replace('/^Compressed /i', '', $ice->type_name)); if (in_array($base, ['enriched clear icicle', 'smooth glacial mass', 'thick blue ice', 'pristine white glaze'], true)) return 'Enriched faction variants (+15% isotope yield)'; if (in_array($base, ['clear icicle', 'white glaze', 'blue ice', 'glacial mass'], true)) return 'Standard faction ice'; return 'Standard nullsec ice'; }))
 @forelse($iceVariantGroups as $variantLabel => $variantIceTypes)
 <h3 style="margin-top:18px">{{ $variantLabel }}</h3>
 <div style="overflow-x:auto"><table><thead><tr><th>Compressed ice</th><th>Buyback percentage</th><th>Save</th></tr></thead><tbody>
