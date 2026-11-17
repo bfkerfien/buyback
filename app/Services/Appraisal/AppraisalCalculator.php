@@ -291,7 +291,7 @@ final class AppraisalCalculator
             // metadata only; it never changes the mineral valuation or payout.
             $oreJitaBuyPrice = null;
             $effectiveRatePercent = null;
-            if ((int) $type->category_id === 25 && $valuationMode === 'reprocessed') {
+            if ((int) $type->category_id === 25 && !$isIce && $valuationMode === 'reprocessed') {
                 // Fetch the current ESI order book for the submitted ore.
                 $oreMarket = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 1, true);
                 $oreJitaBuyPrice = $oreMarket['price'] ?? null;
@@ -325,7 +325,7 @@ final class AppraisalCalculator
                         : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate))));
             // Normalize every existing 90% payout rule to 87%, including
             // category rules, individual PI rules, and explicitly fixed rates.
-            if (abs($rate - 90.0) < 0.000001) {
+            if ($customPayoutPercent === null && abs($rate - 90.0) < 0.000001) {
                 $rate = 87.0;
             }
 
