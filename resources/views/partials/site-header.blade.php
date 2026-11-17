@@ -3,7 +3,10 @@
 @endphp
 
 <div class="acceptance-banner" role="status" aria-label="Current accepted items">
-    <strong>NOW ACCEPTING: Compressed Asteriod Ore / PI / Compressed Ice / Uncompressed Gas from any BRANCH system. Other items are a work in progress.</strong>
+    <div class="acceptance-banner-track">
+        <span>NOW ACCEPTING: Compressed Asteriod Ore / PI / Compressed Ice / Uncompressed Gas from any BRANCH system. Other items are a work in progress.</span>
+        <span aria-hidden="true">NOW ACCEPTING: Compressed Asteriod Ore / PI / Compressed Ice / Uncompressed Gas from any BRANCH system. Other items are a work in progress.</span>
+    </div>
 </div>
 
 <div class="evaluation-banner" role="status" aria-label="Evaluation mode notice">
@@ -58,7 +61,12 @@
 @endauth
 
 <style>
-.acceptance-banner{display:flex;align-items:center;justify-content:center;min-height:48px;margin:0 0 10px;padding:12px 16px;background:#00dff2;color:#ffe600;border:1px solid #00b9cf;border-radius:9px;text-align:center;font-size:15px;font-weight:900;line-height:1.5;letter-spacing:.015em;text-shadow:0 1px 1px rgba(0,0,0,.35)}
+.acceptance-banner{display:flex;align-items:center;overflow:hidden;min-height:48px;margin:0 0 10px;padding:0 14px;background:#00dff2;color:#000;border:1px solid #00b9cf;border-radius:9px;text-align:left;font-size:15px;font-weight:900;line-height:1.5;letter-spacing:.015em}
+.acceptance-banner-track{display:flex;width:max-content;min-width:100%;animation:acceptance-banner-scroll 30s linear infinite}
+.acceptance-banner span{display:block;flex:0 0 auto;padding:0 3rem;white-space:nowrap}
+.acceptance-banner:hover .acceptance-banner-track{animation-play-state:paused}
+@keyframes acceptance-banner-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.acceptance-banner-track{animation:none}.acceptance-banner span+span{display:none}.acceptance-banner{justify-content:center;text-align:center}.acceptance-banner span{white-space:normal;padding:10px 4px}}
 .evaluation-banner{display:flex;align-items:center;overflow:hidden;min-height:48px;margin:0 0 14px;padding:0 14px;background:#ffd84d;color:#111;border:1px solid #e4b923;border-radius:9px;font-size:15px;font-weight:900;letter-spacing:.025em}
 .evaluation-banner-track{display:flex;width:max-content;min-width:100%;animation:evaluation-banner-scroll 34s linear infinite}
 .evaluation-banner span{display:block;flex:0 0 auto;padding:0 3rem;white-space:nowrap}
