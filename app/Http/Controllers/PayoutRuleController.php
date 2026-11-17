@@ -122,7 +122,7 @@ class PayoutRuleController extends Controller
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.type_id', $data['type_id'])
             ->where('t.published', true)
-            ->where('g.group_name', 'Ice')
+            ->whereIn('g.group_name', ['Ice', 'Compressed Ice'])
             ->where('t.type_name', 'like', 'Compressed %')
             ->first(['t.type_id', 't.type_name']);
         if (!$ice) {
