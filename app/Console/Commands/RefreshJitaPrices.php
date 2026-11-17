@@ -9,7 +9,7 @@ use Throwable;
 
 class RefreshJitaPrices extends Command
 {
-    protected $signature = 'buyback:refresh-jita-prices {type_ids?* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4} {--pi : Refresh every input and output type used by imported PI schematics} {--fast : Refresh compressed ore, ice, gas, minerals, and all PI recipe items} {--ships : Refresh all published ship hulls}';
+    protected $signature = 'buyback:refresh-jita-prices {type_ids?* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4} {--pi : Refresh every input and output type used by imported PI schematics} {--fast : Refresh compressed asteroid ores, compressed ice, selected ice products, eight minerals, and all PI recipe items} {--ships : Refresh all published ship hulls}';
     protected $description = 'Fetch Jita IV - Moon 4 market order depth and prices from EVE ESI.';
 
     public function handle(): int
@@ -73,46 +73,57 @@ class RefreshJitaPrices extends Command
 
     private function fastRefreshTypeIds(): array
     {
+        // Only compressed asteroid ores are refreshed here. The SDE name prefix
+        // includes every published bonus-grade variant (II/III/IV, etc.).
         $compressedOreIds = DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
-            ->whereIn('g.category_name', ['Asteroid', 'Moon Materials'])
+            ->where('g.category_name', 'Asteroid')
             ->where('t.type_name', 'like', 'Compressed %')
             ->pluck('t.type_id')->all();
 
-        $iceTypeIds = DB::table('eve_item_types as t')
+        // Do not pull raw ice types or every possible refining output.
+        $compressedIceIds = DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
-            ->whereIn('g.group_name', ['Ice', 'Compressed Ice'])
-            ->pluck('t.type_id')->all();
-        $iceProductIds = $iceTypeIds
-            ? DB::table('eve_type_materials')->whereIn('type_id', $iceTypeIds)->pluck('material_type_id')->all()
-            : [];
-
-        $gasTypeIds = DB::table('eve_item_types as t')
-            ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-            ->where('t.published', true)
-            ->where(function ($query) {
-                $query->where('g.group_name', 'Compressed Gas')
-                    ->orWhere('t.type_name', 'like', '%Mykoserocin')
-                    ->orWhere('t.type_name', 'like', '%Cytoserocin');
-            })
-            ->whereNotIn('t.type_name', ['Chartreuse Cytoserocin', 'Gamboge Cytoserocin'])
+            ->where('g.group_name', 'Compressed Ice')
+            ->where('t.type_name', 'like', 'Compressed %')
             ->pluck('t.type_id')->all();
 
+        $iceProductIds = DB::table('eve_item_types')
+            ->where('published', true)
+            ->whereIn('type_name', [
+                'Nitrogen Isotopes',
+                'Strontium Clathrates',
+                'Heavy Water',
+                'Liquid Ozone',
+            ])
+            ->pluck('type_id')->all();
+
+        // Exactly the eight standard asteroid-reprocessing minerals.
         $mineralIds = DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('g.group_name', 'Mineral')
+            ->whereIn('t.type_name', [
+                'Tritanium', 'Pyerite', 'Mexallon', 'Isogen',
+                'Nocxium', 'Zydrine', 'Megacyte', 'Morphite',
+            ])
             ->pluck('t.type_id')->all();
 
+        // Include every material appearing as an input or product in imported
+        // PI schematics, covering all imported PI tiers.
         $piIds = array_merge(
             DB::table('eve_planet_schematics')->pluck('product_type_id')->all(),
             DB::table('eve_planet_schematic_inputs')->pluck('type_id')->all()
         );
 
         return array_values(array_unique(array_filter(array_map('intval', array_merge(
-            $compressedOreIds, $iceTypeIds, $iceProductIds, $gasTypeIds, $mineralIds, $piIds
+            $compressedOreIds,
+            $compressedIceIds,
+            $iceProductIds,
+            $mineralIds,
+            $piIds
         )), fn (int $id) => $id > 0)));
     }
 
