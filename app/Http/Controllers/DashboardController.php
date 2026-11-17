@@ -153,15 +153,34 @@ class DashboardController extends Controller
         $iceTypes = $admin ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
-            ->whereIn('g.group_name', ['Ice', 'Compressed Ice'])
             ->where('t.type_name', 'like', 'Compressed %')
+            ->where(function ($query) {
+                $query->where('g.group_name', 'like', '%ice%')
+                    ->orWhere('g.category_name', 'like', '%ice%')
+                    ->orWhereIn('t.type_name', [
+                        'Compressed Clear Icicle', 'Compressed Glacial Mass', 'Compressed Blue Ice',
+                        'Compressed White Glaze', 'Compressed Enriched Clear Icicle',
+                        'Compressed Smooth Glacial Mass', 'Compressed Thick Blue Ice',
+                        'Compressed Pristine White Glaze',
+                    ]);
+            })
             ->orderBy('t.type_name')
             ->get(['t.type_id', 't.type_name'])
             : collect();
         $icePricingSettings = $admin
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key')
             : collect();
+        $compressedGasTypes = $admin ? DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->where('g.group_name', 'Compressed Gas')
+            ->orderBy('t.type_name')
+            ->get(['t.type_id', 't.type_name'])
+            : collect();
+        $gasPricingSettings = $admin
+            ? DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key')
+            : collect();
 
-        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'icePricingSettings'));
+        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'icePricingSettings', 'compressedGasTypes', 'gasPricingSettings'));
     }
 }

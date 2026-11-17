@@ -2,6 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EveBuyback · Operations</title>
 <style>
  :root{color-scheme:dark;font-family:Inter,system-ui,sans-serif;background:#071018;color:#eaf7f8}*{box-sizing:border-box}body{margin:0;padding:24px;background:radial-gradient(2px 2px at 8% 16%,#fff 45%,transparent 60%),radial-gradient(1px 1px at 18% 72%,#67d9e8 45%,transparent 60%),radial-gradient(1px 1px at 29% 38%,#fff 45%,transparent 60%),radial-gradient(2px 2px at 43% 82%,#67d9e8 45%,transparent 60%),radial-gradient(1px 1px at 57% 14%,#fff 45%,transparent 60%),radial-gradient(1px 1px at 69% 55%,#fff 45%,transparent 60%),radial-gradient(2px 2px at 83% 27%,#67d9e8 45%,transparent 60%),radial-gradient(1px 1px at 94% 78%,#fff 45%,transparent 60%),radial-gradient(ellipse at 50% -10%,#0d5967 0,transparent 52%),radial-gradient(ellipse at 88% 82%,#3d2512 0,transparent 42%),radial-gradient(ellipse at 8% 90%,#0d2b38 0,transparent 40%),#060d13;min-height:100vh}main{max-width:1200px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:16px}.account-chip{display:flex;align-items:center;gap:9px;padding:5px 11px 5px 6px;border:1px solid #386675;border-radius:999px;background:#09151c;color:#eaf7f8;font-size:13px;font-weight:600;white-space:nowrap}.account-chip img{width:34px;height:34px;display:block;object-fit:cover;border-radius:50%;border:1px solid #68dbea}.muted{color:#9bb5bf;font-size:13px}.panel{background:#101e27;border:1px solid #294a56;border-radius:14px;padding:20px;margin:18px 0}h1{font-size:30px}h2{font-size:19px;margin-top:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{background:#09151c;padding:14px;border-radius:10px}.stat strong{display:block;font-size:22px;margin-top:8px}input,select,textarea{width:100%;background:#09151c;color:#eaf7f8;border:1px solid #315665;border-radius:8px;padding:10px;margin:6px 0 12px}textarea{min-height:70px}button{display:inline-block;background:#ff9b45;color:#111820;border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px;border-bottom:1px solid #294a56;font-size:13px}.success{color:#ffb45f}.row{display:grid;grid-template-columns:1fr 1fr;gap:14px}form.inline{display:inline}form.inline select{width:auto;max-width:170px;padding:8px}@media(max-width:700px){.grid,.row{grid-template-columns:1fr}body{padding:12px}.top{align-items:flex-start}}
+.pricing-settings{margin:18px 0;border:1px solid rgba(91,193,210,.25);border-radius:12px;background:rgba(5,16,23,.42);overflow:hidden}.pricing-settings>summary{cursor:pointer;list-style:none;padding:15px 18px;font-weight:800;color:#9deaf0;display:flex;align-items:center;justify-content:space-between;gap:12px}.pricing-settings>summary::-webkit-details-marker{display:none}.pricing-settings>summary:after{content:'+';font-size:20px;color:#ffb45f}.pricing-settings[open]>summary:after{content:'−'}.pricing-settings-content{padding:0 18px 18px}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:22px 0 16px;border-bottom:1px solid #294a56;padding-bottom:10px}.tab{background:#09151c;color:#c5dbe0;border:1px solid #315665}.tab.active{background:#ff9b45;color:#111820;border-color:#ff9b45}.tab-panel{display:none}.tab-panel.active{display:block}.tab-panel[hidden]{display:none}
 .icon-actions{display:flex;align-items:center;gap:7px;white-space:nowrap}.icon-action{width:36px;height:36px;padding:0!important;border:1px solid #315665!important;border-radius:9px!important;background:#102630!important;color:#dffaff!important;box-shadow:none!important;font-size:18px;line-height:1}.icon-action.contract{color:#8de4a8!important}.icon-action.compare{color:#72deef!important}.contracted-label{display:inline-flex;align-items:center;gap:5px;color:#8de4a8;font-size:12px;font-weight:700}.compare-dialog{width:min(900px,94vw);max-height:88vh;overflow:auto;background:#0b1820;color:#eaf7f8;border:1px solid #386675;border-radius:16px;padding:22px;box-shadow:0 24px 100px #000b}.compare-dialog::backdrop{background:#02070bbd}.compare-dialog textarea{width:100%;min-height:190px;background:#07131a;color:#eaf7f8;border:1px solid #315665;border-radius:9px;padding:12px}.comparison-table{width:100%;border-collapse:collapse;margin-top:14px}.comparison-table th,.comparison-table td{padding:9px;border-bottom:1px solid #294a56;text-align:left;font-size:12px}.comparison-status{font-size:12px;font-weight:700}.comparison-status.match{color:#8de4a8}.comparison-status.diff{color:#ffb45f}.comparison-status.missing{color:#ff927c}.compare-blocks{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:700px){.compare-blocks{grid-template-columns:1fr}}
 
@@ -140,13 +141,14 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </section>
 <section class="tab-panel" id="tab-admin-tools" role="tabpanel" hidden>
 <section class="panel"><h2>Administration</h2><div class="grid"><div class="stat">Open jobs<strong>{{ $adminMetrics['open_jobs'] }}</strong></div><div class="stat">Registered users<strong>{{ $adminMetrics['users'] }}</strong></div></div>
-<h2 style="margin-top:24px">Category buyback rates</h2>
+<details class="pricing-settings"><summary>Category buyback rates</summary><div class="pricing-settings-content">
 <p class="muted">Set the percentage of Jita value paid for each EVE item category. Items inherit their category rate; categories without a rule use the default rate from BUYBACK_PAYOUT_PERCENT (currently {{ number_format((float)config('buyback.payout_percent'),2) }}%).</p>
 <form method="post" action="{{ route('admin.appraisal-rates.store') }}">@csrf
 <div class="row"><label>EVE item category<select name="category_id" required><option value="">Select category</option>@foreach($eveCategories as $category)<option value="{{ $category->category_id }}">{{ $category->category_name }}</option>@endforeach</select></label><label>Buyback rate (%)<input name="payout_percent" type="number" min="0.01" max="100" step="0.01" placeholder="80.00" required></label></div><button>Save category rate</button></form>
 <table><thead><tr><th>Category</th><th>Buyback rate</th><th>Action</th></tr></thead><tbody>@forelse($payoutRules as $rule)<tr><td>{{ $rule->category_name }}</td><td>{{ number_format((float)$rule->payout_percent,2) }}%</td><td><form class="inline" method="post" action="{{ route('admin.appraisal-rates.destroy',$rule->category_id) }}">@csrf @method('DELETE')<button style="background:#263b46;color:#eaf7f8">Remove</button></form></td></tr>@empty<tr><td colspan="3">No category-specific rates. All items use the default rate.</td></tr>@endforelse</tbody></table>
 <p class="muted">CCP SDE category data must be imported once before categories appear in this list.</p>
-<h2 style="margin-top:24px">Standard mineral buyback settings</h2>
+</div></details>
+<details class="pricing-settings"><summary>Standard mineral buyback settings</summary><div class="pricing-settings-content">
 <p class="muted">Each mineral has its own buy percentage and cumulative Jita buy-order quantity. The calculator uses the price at that unit in the live Jita buy book. Save each mineral independently.</p>
 @php($standardMineralDepths = ['Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000, 'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000, 'Megacyte' => 500000, 'Morphite' => 45000])
 <div style="overflow-x:auto"><table><thead><tr><th>Mineral</th><th>Buy percentage</th><th>Jita unit depth</th><th>Save</th></tr></thead><tbody>
@@ -161,7 +163,8 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </tr>
 @endforeach
 </tbody></table></div>
-<h2 style="margin-top:24px">Moon-ore refined material settings</h2>
+</div></details>
+<details class="pricing-settings"><summary>Moon-ore refined material settings</summary><div class="pricing-settings-content">
 <p class="muted">Every material found in the SDE refining recipes for moon ores appears here. Configure its buy percentage and cumulative Jita quantity independently. Defaults are 87% and 50,000 units until changed.</p>
 <div style="overflow-x:auto"><table><thead><tr><th>Refined material</th><th>Material group</th><th>Buy percentage</th><th>Jita unit depth</th><th>Save</th></tr></thead><tbody>
 @forelse($moonMineralTypes as $material)
@@ -176,7 +179,8 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </tr>
 @empty<tr><td colspan="5">No moon-ore refining materials found. Confirm the CCP SDE moon-ore groups and reprocessing recipes are imported.</td></tr>@endforelse
 </tbody></table></div>
-<h2 style="margin-top:24px">Compressed ice variant buyback settings</h2>
+</div></details>
+<details class="pricing-settings"><summary>Compressed ice buyback rates</summary><div class="pricing-settings-content">
 <p class="muted">Each compressed ice type has its own percentage of its live Jita buy price. Types are grouped by their SDE variant bonus; White Glaze and Pristine White Glaze use the refined-output settings below instead.</p>
 @php($iceVariantGroups = $iceTypes->groupBy(function ($ice) { $base = mb_strtolower(preg_replace('/^Compressed /i', '', $ice->type_name)); if (in_array($base, ['enriched clear icicle', 'smooth glacial mass', 'thick blue ice', 'pristine white glaze'], true)) return 'Enriched faction variants (+15% isotope yield)'; if (in_array($base, ['clear icicle', 'white glaze', 'blue ice', 'glacial mass'], true)) return 'Standard faction ice'; return 'Standard nullsec ice'; }))
 @forelse($iceVariantGroups as $variantLabel => $variantIceTypes)
@@ -196,7 +200,8 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @empty
 <p class="muted">No compressed ice types found in the imported SDE Ice group. Re-import the current CCP SDE types and taxonomy.</p>
 @endforelse
-<h2 style="margin-top:24px">White Glaze and Pristine White Glaze refined-output settings</h2>
+</div></details>
+<details class="pricing-settings"><summary>White Glaze / Pristine White Glaze refined-output settings</summary><div class="pricing-settings-content">
 <p class="muted">The refined Nitrogen Isotopes, Liquid Ozone, and Strontium Clathrates are valued from live Jita buy prices at their individual percentages. Heavy Water uses the manual ISK-per-unit value below; leave it at 0 to use 10% of its live Jita buy price until you enter a manual value.</p>
 <form method="post" action="{{ route('admin.ice-pricing.store') }}">@csrf<input type="hidden" name="save_refined_settings" value="1">
 <div class="row">
@@ -205,6 +210,23 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <label>Strontium Clathrates buy percentage (%)<input name="strontium_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $icePricingSettings->get('ice_refined_strontium_percent', 100) }}" required></label>
 <label>Heavy Water value (ISK per unit)<input name="heavy_water_unit_price" type="number" min="0" max="1000000000" step="0.01" value="{{ $icePricingSettings->get('ice_heavy_water_unit_price', 0) }}" required></label>
 </div><button type="submit">Save refined ice settings</button></form>
+</div></details>
+<details class="pricing-settings"><summary>Gas buyback settings</summary><div class="pricing-settings-content">
+<p class="muted">All gas is priced from the equivalent compressed gas type's live Jita buy orders. Uncompressed gas uses the uncompressed percentage; compressed gas uses the compressed percentage. Both use the same cumulative Jita buy-order unit depth below.</p>
+<form method="post" action="{{ route('admin.gas-pricing.store') }}">@csrf
+<div class="row">
+<label>Uncompressed gas buyback (%)<input name="uncompressed_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $gasPricingSettings->get('gas_uncompressed_percent', 85) }}" required></label>
+<label>Compressed gas buyback (%)<input name="compressed_percent" type="number" min="0.01" max="100" step="0.01" value="{{ $gasPricingSettings->get('gas_compressed_percent', 60) }}" required></label>
+<label>Compressed gas Jita buy-order depth (units)<input name="price_depth" type="number" min="1" max="2000000000" step="1" value="{{ $gasPricingSettings->get('gas_buy_depth', 50000) }}" required></label>
+</div>
+<button type="submit">Save gas pricing settings</button>
+</form>
+@if($compressedGasTypes->isNotEmpty())
+<p class="muted" style="margin-top:12px">Compressed gas types included in the reference-price lookup: {{ $compressedGasTypes->count() }}. Each uncompressed type is matched to its exact “Compressed [name]” counterpart.</p>
+@else
+<p class="muted" style="margin-top:12px">No compressed gas types found. Confirm the current CCP SDE types and groups have been imported.</p>
+@endif
+</div></details>
 </section>
 </section>
 <section class="tab-panel" id="tab-ore-refining" role="tabpanel" hidden>
