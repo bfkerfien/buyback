@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppraisalController;
 use App\Http\Controllers\AppraisalComparisonController;
 use App\Http\Controllers\AppraisalVisibilityController;
+use App\Http\Controllers\AdminAppraisalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EveSsoController;
 use App\Http\Controllers\OperationsController;
@@ -30,6 +31,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/link-character/eve', [EveSsoController::class, 'linkCharacter'])->name('login.eve.link');
     Route::delete('/appraisals/{quote}', [AppraisalVisibilityController::class, 'destroy'])->whereNumber('quote')->name('appraisals.destroy');
     Route::delete('/appraisals/{quote}/hide', [AppraisalVisibilityController::class, 'hide'])->whereNumber('quote')->name('appraisals.hide');
+    Route::post('/admin/appraisals/purge', [AdminAppraisalController::class, 'purge'])->middleware('admin')->name('admin.appraisals.purge');
     Route::post('/admin/appraisal-comparison', [AppraisalComparisonController::class, 'compare'])->middleware('admin')->name('admin.appraisal-comparison');
     Route::post('/admin/holo-comparison', [AppraisalComparisonController::class, 'compareHolo'])->middleware('admin')->name('admin.holo-comparison');
     Route::post('/admin/appraisals/{quote}/contract', [AppraisalVisibilityController::class, 'markContracted'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.contract');
