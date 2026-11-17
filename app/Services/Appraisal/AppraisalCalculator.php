@@ -211,6 +211,7 @@ final class AppraisalCalculator
                     $unpricedTypes[] = $item['name']
                         . ' (insufficient live Jita buy volume at configured '
                         . number_format($depth) . '-unit quantity)';
+                    $unpricedItemReasons[$item['name']] = 'No current Jita buy price at the configured depth.';
                     continue;
                 }
 
