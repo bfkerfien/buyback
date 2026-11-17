@@ -98,6 +98,7 @@ class AppraisalController extends Controller
                         'output_quantity' => $line['output_quantity'],
                         'conversion_ratio' => $line['conversion_ratio'],
                         'output_unit_price' => $line['output_unit_price'],
+                        'refined_materials' => $line['refined_materials'] ?? [],
                     ], JSON_THROW_ON_ERROR),
                     'created_at' => now(),
                     'updated_at' => now(),
