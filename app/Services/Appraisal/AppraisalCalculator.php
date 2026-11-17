@@ -113,8 +113,12 @@ final class AppraisalCalculator
                 : 'Compressed ' . $type->type_name;
             $compressedGasType = $compressedGasTypes->get(mb_strtolower($compressedGasName));
             $isGas = $compressedGasType !== null;
-            $isSpecialWhiteGlaze = $isIce && in_array(mb_strtolower($baseTypeName), ['white glaze', 'pristine white glaze'], true);
-            $isHeavyWater = mb_strtolower($type->type_name) === 'heavy water';
+            $isIceProduct = in_array(mb_strtolower($type->type_name), [
+                'nitrogen isotopes',
+                'heavy water',
+                'strontium clathrates',
+                'liquid ozone',
+            ], true);
 
             // Every gas type is valued against the live Jita buy book for its
             // compressed counterpart. Only the configured payout percentage differs
@@ -138,112 +142,68 @@ final class AppraisalCalculator
                     $isCompressedGas ? 60 : 85
                 );
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
-                $valuationMode = 'gas_market';
-            // White Glaze and Pristine White Glaze use SDE ice products. Their
-            // market-priced outputs have independent rates; Heavy Water uses an
-            // admin-entered ISK/unit value (10% of Jita buy until configured).
-            } elseif ($isSpecialWhiteGlaze) {
-                $recipeTypeId = (int) $oreRecipeTypeIds->get((int) $type->type_id, (int) $type->type_id);
-                $recipe = $oreMaterials->get($recipeTypeId, collect());
-                $baseType = $baseOreTypes->get(mb_strtolower($baseTypeName));
-                $portionSize = max(1, (int) ($baseType?->portion_size ?? $type->portion_size ?? 1));
-                $batches = intdiv($pricingQuantity, $portionSize);
-                if ($recipe->isEmpty() || $batches < 1) {
-                    $unresolvedTypes[] = $item['name'] . ' (missing SDE ice refining recipe or incomplete batch quantity)';
+                $valuati            // Compressed ice and the four ice products are independently priced
+            // from their own live Jita buy books, with per-type payout and depth settings.
+            } elseif ($isIce || $isIceProduct) {
+                $typeId = (int) $type->type_id;
+                $depth = max(1, (int) $icePricingSettings->get(
+                    'ice_buy_depth_' . $typeId,
+                    1000
+                ));
+
+                $marketPrice = $this->liveJitaOrderPrice(
+                    $typeId,
+                    $regionId,
+                    $depth,
+                    true
+                );
+
+                if ($marketPrice === null) {
+                    $unpricedTypes[] = $item['name']
+                        . ' (insufficient Jita buy volume at configured '
+                        . number_format($depth) . '-unit depth)';
                     continue;
                 }
 
-                $refinedLineValue = 0.0;
-                foreach ($recipe as $material) {
-                    $output = $mineralTypes->get($material->material_type_id);
-                    if (!$output) {
-                        $unresolvedTypes[] = $item['name'] . ' (missing ice product type ID ' . $material->material_type_id . ')';
-                        continue 2;
-                    }
-                    $outputName = mb_strtolower($output->type_name);
-                    $yieldedQuantity = (int) $material->quantity * $batches;
-                    if ($outputName === 'heavy water') {
-                        $manualUnitPrice = (float) $icePricingSettings->get('ice_heavy_water_unit_price', 0);
-                        if ($manualUnitPrice > 0) {
-                            $unitOutputPrice = $manualUnitPrice;
-                            $priceSource = 'admin-configured-heavy-water-unit-value';
-                        } else {
-                            $market = $this->liveJitaOrderPrice((int) $output->type_id, $regionId, 1, true);
-                            if ($market === null) {
-                                $unpricedTypes[] = 'Heavy Water (refined output for ' . $item['name'] . ': no Jita buy price and no manual unit value configured)';
-                                continue 2;
-                            }
-                            $unitOutputPrice = $market['price'] * 0.10;
-                            $priceSource = 'live-jita-buy-10-percent-default';
-                        }
-                        $buyPercent = null;
-                    } else {
-                        $settingKey = match (true) {
-                            $outputName === 'nitrogen isotopes' => 'ice_refined_nitrogen_percent',
-                            $outputName === 'liquid ozone' => 'ice_refined_ozone_percent',
-                            str_starts_with($outputName, 'strontium') => 'ice_refined_strontium_percent',
-                            default => null,
-                        };
-                        if ($settingKey === null) {
-                            $unresolvedTypes[] = $item['name'] . ' (unexpected ice refining output: ' . $output->type_name . ')';
-                            continue 2;
-                        }
-                        $buyPercent = (float) $icePricingSettings->get($settingKey, 100);
-                        $market = $this->liveJitaOrderPrice((int) $output->type_id, $regionId, 1, true);
-                        if ($market === null) {
-                            $unpricedTypes[] = $output->type_name . ' (refined output for ' . $item['name'] . ': no current Jita buy price)';
-                            continue 2;
-                        }
-                        $unitOutputPrice = $market['price'] * $buyPercent / 100;
-                        $priceSource = 'live-jita-buy';
-                    }
-                    $grossValue = round($yieldedQuantity * $unitOutputPrice, 2);
-                    $refinedLineValue += $grossValue;
-                    $refinedMineralDetails[] = [
-                        'type_id' => (int) $output->type_id,
-                        'name' => $output->type_name,
-                        'quantity' => $yieldedQuantity,
-                        'unit_price' => $unitOutputPrice,
-                        'buy_percent' => $buyPercent,
-                        'price_source' => $priceSource,
-                        'gross_value' => $grossValue,
-                        'value' => $grossValue,
-                    ];
-                }
-                $refinedLineValue = round($refinedLineValue, 2);
-                $outputQuantity = null;
-                $outputName = 'refined ice products';
-                $valuationMode = 'ice_reprocessed';
-                $unitPrice = $refinedLineValue / $pricingQuantity;
-                $price = (object) ['source' => 'live-esi-ice-products-with-configured-heavy-water-value', 'observed_at' => now()];
-                $lineValue = $refinedLineValue;
-                $customPayoutPercent = 100.0;
-                $customRateSource = 'ice_refined_outputs';
-            } elseif ($isIce) {
-                // Other ice types use their own live Jita buy price and individual rate.
-                $marketPrice = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 50000, true);
-                if ($marketPrice === null) {
-                    $unpricedTypes[] = $item['name'] . ' (no current Jita buy price at 50,000-unit depth)';
-                    continue;
-                }
                 $unitPrice = $marketPrice['price'];
-                $price = (object) ['source' => 'live-esi-jita-50000-unit-depth', 'observed_at' => $marketPrice['observed_at']];
+                $price = (object) [
+                    'source' => 'live-esi-jita-' . $depth . '-unit-depth',
+                    'observed_at' => $marketPrice['observed_at'],
+                ];
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
-                $customPayoutPercent = (float) $icePricingSettings->get('ice_buy_percent_' . (int) $type->type_id, 87);
-                $customRateSource = 'individual_ice';
-                $valuationMode = 'ice_market';
-            } elseif ($isHeavyWater) {
-                // Heavy Water is discounted because of its hauling volume.
-                $marketPrice = $this->liveJitaOrderPrice((int) $type->type_id, $regionId, 50000, true);
-                if ($marketPrice === null) {
-                    $unpricedTypes[] = 'Heavy Water (no current Jita buy price at 50,000-unit depth)';
-                    continue;
+
+                if ($isIce) {
+                    $customPayoutPercent = (float) $icePricingSettings->get(
+                        'ice_buy_percent_' . $typeId,
+                        87
+                    );
+                    $customRateSource = 'individual_ice';
+                    $valuationMode = 'ice_market';
+                } else {
+                    $defaultProductPercent = mb_strtolower($type->type_name) === 'heavy water'
+                        ? 10
+                        : 100;
+
+                    $legacyPercentKey = match (mb_strtolower($type->type_name)) {
+                        'nitrogen isotopes' => 'ice_refined_nitrogen_percent',
+                        'liquid ozone' => 'ice_refined_ozone_percent',
+                        'strontium clathrates' => 'ice_refined_strontium_percent',
+                        default => null,
+                    };
+
+                    $legacyPercent = $legacyPercentKey !== null
+                        ? (float) $icePricingSettings->get($legacyPercentKey, $defaultProductPercent)
+                        : $defaultProductPercent;
+
+                    $customPayoutPercent = (float) $icePricingSettings->get(
+                        'ice_buy_percent_' . $typeId,
+                        $legacyPercent
+                    );
+
+                    $customRateSource = 'individual_ice_product';
+                    $valuationMode = 'ice_product_market';
                 }
-                $unitPrice = $marketPrice['price'];
-                $price = (object) ['source' => 'live-esi-jita-50000-unit-depth', 'observed_at' => $marketPrice['observed_at']];
-                $lineValue = round($unitPrice * $pricingQuantity, 2);
-                $customPayoutPercent = 10.0;
-                $customRateSource = 'heavy_water_fixed_10_percent';
+ter_fixed_10_percent';
             } elseif ((int) $type->category_id === 25) {
                 $recipeTypeId = (int) $oreRecipeTypeIds->get((int) $type->type_id, (int) $type->type_id);
                 $recipe = $oreMaterials->get($recipeTypeId, collect());
