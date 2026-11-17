@@ -9,7 +9,7 @@ use Throwable;
 
 class RefreshJitaPrices extends Command
 {
-    protected $signature = 'buyback:refresh-jita-prices {type_ids?* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4} {--pi : Refresh every input and output type used by imported PI schematics}';
+    protected $signature = 'buyback:refresh-jita-prices {type_ids?* : Optional EVE type IDs when refreshing selected items} {--all : Refresh every item with orders at Jita IV - Moon 4} {--pi : Refresh every input and output type used by imported PI schematics} {--fast : Refresh compressed ore, ice, gas, minerals, and all PI recipe items} {--ships : Refresh all published ship hulls}';
     protected $description = 'Fetch Jita IV - Moon 4 market order depth and prices from EVE ESI.';
 
     public function handle(): int
@@ -20,6 +20,26 @@ class RefreshJitaPrices extends Command
         }
 
         $typeIds = array_values(array_unique(array_filter(array_map('intval', $this->argument('type_ids')), fn (int $id) => $id > 0)));
+
+        $modeCount = (int) $this->option('all') + (int) $this->option('pi') + (int) $this->option('fast') + (int) $this->option('ships');
+        if ($modeCount > 1 || ($typeIds && $modeCount > 0)) {
+            $this->error('Choose one refresh mode or provide explicit type IDs.');
+            return self::FAILURE;
+        }
+
+        if ($this->option('fast')) {
+            return $this->refreshTypeIds($this->fastRefreshTypeIds(), '15-minute market set');
+        }
+
+        if ($this->option('ships')) {
+            $shipIds = DB::table('eve_item_types as t')
+                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+                ->where('t.published', true)
+                ->where('g.category_name', 'Ship')
+                ->orderBy('t.type_id')
+                ->pluck('t.type_id')->map(fn ($id) => (int) $id)->all();
+            return $this->refreshTypeIds($shipIds, '2-hour ship hull set');
+        }
         if ($this->option('pi')) {
             if ($this->option('all') || $typeIds) {
                 $this->error('Use --pi by itself, without --all or explicit type IDs.');
@@ -48,24 +68,81 @@ class RefreshJitaPrices extends Command
             return self::FAILURE;
         }
 
+        return $this->refreshTypeIds($typeIds, 'explicit type list');
+    }
+
+    private function fastRefreshTypeIds(): array
+    {
+        $compressedOreIds = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->whereIn('g.category_name', ['Asteroid', 'Moon Materials'])
+            ->where('t.type_name', 'like', 'Compressed %')
+            ->pluck('t.type_id')->all();
+
+        $iceTypeIds = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->whereIn('g.group_name', ['Ice', 'Compressed Ice'])
+            ->pluck('t.type_id')->all();
+        $iceProductIds = $iceTypeIds
+            ? DB::table('eve_type_materials')->whereIn('type_id', $iceTypeIds)->pluck('material_type_id')->all()
+            : [];
+
+        $gasTypeIds = DB::table('eve_item_types as t')
+            ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->where(function ($query) {
+                $query->where('g.group_name', 'Compressed Gas')
+                    ->orWhere('t.type_name', 'like', '%Mykoserocin')
+                    ->orWhere('t.type_name', 'like', '%Cytoserocin');
+            })
+            ->whereNotIn('t.type_name', ['Chartreuse Cytoserocin', 'Gamboge Cytoserocin'])
+            ->pluck('t.type_id')->all();
+
+        $mineralIds = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->where('g.group_name', 'Mineral')
+            ->pluck('t.type_id')->all();
+
+        $piIds = array_merge(
+            DB::table('eve_planet_schematics')->pluck('product_type_id')->all(),
+            DB::table('eve_planet_schematic_inputs')->pluck('type_id')->all()
+        );
+
+        return array_values(array_unique(array_filter(array_map('intval', array_merge(
+            $compressedOreIds, $iceTypeIds, $iceProductIds, $gasTypeIds, $mineralIds, $piIds
+        )), fn (int $id) => $id > 0)));
+    }
+
+    private function refreshTypeIds(array $typeIds, string $label): int
+    {
+        $typeIds = array_values(array_unique(array_filter(array_map('intval', $typeIds), fn (int $id) => $id > 0)));
+        if (!$typeIds) {
+            $this->error('No item types found for ' . $label . '. Check the imported EVE SDE and PI schematics.');
+            return self::FAILURE;
+        }
         $saved = 0;
+        $failed = 0;
         foreach ($typeIds as $typeId) {
             try {
                 $orders = $this->fetchTypeOrders($typeId);
                 if (!$orders) {
-                    $this->warn("Type {$typeId}: no Jita IV - Moon 4 orders.");
+                    $this->warn('Type ' . $typeId . ': no Jita IV - Moon 4 orders.');
                     continue;
                 }
-                $this->storeOrderBook($orders);
+                // These scheduled refreshes only need current best-price snapshots.
+                // Do not append the full order book every 15 minutes / 2 hours.
                 $this->storeBestPriceSnapshot($typeId, $orders);
                 $saved++;
-                $this->line("Type {$typeId}: stored ".count($orders)." Jita orders.");
             } catch (Throwable $exception) {
-                $this->warn("Failed to refresh type {$typeId}: {$exception->getMessage()}");
+                $failed++;
+                $this->warn('Failed to refresh type ' . $typeId . ': ' . $exception->getMessage());
             }
         }
-        $this->info("Saved order-book depth for {$saved} of ".count($typeIds)." requested types.");
-        return $saved === count($typeIds) ? self::SUCCESS : self::FAILURE;
+        $this->info($label . ': saved prices for ' . $saved . ' of ' . count($typeIds) . ' types; ' . $failed . ' failed. Order-book history was skipped.');
+        return $failed === 0 ? self::SUCCESS : self::FAILURE;
     }
 
     private function refreshAll(): int
