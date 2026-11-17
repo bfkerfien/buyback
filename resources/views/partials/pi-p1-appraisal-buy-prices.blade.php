@@ -1,9 +1,9 @@
 <details class="panel p1-appraisal-buy-prices"><summary style="cursor:pointer;color:#62d9e9;font-weight:700">Individual {{ $tier }} appraisal buy prices and saved rules</summary><div style="padding-top:12px">
 <h2>Individual {{ $tier }} appraisal buy prices</h2>
-<p class="muted">Each {{ $tier }} commodity appears once. The recommended percentage is the lowest target calculated across every P2 recipe that uses that input. Press Set to use that percentage as the individual appraisal payout rate for this commodity, replacing the shared PI category rate. The setting is saved until changed.</p>
+<p class="muted">Each {{ $tier }} commodity appears once. The recommended percentage is the lowest target calculated across every {{ $nextTier }} recipe that uses that input. Press Set to use that percentage as the individual appraisal payout rate for this commodity, replacing the shared PI category rate. The setting is saved until changed.</p>
 @if(session('status'))<div class="result" style="margin:10px 0">{{ session('status') }}</div>@endif
 @if($tierBuyTargets->isEmpty())
-<div class="empty">No {{ $tier }} buy targets are available yet. Check that {{ $tier }} Jita prices and all {{ $tier }} → P2 recipe prices are loaded.</div>
+<div class="empty">No {{ $tier }} buy targets are available yet. Check that {{ $tier }} Jita prices and all {{ $tier }} → {{ $nextTier }} recipe prices are loaded.</div>
 @else
 <div style="overflow-x:auto">
 <table style="width:100%;border-collapse:collapse;min-width:650px">
