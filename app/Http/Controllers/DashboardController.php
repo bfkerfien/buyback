@@ -43,17 +43,20 @@ class DashboardController extends Controller
                 ])
             : collect();
 
-        // Contracts are shown for the account's linked character named exactly
-        // "My Eve Online". This keeps the board tied to a verified EVE SSO identity.
+        // Use the EVE character that most recently authenticated into this
+        // Buyback account (for example, DivineReign DivineSpirit). Its contracts
+        // addressed to My Eve Online are the customer's buyback submissions.
         $contractCharacter = $user->characters()
-            ->whereRaw('LOWER(name) = ?', ['my eve online'])
+            ->orderByDesc('last_authenticated_at')
             ->first();
         $myEveContracts = collect();
-        $contractBoardStatus = 'missing_character';
-        $contractBoardMessage = 'Link the EVE character named My Eve Online to this account to display its latest contracts.';
+        $contractBoardStatus = $contractCharacter ? 'loading' : 'missing_character';
+        $contractBoardMessage = $contractCharacter
+            ? null
+            : 'Link your EVE character to this Buyback account to display contracts issued to My Eve Online.';
 
         if ($contractCharacter) {
-            $contractResult = app(CharacterContracts::class)->latest($contractCharacter, 10);
+            $contractResult = app(CharacterContracts::class)->forRecipient($contractCharacter, 'My Eve Online', 10);
             $myEveContracts = collect($contractResult['contracts']);
             $contractBoardStatus = $contractResult['status'];
             $contractBoardMessage = $contractResult['message'];
