@@ -81,6 +81,70 @@ class PayoutRuleController extends Controller
         return back()->with('status', $material->type_name . ' buy percentage and Jita depth saved.');
     }
 
+    public function storeIcePricing(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        if ($request->boolean('save_refined_settings')) {
+            $data = $request->validate([
+                'nitrogen_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
+                'ozone_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
+                'strontium_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
+                'heavy_water_unit_price' => ['required', 'numeric', 'min:0', 'max:1000000000'],
+            ]);
+            $settings = [
+                'ice_refined_nitrogen_percent' => (string) $data['nitrogen_percent'],
+                'ice_refined_ozone_percent' => (string) $data['ozone_percent'],
+                'ice_refined_strontium_percent' => (string) $data['strontium_percent'],
+                'ice_heavy_water_unit_price' => (string) $data['heavy_water_unit_price'],
+            ];
+            foreach ($settings as $key => $value) {
+                DB::table('buyback_system_status')->updateOrInsert(['status_key' => $key], ['status_value' => $value]);
+            }
+            DB::table('audit_logs')->insert([
+                'user_id' => $request->user()->id,
+                'action' => 'ice_refined_pricing.saved',
+                'subject_type' => 'ice_refined_outputs',
+                'subject_id' => null,
+                'details' => json_encode($data),
+                'ip_address' => $request->ip(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            return back()->with('status', 'White Glaze and Pristine White Glaze refined-output settings saved.');
+        }
+
+        $data = $request->validate([
+            'type_id' => ['required', 'integer', 'min:1'],
+            'buy_percent' => ['required', 'numeric', 'min:0.01', 'max:100'],
+        ]);
+        $ice = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.type_id', $data['type_id'])
+            ->where('t.published', true)
+            ->where('g.group_name', 'Ice')
+            ->where('t.type_name', 'like', 'Compressed %')
+            ->first(['t.type_id', 't.type_name']);
+        if (!$ice) {
+            throw ValidationException::withMessages(['type_id' => ['Select a published compressed ice type from the Ice group.']]);
+        }
+        DB::table('buyback_system_status')->updateOrInsert(
+            ['status_key' => 'ice_buy_percent_' . $ice->type_id],
+            ['status_value' => (string) $data['buy_percent']]
+        );
+        DB::table('audit_logs')->insert([
+            'user_id' => $request->user()->id,
+            'action' => 'ice_buyback_rate.saved',
+            'subject_type' => 'eve_ice_type',
+            'subject_id' => $ice->type_id,
+            'details' => json_encode(['ice' => $ice->type_name, 'buy_percent' => (float) $data['buy_percent']]),
+            'ip_address' => $request->ip(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        return back()->with('status', $ice->type_name . ' buyback rate saved.');
+    }
+
     public function destroy(Request $request, int $categoryId): RedirectResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
