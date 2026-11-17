@@ -144,22 +144,17 @@ final class AppraisalCalculator
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
                 $valuationMode = 'gas_market';
-            } elseif ($isIce || $isIceProduct) {
-                // Use the configured cumulative Jita buy-order quantity for each
-                // compressed ice type and ice product. The marginal price at that
-                // quantity is the actual appraisal price; do not substitute a
-                // cached best-price snapshot or a hard-coded 50,000-unit depth.
+            } elseif ($isIceProduct) {
+                // Refined ice outputs (isotopes, Heavy Water, Liquid Ozone and
+                // Strontium Clathrates) remain directly valued from their own
+                // Jita buy orders. Regional ice ores themselves are handled by
+                // the shared SDE reprocessing path below, like asteroid and moon ore.
                 $typeId = (int) $type->type_id;
                 $depth = max(1, (int) $icePricingSettings->get(
                     'ice_buy_depth_' . $typeId,
                     1000
                 ));
-                $marketPrice = $this->liveJitaOrderPrice(
-                    $typeId,
-                    $regionId,
-                    $depth,
-                    true
-                );
+                $marketPrice = $this->liveJitaOrderPrice($typeId, $regionId, $depth, true);
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
@@ -175,36 +170,27 @@ final class AppraisalCalculator
                 ];
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
 
-                if ($isIce) {
-                    $customPayoutPercent = (float) $icePricingSettings->get(
-                        'ice_buy_percent_' . $typeId,
-                        87
-                    );
-                    $customRateSource = 'individual_ice';
-                    $valuationMode = 'ice_market';
-                } else {
-                    $defaultProductPercent = mb_strtolower($type->type_name) === 'heavy water'
-                        ? 10
-                        : 100;
+                $defaultProductPercent = mb_strtolower($type->type_name) === 'heavy water'
+                    ? 10
+                    : 100;
 
-                    $legacyPercentKey = match (mb_strtolower($type->type_name)) {
-                        'nitrogen isotopes' => 'ice_refined_nitrogen_percent',
-                        'liquid ozone' => 'ice_refined_ozone_percent',
-                        'strontium clathrates' => 'ice_refined_strontium_percent',
-                        default => null,
-                    };
+                $legacyPercentKey = match (mb_strtolower($type->type_name)) {
+                    'nitrogen isotopes' => 'ice_refined_nitrogen_percent',
+                    'liquid ozone' => 'ice_refined_ozone_percent',
+                    'strontium clathrates' => 'ice_refined_strontium_percent',
+                    default => null,
+                };
 
-                    $legacyPercent = $legacyPercentKey !== null
-                        ? (float) $icePricingSettings->get($legacyPercentKey, $defaultProductPercent)
-                        : $defaultProductPercent;
+                $legacyPercent = $legacyPercentKey !== null
+                    ? (float) $icePricingSettings->get($legacyPercentKey, $defaultProductPercent)
+                    : $defaultProductPercent;
 
-                    $customPayoutPercent = (float) $icePricingSettings->get(
-                        'ice_buy_percent_' . $typeId,
-                        $legacyPercent
-                    );
-                    $customRateSource = 'individual_ice_product';
-                    $valuationMode = 'ice_product_market';
-                }
+                $customPayoutPercent = (float) $icePricingSettings->get(
+                    'ice_buy_percent_' . $typeId,
+                    $legacyPercent
+                );
+                $customRateSource = 'individual_ice_product';
+                $valuationMode = 'ice_product_market';
             } elseif ((int) $type->category_id === 25) {
                 $recipeTypeId = (int) $oreRecipeTypeIds->get((int) $type->type_id, (int) $type->type_id);
                 $recipe = $oreMaterials->get($recipeTypeId, collect());
@@ -314,7 +300,7 @@ final class AppraisalCalculator
             $hasSpecial87Percent = in_array(mb_strtolower($type->type_name), $special87PercentNames, true);
             $rate = $customPayoutPercent !== null
                 ? $customPayoutPercent
-                : ((int) $type->category_id === 25 && !$isIce
+                : ((int) $type->category_id === 25
                     ? 100.0
                     : ($fixedPayoutPercent !== null
                         ? $fixedPayoutPercent
