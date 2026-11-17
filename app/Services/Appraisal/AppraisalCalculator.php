@@ -146,7 +146,8 @@ final class AppraisalCalculator
                     ];
                 }
                 $refinedLineValue = round($refinedLineValue, 2);
-                $outputQuantity = array_sum(array_column($refinedMineralDetails, 'quantity'));
+                $outputQuantity = count($refinedMineralDetails) === 1 ? (int) $refinedMineralDetails[0]['quantity'] : null;
+                $outputName = count($refinedMineralDetails) === 1 ? $refinedMineralDetails[0]['name'] : 'refined minerals';
                 $valuationMode = 'reprocessed';
                 $unitPrice = $refinedLineValue / $pricingQuantity;
                 $price = (object) ['source' => 'sde-refined-outputs-50000-depth', 'observed_at' => now()];
@@ -251,7 +252,7 @@ final class AppraisalCalculator
                 'observed_at' => $price->observed_at,
                 'valuation_mode' => $valuationMode,
                 'output_type_id' => $valuationMode === 'reprocessed' ? (int) $pricingType->type_id : null,
-                'output_name' => $valuationMode === 'reprocessed' ? $pricingType->type_name : null,
+                'output_name' => $valuationMode === 'reprocessed' ? $outputName : null,
                 'output_quantity' => $outputQuantity,
                 'conversion_ratio' => $conversionRatio,
                 'output_unit_price' => $unitPrice,
