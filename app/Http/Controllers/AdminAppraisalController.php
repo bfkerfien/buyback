@@ -25,4 +25,25 @@ class AdminAppraisalController extends Controller
             ->route('dashboard', ['tab' => 'tab-admin-tools'])
             ->with('status', "Purged {$quoteCount} appraisals and {$itemCount} appraisal item lines. Runner jobs and finance ledger entries were retained.");
     }
+    public function purgeArchived(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()?->isAdmin(), 403);
+
+        $archived = DB::table('appraisal_quotes')->whereNotNull('archived_at');
+        $quoteCount = (clone $archived)->count();
+        $itemCount = DB::table('appraisal_quote_items')
+            ->whereIn('appraisal_quote_id', (clone $archived)->select('id'))
+            ->count();
+
+        DB::transaction(function () use ($archived): void {
+            // Only archived quotes are removed; active and expired non-archived quotes remain.
+            // Dependent item/hidden rows cascade and runner-job references are nulled.
+            $archived->delete();
+        });
+
+        return redirect()
+            ->route('dashboard', ['tab' => 'tab-admin-tools'])
+            ->with('status', "Purged {$quoteCount} archived appraisals and {$itemCount} appraisal item lines. All non-archived appraisals were retained.");
+    }
+
 }
