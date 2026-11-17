@@ -156,11 +156,17 @@ final class AppraisalCalculator
                 ];
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
                 $isCompressedGas = str_starts_with(mb_strtolower($type->type_name), 'compressed ');
+                $gasRateKey = $isCompressedGas
+                    ? 'gas_compressed_percent_' . (int) $type->type_id
+                    : 'gas_uncompressed_percent_' . (int) $type->type_id;
+                $globalGasRateKey = $isCompressedGas ? 'gas_compressed_percent' : 'gas_uncompressed_percent';
+                // Per-type overrides let admins tune individual raw gas prices
+                // against Holo without changing other gas types. The global rate
+                // remains the fallback for types without an individual override.
                 $customPayoutPercent = (float) $gasPricingSettings->get(
-                    $isCompressedGas ? 'gas_compressed_percent' : 'gas_uncompressed_percent',
-                    $isCompressedGas ? 60 : 85
+                    $gasRateKey,
+                    $gasPricingSettings->get($globalGasRateKey, $isCompressedGas ? 60 : 85)
                 );
-                $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
                 $valuationMode = 'gas_market';
             } elseif ($isIce && !$hasFactionIsotopeOutput) {
