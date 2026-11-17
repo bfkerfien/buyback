@@ -178,8 +178,24 @@ final class AppraisalCalculator
             $oreJitaBuyPrice = null;
             $effectiveRatePercent = null;
             if ((int) $type->category_id === 25 && $valuationMode === 'reprocessed') {
+                // Prefer the live Jita IV - Moon 4 best buy order. If the order-book
+                // snapshot is absent (or has no buy orders), fall back to the latest
+                // ESI Jita price snapshot maintained by the same market refresh job.
                 $oreMarket = $this->jitaBuyPrice((int) $type->type_id, $regionId, 1, false);
                 $oreJitaBuyPrice = $oreMarket['price'] ?? null;
+
+                if ($oreJitaBuyPrice === null) {
+                    $oreJitaBuyPrice = DB::table('market_price_snapshots')
+                        ->where('type_id', (int) $type->type_id)
+                        ->where('region_id', $regionId)
+                        ->where('source', 'esi-jita-4-4')
+                        ->whereNotNull('buy_price')
+                        ->where('buy_price', '>', 0)
+                        ->orderByDesc('observed_at')
+                        ->value('buy_price');
+
+                    $oreJitaBuyPrice = $oreJitaBuyPrice !== null ? (float) $oreJitaBuyPrice : null;
+                }
             }
 
             $effectiveCategoryId = $pricingType->category_id;
