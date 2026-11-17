@@ -37,8 +37,8 @@
     <a href="{{ route('ship-buyback.index') }}">Ship Buyback</a>
     @auth
         <a href="{{ route('dashboard') }}">Dashboard</a>
-        <a href="{{ route('pi-planner.index') }}">Planetary Industry</a>
         @if(auth()->user()->isAdmin())
+            <a href="{{ route('pi-planner.index') }}">Planetary Industry</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-ore-refining']) }}">Ore Refining</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-marketbaiters']) }}">Marketbaiters</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-admin']) }}">Admin</a>
