@@ -83,9 +83,10 @@ $stageRecipes = $recipes->filter(function ($recipe) use ($stage) {
 </article>
 @endforeach
 @endif
-@if($key === 'p1-p2')
-@include('partials.pi-p1-appraisal-buy-prices')
-@endif
+@php
+$tierLabel = ['p1-p2' => 'P1', 'p2-p3' => 'P2', 'p3-p4' => 'P3'][$key];
+@endphp
+@include('partials.pi-p1-appraisal-buy-prices', ['tier' => $tierLabel, 'tierBuyTargets' => $tierBuyTargets[$key]])
 </div></section>
 @endforeach
 </main>
