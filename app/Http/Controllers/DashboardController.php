@@ -14,6 +14,13 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $admin = $user->isAdmin();
+        $activeTab = $request->query('tab', 'tab-appraisals');
+        // The dashboard is tabbed client-side, but each request should fetch
+        // only the data required by the selected tab.
+        $loadAdminQueue = $admin && $activeTab === 'tab-admin';
+        $loadAdminTools = $admin && $activeTab === 'tab-admin-tools';
+        $loadMarketbaiters = $admin && $activeTab === 'tab-marketbaiters';
+        $loadHoloCatalog = $admin && $activeTab === 'tab-holo-compare';
         $characterIds = $user->characters()->pluck('id');
 
         $visibleQuotes = DB::table('appraisal_quotes')
@@ -80,13 +87,13 @@ class DashboardController extends Controller
             ->where('created_at', '<', $expiryCutoff)
             ->orderByDesc('created_at')->limit(100)->get();
 
-        $archivedQuotes = $admin
+        $archivedQuotes = $loadAdminQueue
             ? DB::table('appraisal_quotes')->whereNotNull('archived_at')->orderByDesc('archived_at')->limit(100)->get()
             : collect();
 
         // The first Admin tab shows every non-archived appraisal, regardless of age
         // or whether its owner hid it from their own dashboard.
-        $adminQuotes = $admin
+        $adminQuotes = $loadAdminQueue
             ? DB::table('appraisal_quotes')
                 ->leftJoin('users', 'users.id', '=', 'appraisal_quotes.created_by')
                 ->whereNull('appraisal_quotes.archived_at')
@@ -95,7 +102,7 @@ class DashboardController extends Controller
                 ->get()
             : collect();
 
-        $adminAppraisalItems = $admin && $adminQuotes->isNotEmpty()
+        $adminAppraisalItems = $loadAdminQueue && $adminQuotes->isNotEmpty()
             ? DB::table('appraisal_quote_items')
                 ->whereIn('appraisal_quote_id', $adminQuotes->pluck('id'))
                 ->orderBy('type_name')
@@ -107,26 +114,26 @@ class DashboardController extends Controller
                 ])->values())
             : collect();
 
-        $adminMetrics = $admin ? [
+        $adminMetrics = $loadAdminQueue ? [
             'open_jobs' => DB::table('runner_jobs')->where('status', 'open')->count(),
             'users' => DB::table('users')->count(),
         ] : [];
-        $priceRefreshStatus = $admin
+        $priceRefreshStatus = $loadAdminQueue
             ? DB::table('buyback_system_status')
                 ->whereIn('status_key', ['jita_full_refresh_at', 'jita_full_refresh_items'])
                 ->pluck('status_value', 'status_key')
             : collect();
-        $lastJitaPriceRefreshAt = $admin ? $priceRefreshStatus->get('jita_full_refresh_at') : null;
-        $lastJitaPriceRefreshCount = $admin ? (int) $priceRefreshStatus->get('jita_full_refresh_items', 0) : 0;
-        $catalogPublishedTypeCount = $admin ? DB::table('eve_item_types')->where('published', true)->count() : 0;
-        $payoutRules = $admin ? DB::table('appraisal_payout_rules')->whereNotIn('category_name', ['Asteroid', 'Material'])->orderBy('category_name')->get() : collect();
-        $eveCategories = $admin ? DB::table('eve_item_groups')->whereNotIn('category_name', ['Asteroid', 'Material'])->select('category_id', 'category_name')->distinct()->orderBy('category_name')->get() : collect();
-        $compressedOreTypes = $admin ? DB::table('eve_item_types as t')
+        $lastJitaPriceRefreshAt = $loadAdminQueue ? $priceRefreshStatus->get('jita_full_refresh_at') : null;
+        $lastJitaPriceRefreshCount = $loadAdminQueue ? (int) $priceRefreshStatus->get('jita_full_refresh_items', 0) : 0;
+        $catalogPublishedTypeCount = $loadAdminQueue ? DB::table('eve_item_types')->where('published', true)->count() : 0;
+        $payoutRules = $loadAdminTools ? DB::table('appraisal_payout_rules')->whereNotIn('category_name', ['Asteroid', 'Material'])->orderBy('category_name')->get() : collect();
+        $eveCategories = $loadAdminTools ? DB::table('eve_item_groups')->whereNotIn('category_name', ['Asteroid', 'Material'])->select('category_id', 'category_name')->distinct()->orderBy('category_name')->get() : collect();
+        $compressedOreTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
             ->where('t.type_name', 'like', 'Compressed %')
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
-        $oreTypes = $admin ? DB::table('eve_item_types as t')
+        $oreTypes = $loadMarketbaiters ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
@@ -136,7 +143,7 @@ class DashboardController extends Controller
             'Tritanium', 'Pyerite', 'Mexallon', 'Isogen',
             'Nocxium', 'Zydrine', 'Megacyte', 'Morphite',
         ];
-        $mineralTypes = $admin ? DB::table('eve_item_types as t')
+        $mineralTypes = $loadAdminTools ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('g.category_name', 'Material')
@@ -144,13 +151,13 @@ class DashboardController extends Controller
             ->whereIn('t.type_name', $standardMineralNames)
             ->orderByRaw("FIELD(t.type_name, 'Tritanium', 'Pyerite', 'Mexallon', 'Isogen', 'Nocxium', 'Zydrine', 'Megacyte', 'Morphite')")
             ->get(['t.type_id', 't.type_name']) : collect();
-        $mineralPricingSettings = $admin
+        $mineralPricingSettings = $loadAdminTools
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key')
             : collect();
         // Moon goo settings contain only the 20 published types in the
         // dedicated Moon Materials group. Do not infer moon materials from
         // every non-mineral output in a moon-ore recipe.
-        $moonMineralTypes = $admin ? DB::table('eve_item_types as material')
+        $moonMineralTypes = $loadAdminTools ? DB::table('eve_item_types as material')
             ->join('eve_item_groups as mg', 'mg.group_id', '=', 'material.group_id')
             ->where('material.published', true)
             ->where('mg.category_name', 'Material')
@@ -159,7 +166,7 @@ class DashboardController extends Controller
             ->get(['material.type_id', 'material.type_name', 'mg.group_name'])
             : collect();
 
-        $iceTypes = $admin ? DB::table('eve_item_types as t')
+        $iceTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('t.type_name', 'like', 'Compressed %')
@@ -176,7 +183,7 @@ class DashboardController extends Controller
             ->orderBy('t.type_name')
             ->get(['t.type_id', 't.type_name'])
             : collect();
-        $iceProductTypes = $admin ? DB::table('eve_item_types as t')
+        $iceProductTypes = $loadAdminTools ? DB::table('eve_item_types as t')
             ->where('t.published', true)
             ->whereIn('t.type_name', [
                 'Nitrogen Isotopes',
@@ -187,10 +194,10 @@ class DashboardController extends Controller
             ->orderBy('t.type_name')
             ->get(['t.type_id', 't.type_name'])
             : collect();
-        $icePricingSettings = $admin
+        $icePricingSettings = $loadAdminTools
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key')
             : collect();
-        $iceProductPrices = $admin
+        $iceProductPrices = $loadAdminTools
             ? DB::table('market_price_snapshots as p')
                 ->joinSub(
                     DB::table('market_price_snapshots')
@@ -204,14 +211,14 @@ class DashboardController extends Controller
                 ->get(['p.type_id', 'p.buy_price'])
                 ->keyBy('type_id')
             : collect();
-        $compressedGasTypes = $admin ? DB::table('eve_item_types as t')
+        $compressedGasTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('g.group_name', 'Compressed Gas')
             ->orderBy('t.type_name')
             ->get(['t.type_id', 't.type_name'])
             : collect();
-        $uncompressedGasTypes = $admin ? DB::table('eve_item_types as t')
+        $uncompressedGasTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('g.group_name', 'Harvestable Cloud')
@@ -222,12 +229,12 @@ class DashboardController extends Controller
 
         // PI test inventory is the complete set of published planetary commodities
         // appearing as either an input or output in the imported SDE schematics.
-        $piTypeIds = $admin
+        $piTypeIds = $loadHoloCatalog
             ? DB::table('eve_planet_schematics')->select('product_type_id as type_id')
                 ->union(DB::table('eve_planet_schematic_inputs')->select('type_id'))
                 ->pluck('type_id')->unique()->values()
             : collect();
-        $piMaterialTypes = $admin && $piTypeIds->isNotEmpty()
+        $piMaterialTypes = $loadHoloCatalog && $piTypeIds->isNotEmpty()
             ? DB::table('eve_item_types as t')
                 ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
                 ->where('t.published', true)
@@ -237,7 +244,7 @@ class DashboardController extends Controller
                 ->get(['t.type_id', 't.type_name'])
             : collect();
 
-        $gasPricingSettings = $admin
+        $gasPricingSettings = $loadAdminTools
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key')
             : collect();
 
