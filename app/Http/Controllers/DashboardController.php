@@ -211,10 +211,36 @@ class DashboardController extends Controller
             ->orderBy('t.type_name')
             ->get(['t.type_id', 't.type_name'])
             : collect();
+        $uncompressedGasTypes = $admin ? DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->where('g.group_name', 'Harvestable Cloud')
+            ->where('t.type_name', 'not like', 'Compressed %')
+            ->orderBy('t.type_name')
+            ->get(['t.type_id', 't.type_name'])
+            : collect();
+
+        // PI test inventory is the complete set of published planetary commodities
+        // appearing as either an input or output in the imported SDE schematics.
+        $piTypeIds = $admin
+            ? DB::table('eve_planet_schematics')->select('product_type_id as type_id')
+                ->union(DB::table('eve_planet_schematic_inputs')->select('type_id'))
+                ->pluck('type_id')->unique()->values()
+            : collect();
+        $piMaterialTypes = $admin && $piTypeIds->isNotEmpty()
+            ? DB::table('eve_item_types as t')
+                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+                ->where('t.published', true)
+                ->where('g.category_id', 43)
+                ->whereIn('t.type_id', $piTypeIds)
+                ->orderBy('t.type_name')
+                ->get(['t.type_id', 't.type_name'])
+            : collect();
+
         $gasPricingSettings = $admin
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key')
             : collect();
 
-        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'iceProductTypes', 'icePricingSettings', 'iceProductPrices', 'compressedGasTypes', 'gasPricingSettings'));
+        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'iceProductTypes', 'icePricingSettings', 'iceProductPrices', 'compressedGasTypes', 'uncompressedGasTypes', 'piMaterialTypes', 'gasPricingSettings'));
     }
 }
