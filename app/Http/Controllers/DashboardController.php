@@ -243,4 +243,75 @@ class DashboardController extends Controller
 
         return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'payoutRules', 'eveCategories', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'iceProductTypes', 'icePricingSettings', 'iceProductPrices', 'compressedGasTypes', 'uncompressedGasTypes', 'piMaterialTypes', 'gasPricingSettings'));
     }
+
+    /**
+     * Lightweight, dedicated Holo comparison page.
+     *
+     * Keep this out of DashboardController::index(): the full dashboard loads
+     * appraisal history, item rows, pricing rules and several unrelated SDE
+     * catalogs. The Holo tool needs only its test-inventory catalogs.
+     */
+    public function holoComparison(): View
+    {
+        $catalog = Cache::remember('buyback:holo-comparison:catalog:v1', now()->addHour(), function () {
+            $compressedOreTypes = DB::table('eve_item_types as t')
+                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+                ->where('t.published', true)
+                ->where('g.category_name', 'Asteroid')
+                ->where('t.type_name', 'like', 'Compressed %')
+                ->orderBy('t.type_name')
+                ->get(['t.type_id', 't.type_name']);
+
+            $iceTypes = DB::table('eve_item_types as t')
+                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+                ->where('t.published', true)
+                ->where('t.type_name', 'like', 'Compressed %')
+                ->where(function ($query) {
+                    $query->where('g.group_name', 'like', '%ice%')
+                        ->orWhere('g.category_name', 'like', '%ice%')
+                        ->orWhereIn('t.type_name', [
+                            'Compressed Clear Icicle', 'Compressed Glacial Mass', 'Compressed Blue Ice',
+                            'Compressed White Glaze', 'Compressed Enriched Clear Icicle',
+                            'Compressed Smooth Glacial Mass', 'Compressed Thick Blue Ice',
+                            'Compressed Pristine White Glaze',
+                        ]);
+                })
+                ->orderBy('t.type_name')
+                ->get(['t.type_id', 't.type_name']);
+
+            $compressedGasTypes = DB::table('eve_item_types as t')
+                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+                ->where('t.published', true)
+                ->where('g.group_name', 'Compressed Gas')
+                ->orderBy('t.type_name')
+                ->get(['t.type_id', 't.type_name']);
+
+            $uncompressedGasTypes = DB::table('eve_item_types as t')
+                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+                ->where('t.published', true)
+                ->where('g.group_name', 'Harvestable Cloud')
+                ->where('t.type_name', 'not like', 'Compressed %')
+                ->orderBy('t.type_name')
+                ->get(['t.type_id', 't.type_name']);
+
+            $piTypeIds = DB::table('eve_planet_schematics')
+                ->select('product_type_id as type_id')
+                ->union(DB::table('eve_planet_schematic_inputs')->select('type_id'))
+                ->pluck('type_id')->unique()->values();
+
+            $piMaterialTypes = $piTypeIds->isNotEmpty()
+                ? DB::table('eve_item_types as t')
+                    ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+                    ->where('t.published', true)
+                    ->where('g.category_id', 43)
+                    ->whereIn('t.type_id', $piTypeIds)
+                    ->orderBy('t.type_name')
+                    ->get(['t.type_id', 't.type_name'])
+                : collect();
+
+            return compact('compressedOreTypes', 'iceTypes', 'compressedGasTypes', 'uncompressedGasTypes', 'piMaterialTypes');
+        });
+
+        return view('holo-comparison', $catalog);
+    }
 }
