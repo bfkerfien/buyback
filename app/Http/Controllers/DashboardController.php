@@ -166,7 +166,7 @@ class DashboardController extends Controller
             ->get(['material.type_id', 'material.type_name', 'mg.group_name'])
             : collect();
 
-        $iceTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
+        $iceTypes = ($loadHoloCatalog || $loadAdminTools) ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('t.type_name', 'like', 'Compressed %')
@@ -211,7 +211,7 @@ class DashboardController extends Controller
                 ->get(['p.type_id', 'p.buy_price'])
                 ->keyBy('type_id')
             : collect();
-        $compressedGasTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
+        $compressedGasTypes = ($loadHoloCatalog || $loadAdminTools) ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('g.group_name', 'Compressed Gas')
