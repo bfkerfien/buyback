@@ -1,11 +1,11 @@
 <?php
 
-use App\Http\Middleware\RequireActiveUser;
-use App\Http\Middleware\RequireAdmin;
-use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Foundation\Application;
-use Illuminate\Foundation\Configuration\Exceptions;
-use Illuminate\Foundation\Configuration\Middleware;
+use App\\Http\\Middleware\\RequireActiveUser;
+use App\\Http\\Middleware\\RequireAdmin;
+use Illuminate\\Console\\Scheduling\\Schedule;
+use Illuminate\\Foundation\\Application;
+use Illuminate\\Foundation\\Configuration\\Exceptions;
+use Illuminate\\Foundation\\Configuration\\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        // This app authenticates through EVE SSO and has no generic "login" route.
+        // Send unauthenticated browser requests to the public EVE login endpoint.
+        $middleware->redirectGuestsTo(fn () => route('login.eve'));
         $middleware->alias([
             'active' => RequireActiveUser::class,
             'admin' => RequireAdmin::class,
