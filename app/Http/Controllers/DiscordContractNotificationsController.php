@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Throwable;
 
@@ -94,11 +95,11 @@ class DiscordContractNotificationsController extends Controller
 
         try {
             $webhook = Crypt::decryptString((string) $encryptedWebhook);
-            Http::asJson()->timeout(10)->post($webhook, [
+            Http::asJson()->withoutRedirecting()->timeout(10)->post($webhook, [
                 'content' => 'EveBuyback Discord test: notifications for personal contracts received by My Eve Online are connected.',
             ])->throw();
         } catch (Throwable $exception) {
-            report($exception);
+            Log::warning('Discord webhook test failed.', ['exception' => class_basename($exception)]);
             return back()->withErrors(['webhook_url' => 'Discord test notification failed. Check the webhook URL and try again.']);
         }
 
