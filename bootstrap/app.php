@@ -32,6 +32,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('buyback:refresh-jita-prices --ships')
             ->everyTwoHours()
             ->withoutOverlapping(110);
+
+        // Check only the linked personal character named My Eve Online for
+        // newly received personal contracts. This never queries corporation contracts.
+        $schedule->command('buyback:notify-incoming-contracts')
+            ->everyTwoMinutes()
+            ->withoutOverlapping(3);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
     })

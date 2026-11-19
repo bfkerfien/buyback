@@ -42,6 +42,12 @@ bash deploy.sh
 
 The script validates required production settings, checks the Traefik network, builds the PHP-FPM and Nginx images, starts MariaDB and Redis, generates an APP_KEY if missing, starts the services, applies migrations, and caches Laravel config and views. It does not delete volumes or reset the database.
 
+## Discord notifications for My Eve Online contracts
+
+The admin-only Discord Alerts page configures an incoming-contract webhook for the linked personal EVE character named exactly My Eve Online. Link that character to the Buyback account and authorize the ESI scope esi-contracts.read_character_contracts.v1. The scheduler checks the character contracts ESI endpoint every two minutes and notifies only for contracts assigned directly to that character. Corporation contract endpoints are not used. Existing contracts issued before the webhook was enabled are treated as baseline history and do not generate a burst of old notifications. The webhook URL is encrypted in the database; it is never written to Git or displayed after saving.
+
+Create a Discord channel incoming webhook, save its URL on the Discord Alerts page, and use Send test notification to verify delivery. Re-authorize My Eve Online through Link characters if the page reports that the contracts scope is missing.
+
 ## Load EVE item types and Jita prices
 
 Place the CCP SDE JSONL \`types.jsonl\` file at \`/opt/buyback/data/types.jsonl\` on the server. The \`data/\` directory is deliberately excluded from Git and Docker build context. Then run:

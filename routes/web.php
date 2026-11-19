@@ -5,6 +5,7 @@ use App\Http\Controllers\AppraisalComparisonController;
 use App\Http\Controllers\AppraisalVisibilityController;
 use App\Http\Controllers\AdminAppraisalController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DiscordContractNotificationsController;
 use App\Http\Controllers\EveSsoController;
 use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\OreValueController;
@@ -26,6 +27,9 @@ Route::get('/q/{token}', [AppraisalController::class, 'show'])->whereAlphaNumeri
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/admin/discord-contract-notifications', [DiscordContractNotificationsController::class, 'index'])->middleware('admin')->name('admin.discord-contract-notifications.index');
+    Route::post('/admin/discord-contract-notifications', [DiscordContractNotificationsController::class, 'save'])->middleware('admin')->name('admin.discord-contract-notifications.save');
+    Route::post('/admin/discord-contract-notifications/test', [DiscordContractNotificationsController::class, 'test'])->middleware('admin')->name('admin.discord-contract-notifications.test');
     Route::get('/admin/holo-comparison', [DashboardController::class, 'holoComparison'])->middleware('admin')->name('admin.holo-comparison.index');
     Route::get('/pi-planner', [PiPlannerController::class, 'index'])->middleware('admin')->name('pi-planner.index');
     Route::post('/pi-planner/p1-buy-rule', [PiPlannerController::class, 'setP1BuyRule'])->middleware('admin')->name('pi-planner.p1-buy-rule');

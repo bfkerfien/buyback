@@ -63,6 +63,7 @@
             <a href="{{ route('admin.holo-comparison.index') }}" @if(request()->routeIs('admin.holo-comparison.index')) aria-current="page" @endif>Holo Comparison</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-admin']) }}">Admin</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-admin-tools']) }}">Admin Tools</a>
+            <a href="{{ route('admin.discord-contract-notifications.index') }}" @if(request()->routeIs('admin.discord-contract-notifications.*')) aria-current="page" @endif>Discord Alerts</a>
         </nav>
     @endif
 @endauth
