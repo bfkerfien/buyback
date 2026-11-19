@@ -1,11 +1,11 @@
 <?php
 
-use App\\Http\\Middleware\\RequireActiveUser;
-use App\\Http\\Middleware\\RequireAdmin;
-use Illuminate\\Console\\Scheduling\\Schedule;
-use Illuminate\\Foundation\\Application;
-use Illuminate\\Foundation\\Configuration\\Exceptions;
-use Illuminate\\Foundation\\Configuration\\Middleware;
+use App\Http\Middleware\RequireActiveUser;
+use App\Http\Middleware\RequireAdmin;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Application;
+use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
