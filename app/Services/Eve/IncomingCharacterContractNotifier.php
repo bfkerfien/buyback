@@ -81,17 +81,11 @@ class IncomingCharacterContractNotifier
                 foreach ($response->json() ?? [] as $contract) {
                     $assigneeId = (int) ($contract['assignee_id'] ?? 0);
                     $issuerId = (int) ($contract['issuer_id'] ?? 0);
-                    $status = (string) ($contract['status'] ?? '');
-
                     // Personal character endpoint only; the contract must be
                     // assigned to My Eve Online, not issued by that character.
                     if ($assigneeId !== (int) $character->eve_character_id || $issuerId === (int) $character->eve_character_id) {
                         continue;
                     }
-                    if (!in_array($status, ['outstanding', 'in_progress'], true)) {
-                        continue;
-                    }
-
                     $incoming[] = $contract;
                 }
             }
@@ -233,6 +227,7 @@ class IncomingCharacterContractNotifier
             ['name' => 'Character', 'value' => $character->name, 'inline' => true],
             ['name' => 'Issuer', 'value' => mb_substr($issuerName, 0, 200), 'inline' => true],
             ['name' => 'Contract type', 'value' => ucfirst(str_replace('_', ' ', (string) ($contract['type'] ?? 'unknown'))), 'inline' => true],
+            ['name' => 'Status', 'value' => ucfirst(str_replace('_', ' ', (string) ($contract['status'] ?? 'unknown'))), 'inline' => true],
             ['name' => 'Contract ID', 'value' => (string) ($contract['contract_id'] ?? 'Unknown'), 'inline' => true],
             ['name' => 'Expires', 'value' => $this->formatDate($contract['date_expired'] ?? null), 'inline' => true],
             ['name' => 'Price', 'value' => $this->formatIsk($contract['price'] ?? 0), 'inline' => true],
