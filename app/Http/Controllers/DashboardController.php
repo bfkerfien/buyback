@@ -114,7 +114,7 @@ class DashboardController extends Controller
                 ])->values())
             : collect();
 
-        $adminMetrics = $loadAdminQueue ? [
+        $adminMetrics = ($loadAdminQueue || $loadAdminTools) ? [
             'open_jobs' => DB::table('runner_jobs')->where('status', 'open')->count(),
             'users' => DB::table('users')->count(),
         ] : [];
