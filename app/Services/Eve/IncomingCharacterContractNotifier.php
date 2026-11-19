@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -197,13 +198,16 @@ class IncomingCharacterContractNotifier
                         ]);
                     $notified++;
                 } catch (Throwable $exception) {
-                    report($exception);
+                    Log::warning('Discord contract webhook delivery failed.', [
+                        'contract_id' => $contractId,
+                        'exception' => class_basename($exception),
+                    ]);
                     DB::table('eve_contract_notification_logs')
                         ->where('eve_character_id', $character->id)
                         ->where('contract_id', $contractId)
                         ->update([
                             'notification_status' => 'failed',
-                            'last_error' => mb_substr($exception->getMessage(), 0, 4000),
+                            'last_error' => 'Discord delivery failed (' . class_basename($exception) . ').',
                             'updated_at' => now(),
                         ]);
                     $failed++;
@@ -249,7 +253,7 @@ class IncomingCharacterContractNotifier
             $description = 'A new personal EVE contract was assigned to My Eve Online.';
         }
 
-        Http::asJson()->timeout(10)->post($webhook, [
+        Http::asJson()->withoutRedirecting()->timeout(10)->post($webhook, [
             'embeds' => [[
                 'title' => 'New EVE Contract Received',
                 'description' => mb_substr($description, 0, 3500),
