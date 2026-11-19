@@ -22,8 +22,8 @@ return new class extends Migration {
             $table->text('last_error')->nullable();
             $table->timestamps();
 
-            $table->unique(['eve_character_id', 'contract_id']);
-            $table->index(['notification_status', 'date_issued']);
+            $table->unique(['eve_character_id', 'contract_id'], 'eve_contract_char_contract_unique');
+            $table->index(['notification_status', 'date_issued'], 'eve_contract_status_date_idx');
         });
     }
 
