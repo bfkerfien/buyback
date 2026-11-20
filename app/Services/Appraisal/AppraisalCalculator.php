@@ -3,11 +3,16 @@
 namespace App\Services\Appraisal;
 
 use App\Services\Eve\ExcludedMissionOre;
+use App\Services\JitaMarketPriceRefresher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 final class AppraisalCalculator
 {
+    public function __construct(private readonly JitaMarketPriceRefresher $priceRefresher)
+    {
+    }
+
     public function calculate(array $parsedItems, ?string $requiredCategoryName = null, ?float $fixedPayoutPercent = null, bool $ignoreNonMatching = false): array
     {
         // Mission-only ores and special variants are never accepted for buyback.
@@ -75,6 +80,12 @@ final class AppraisalCalculator
         $side = config('buyback.price_side', 'buy');
         $defaultRate = (float) config('buyback.payout_percent', 87);
         $regionId = (string) config('buyback.region_id', '10000002');
+
+        $appraisedTypeIds = $types->filter(fn ($type) => $requiredCategoryName === null
+                || mb_strtolower((string) $type->category_name) === mb_strtolower($requiredCategoryName))
+            ->pluck('type_id');
+        $this->priceRefresher->ensureCurrentPrices($appraisedTypeIds->all(), $side);
+        $this->priceRefresher->ensureCurrentPrices($mineralIds->all(), 'buy');
 
         foreach ($parsedItems as $item) {
             $type = $types->get(mb_strtolower($item['name']));
@@ -477,21 +488,20 @@ final class AppraisalCalculator
         ];
     }
 
-    /**
-     * Appraisals never call ESI. They use the newest scheduled market-price
-     * snapshot for the requested type, region, and side. A missing snapshot
-     * is reported as an unpriced item rather than triggering a live request.
-     */
+    /** Read the latest usable value from the compact current-price table. */
     private function snapshotJitaPrice(int $typeId, string $regionId, string $side): ?array
     {
         $column = $side === 'sell' ? 'sell_price' : 'buy_price';
-        $snapshot = DB::table('market_price_snapshots')
+        $snapshotIdColumn = $side === 'sell' ? 'sell_snapshot_id' : 'buy_snapshot_id';
+        $observedAtColumn = $side === 'sell' ? 'sell_observed_at' : 'buy_observed_at';
+        $snapshot = DB::table('market_price_current')
             ->where('type_id', $typeId)
             ->where('region_id', $regionId)
+            ->whereNotNull($snapshotIdColumn)
             ->whereNotNull($column)
             ->where($column, '>', 0)
-            ->orderByDesc('id')
-            ->first(['id', $column, 'observed_at']);
+            ->orderByDesc($snapshotIdColumn)
+            ->first([$column, $observedAtColumn]);
 
         if (!$snapshot) {
             return null;
@@ -499,7 +509,7 @@ final class AppraisalCalculator
 
         return [
             'price' => (float) $snapshot->{$column},
-            'observed_at' => $snapshot->observed_at,
+            'observed_at' => $snapshot->{$observedAtColumn},
         ];
     }
 }

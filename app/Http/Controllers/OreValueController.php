@@ -18,11 +18,10 @@ class OreValueController extends Controller
         $taxPercent = 0.01;
         $regionId = (string) config('buyback.region_id', '10000002');
 
-        $latestPrices = DB::table('market_price_snapshots')
-            ->selectRaw('type_id, MAX(id) as latest_id')
+        $latestPrices = DB::table('market_price_current')
+            ->selectRaw('type_id, MAX(buy_snapshot_id) as latest_id')
             ->where('region_id', $regionId)
-            ->whereNotNull('buy_price')
-            ->where('buy_price', '>', 0)
+            ->whereNotNull('buy_snapshot_id')
             ->groupBy('type_id');
 
         // Mission/NPE-only ore variants are excluded from the normal asteroid basket.
@@ -36,19 +35,19 @@ class OreValueController extends Controller
             ->leftJoin('eve_type_materials as materials', 'materials.type_id', '=', 'ore.type_id')
             ->leftJoin('eve_item_types as mineral', 'mineral.type_id', '=', 'materials.material_type_id')
             ->leftJoinSub($latestPrices, 'ore_latest', fn ($join) => $join->on('ore_latest.type_id', '=', 'ore.type_id'))
-            ->leftJoin('market_price_snapshots as ore_price', 'ore_price.id', '=', 'ore_latest.latest_id')
+            ->leftJoin('market_price_current as ore_price', 'ore_price.buy_snapshot_id', '=', 'ore_latest.latest_id')
             ->leftJoinSub($latestPrices, 'mineral_latest', fn ($join) => $join->on('mineral_latest.type_id', '=', 'materials.material_type_id'))
-            ->leftJoin('market_price_snapshots as mineral_price', 'mineral_price.id', '=', 'mineral_latest.latest_id')
+            ->leftJoin('market_price_current as mineral_price', 'mineral_price.buy_snapshot_id', '=', 'mineral_latest.latest_id')
             ->where('groups.category_name', 'Asteroid')
             ->where('ore.published', true)
             ->whereNotIn('ore.type_name', $missionOres)
             ->orderBy('ore.type_name')
             ->get([
                 'ore.type_id as ore_type_id', 'ore.type_name as ore_name', 'ore.portion_size',
-                'ore_price.buy_price as ore_buy_price', 'ore_price.observed_at as ore_price_at',
+                'ore_price.buy_price as ore_buy_price', 'ore_price.buy_observed_at as ore_price_at',
                 'materials.material_type_id', 'materials.quantity as material_quantity',
                 'mineral.type_name as mineral_name', 'mineral_price.buy_price as mineral_buy_price',
-                'mineral_price.observed_at as mineral_price_at',
+                'mineral_price.buy_observed_at as mineral_price_at',
             ]);
 
         $ores = [];
@@ -129,7 +128,7 @@ class OreValueController extends Controller
         $piRecords = DB::table('eve_item_types as item')
             ->join('eve_item_groups as groups', 'groups.group_id', '=', 'item.group_id')
             ->leftJoinSub($latestPrices, 'item_latest', fn ($join) => $join->on('item_latest.type_id', '=', 'item.type_id'))
-            ->leftJoin('market_price_snapshots as item_price', 'item_price.id', '=', 'item_latest.latest_id')
+            ->leftJoin('market_price_current as item_price', 'item_price.buy_snapshot_id', '=', 'item_latest.latest_id')
             ->where('groups.category_id', 43)
             ->where('item.published', true)
             ->orderBy('groups.group_id')
@@ -139,7 +138,7 @@ class OreValueController extends Controller
                 'item.type_name',
                 'groups.group_name',
                 'item_price.buy_price',
-                'item_price.observed_at',
+                'item_price.buy_observed_at as observed_at',
             ]);
 
         $piItems = $piRecords->map(function ($record) use ($piQuantity) {
@@ -182,7 +181,7 @@ class OreValueController extends Controller
             ->join('eve_item_types as product', 'product.type_id', '=', 'schematic.product_type_id')
             ->join('eve_item_groups as product_group', 'product_group.group_id', '=', 'product.group_id')
             ->leftJoinSub($latestPrices, 'product_latest', fn ($join) => $join->on('product_latest.type_id', '=', 'product.type_id'))
-            ->leftJoin('market_price_snapshots as product_price', 'product_price.id', '=', 'product_latest.latest_id')
+            ->leftJoin('market_price_current as product_price', 'product_price.buy_snapshot_id', '=', 'product_latest.latest_id')
             ->where('product_group.category_id', 43)
             ->whereIn('product_group.group_id', array_values($tierGroups))
             ->where('product.published', true)
@@ -204,7 +203,7 @@ class OreValueController extends Controller
                 ->join('eve_item_types as input_type', 'input_type.type_id', '=', 'input.type_id')
                 ->leftJoin('eve_item_groups as input_group', 'input_group.group_id', '=', 'input_type.group_id')
                 ->leftJoinSub($latestPrices, 'input_latest', fn ($join) => $join->on('input_latest.type_id', '=', 'input.type_id'))
-                ->leftJoin('market_price_snapshots as input_price', 'input_price.id', '=', 'input_latest.latest_id')
+                ->leftJoin('market_price_current as input_price', 'input_price.buy_snapshot_id', '=', 'input_latest.latest_id')
                 ->whereIn('input.schematic_id', $schematicIds)
                 ->orderBy('input_type.type_name')
                 ->get([

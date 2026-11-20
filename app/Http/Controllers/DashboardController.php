@@ -198,16 +198,10 @@ class DashboardController extends Controller
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key')
             : collect();
         $iceProductPrices = $loadAdminTools
-            ? DB::table('market_price_snapshots as p')
-                ->joinSub(
-                    DB::table('market_price_snapshots')
-                        ->selectRaw('type_id, MAX(id) as latest_id')
-                        ->where('region_id', '10000002')
-                        ->where('source', 'esi-jita-4-4')
-                        ->groupBy('type_id'),
-                    'latest_ice_prices',
-                    fn ($join) => $join->on('latest_ice_prices.latest_id', '=', 'p.id')
-                )
+            ? DB::table('market_price_current as p')
+                ->where('p.region_id', '10000002')
+                ->where('p.source', 'esi-jita-4-4')
+                ->whereIn('p.type_id', $iceProductTypes->pluck('type_id'))
                 ->get(['p.type_id', 'p.buy_price'])
                 ->keyBy('type_id')
             : collect();

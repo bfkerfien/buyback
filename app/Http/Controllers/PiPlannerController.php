@@ -6,22 +6,16 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use App\Services\LatestMarketPrices;
 
 class PiPlannerController extends Controller
 {
-    public function index(): View
+    public function index(LatestMarketPrices $latestMarketPrices): View
     {
-        $latestPriceIds = DB::table('market_price_snapshots')
-            ->select('type_id', DB::raw('MAX(id) as latest_id'))
-            ->where('region_id', (string) config('buyback.region_id', '10000002'))
-            ->groupBy('type_id');
-
-        $prices = DB::table('market_price_snapshots as price')
-            ->joinSub($latestPriceIds, 'latest', function ($join) {
-                $join->on('latest.latest_id', '=', 'price.id');
-            })
-            ->get(['price.type_id', 'price.buy_price', 'price.sell_price', 'price.observed_at'])
-            ->keyBy('type_id');
+        $piTypeIds = DB::table('eve_planet_schematics')->select('product_type_id as type_id')
+            ->union(DB::table('eve_planet_schematic_inputs')->select('type_id'))
+            ->pluck('type_id')->all();
+        $prices = $latestMarketPrices->forTypes($piTypeIds, (string) config('buyback.region_id', '10000002'));
 
         $taxSettings = DB::table('pi_tax_settings')->where('id', 1)->first();
         $importTaxPercent = (float) ($taxSettings->import_tax_percent ?? 0);

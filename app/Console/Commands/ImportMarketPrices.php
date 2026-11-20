@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\MarketPriceSnapshotWriter;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +13,7 @@ class ImportMarketPrices extends Command
     protected $signature = 'buyback:import-prices {file : CSV with type_id,buy_price,sell_price columns} {--region=10000002}';
     protected $description = 'Import timestamped market price observations from CSV.';
 
-    public function handle(): int
+    public function handle(MarketPriceSnapshotWriter $snapshotWriter): int
     {
         $path = $this->argument('file');
         if (!is_file($path) || !is_readable($path)) {
@@ -77,7 +78,7 @@ class ImportMarketPrices extends Command
             ];
 
             if (count($batch) >= 1000) {
-                DB::table('market_price_snapshots')->insert($batch);
+                $snapshotWriter->store($batch);
                 $count += count($batch);
                 $batch = [];
             }
@@ -86,7 +87,7 @@ class ImportMarketPrices extends Command
         fclose($handle);
 
         if ($batch) {
-            DB::table('market_price_snapshots')->insert($batch);
+            $snapshotWriter->store($batch);
             $count += count($batch);
         }
 
