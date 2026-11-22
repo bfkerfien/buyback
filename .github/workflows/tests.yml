@@ -55,6 +55,8 @@ jobs:
         run: docker compose config --quiet
       - name: Build all deployment images
         run: docker compose build --pull app web worker
+      - name: Create external Traefik network for Compose validation
+        run: docker network create traefik
       - name: Start database and Redis
         run: docker compose up -d --wait db cache
       - name: Apply migrations against MariaDB
