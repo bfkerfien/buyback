@@ -69,7 +69,7 @@
             @endif
             @if($monitorStartedAt)
                 <div class="muted">Monitoring baseline: {{ \Illuminate\Support\Carbon::parse($monitorStartedAt)->timezone(config('app.timezone'))->format('M j, Y g:i:s A T') }}</div>
-                <div class="muted">Contracts issued before this time are treated as existing history and will not trigger an alert.</div>
+                <div class="muted">The first successful poll after saving a webhook snapshots existing contracts without alerts. Contracts appearing in later polls trigger alerts even if their original issue date is older.</div>
             @endif
         </div>
 
@@ -138,7 +138,7 @@
         <h2>How monitoring works</h2>
         <ul class="muted">
             <li>The scheduler checks every two minutes.</li>
-            <li>Only contracts returned by the personal character contracts endpoint and assigned directly to My Eve Online are considered.</li>
+            <li>Only personal contracts where My Eve Online is the assignee or acceptor are considered; contracts issued by My Eve Online are excluded.</li>
             <li>Each contract ID is recorded so successful notifications are not repeated.</li>
             <li>Failed Discord deliveries are retried on a later poll.</li>
             <li>The normal dashboard request does not perform any contract polling.</li>
