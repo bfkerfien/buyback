@@ -365,9 +365,11 @@ final class AppraisalCalculator
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
             $payoutRule = $effectiveCategoryId ? $rules->get($effectiveCategoryId) : null;
-            // P1 planetary commodities use their individually configured appraisal
-            // buy percentage instead of the shared PI category payout percentage.
-            $piBuyRule = ((int) $type->category_id === 43 && (int) $type->group_id === 1042)
+            // Planetary commodities P1-P4 can use individual appraisal rates.
+            // This lets the PI matching tool tune each commodity independently
+            // instead of forcing one shared percentage across an entire tier.
+            $piBuyRule = ((int) $type->category_id === 43
+                && in_array((int) $type->group_id, [1042, 1034, 1040, 1041], true))
                 ? $piBuyRules->get($type->type_id)
                 : null;
             // Mercoxit in every grade and Morphite have a fixed 87% buyback rate.
