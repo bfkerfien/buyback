@@ -390,9 +390,11 @@ final class AppraisalCalculator
                     : ($fixedPayoutPercent !== null
                         ? $fixedPayoutPercent
                         : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate))));
-            // Normalize every existing 90% payout rule to 87%, including
-            // category rules, individual PI rules, and explicitly fixed rates.
-            if ($customPayoutPercent === null && abs($rate - 90.0) < 0.000001) {
+            // Preserve explicit per-commodity PI rates, including 90%, so
+            // individual Holo-matched rates are not silently reduced to 87%.
+            // Keep the historical normalization for category/default and fixed rates.
+            $isIndividualPiRate = $piBuyRule !== null && $fixedPayoutPercent === null;
+            if (!$isIndividualPiRate && $customPayoutPercent === null && abs($rate - 90.0) < 0.000001) {
                 $rate = 87.0;
             }
 
