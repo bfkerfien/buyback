@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SendDiscordAppraisalNotification;
+
 use App\Services\Appraisal\AppraisalCalculator;
 use App\Services\Appraisal\InventoryParser;
 use Illuminate\Http\RedirectResponse;
