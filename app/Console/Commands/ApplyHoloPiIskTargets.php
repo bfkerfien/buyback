@@ -17,7 +17,7 @@ class ApplyHoloPiIskTargets extends Command
      * commodity targets match the supplied Holo benchmark exactly.
      */
     private const TARGETS = [
-        'Bacteria' => 304596.00 * 1.01,
+        'Bacteria' => 308746.90 * 1.01,
         'Biocells' => 8396622.00,
         'Biofuels' => 336469.38,
         'Biomass' => 712812.55,
