@@ -103,6 +103,7 @@ class DiscordContractNotificationsController extends Controller
         }
 
         try {
+            $webhook = Crypt::decryptString((string) $encryptedWebhook);
             Http::asJson()->withoutRedirecting()->timeout(10)->post($webhook, [
                 'content' => 'EveBuyback Discord test: notifications for personal contracts received by My Eve Online are connected.',
             ])->throw();
@@ -153,7 +154,6 @@ class DiscordContractNotificationsController extends Controller
         }
 
         try {
-            $webhook = Crypt::decryptString((string) $encryptedWebhook);
             Http::asJson()->withoutRedirecting()->timeout(10)->post($webhook, [
                 'content' => 'EveBuyback test: new appraisal notifications are connected.',
                 'allowed_mentions' => ['parse' => []],
