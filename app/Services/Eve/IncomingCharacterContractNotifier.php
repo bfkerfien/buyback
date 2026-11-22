@@ -16,11 +16,11 @@ class IncomingCharacterContractNotifier
     private const TARGET_CHARACTER_NAME = 'My Eve Online';
     private const CONTRACT_SCOPE = 'esi-contracts.read_character_contracts.v1';
     private const WEBHOOK_KEY = 'discord_contract_webhook';
-    private const STARTED_AT_KEY = 'discord_contract_monitor_started_at';
+    private const BASELINE_COMPLETE_KEY = 'discord_contract_baseline_complete';
 
     /**
      * Poll the personal-character contracts endpoint and notify about new
-     * contracts assigned directly to the character named My Eve Online.
+     * contracts received or accepted by the character named My Eve Online.
      *
      * @return array{status:string,message:string,checked?:int,notified?:int,failed?:int}
      */
@@ -80,10 +80,13 @@ class IncomingCharacterContractNotifier
 
                 foreach ($response->json() ?? [] as $contract) {
                     $assigneeId = (int) ($contract['assignee_id'] ?? 0);
+                    $acceptorId = (int) ($contract['acceptor_id'] ?? 0);
                     $issuerId = (int) ($contract['issuer_id'] ?? 0);
-                    // Personal character endpoint only; the contract must be
-                    // assigned to My Eve Online, not issued by that character.
-                    if ($assigneeId !== (int) $character->eve_character_id || $issuerId === (int) $character->eve_character_id) {
+                    // The personal endpoint includes contracts where this pilot is
+                    // issuer, assignee, or acceptor. Notify only on incoming activity:
+                    // directly assigned contracts and contracts accepted by this pilot.
+                    if (($assigneeId !== (int) $character->eve_character_id && $acceptorId !== (int) $character->eve_character_id)
+                        || $issuerId === (int) $character->eve_character_id) {
                         continue;
                     }
                     $incoming[] = $contract;
@@ -96,18 +99,57 @@ class IncomingCharacterContractNotifier
             ))));
             $issuerNames = $this->resolveNames($issuerIds);
 
-            $startedAtValue = DB::table('buyback_system_status')
-                ->where('status_key', self::STARTED_AT_KEY)
-                ->value('status_value');
+            // On first successful poll after a webhook is enabled or changed,
+            // snapshot contracts already visible to ESI. This prevents a historical
+            // notification burst without relying on date_issued, which can predate
+            // the moment a contract becomes visible to this character.
+            $baselineComplete = DB::table('buyback_system_status')
+                ->where('status_key', self::BASELINE_COMPLETE_KEY)
+                ->exists();
 
-            if (!$startedAtValue) {
-                $startedAtValue = now()->toIso8601String();
+            if (!$baselineComplete) {
+                foreach ($incoming as $contract) {
+                    $contractId = (int) ($contract['contract_id'] ?? 0);
+                    if ($contractId < 1) {
+                        continue;
+                    }
+
+                    $existing = DB::table('eve_contract_notification_logs')
+                        ->where('eve_character_id', $character->id)
+                        ->where('contract_id', $contractId)
+                        ->exists();
+
+                    if (!$existing) {
+                        $issuedAt = !empty($contract['date_issued']) ? Carbon::parse($contract['date_issued']) : null;
+                        DB::table('eve_contract_notification_logs')->insert([
+                            'eve_character_id' => $character->id,
+                            'contract_id' => $contractId,
+                            'issuer_id' => (int) ($contract['issuer_id'] ?? 0) ?: null,
+                            'contract_type' => $contract['type'] ?? null,
+                            'contract_status' => $contract['status'] ?? null,
+                            'date_issued' => $issuedAt,
+                            'notification_status' => 'ignored',
+                            'contract_data' => json_encode($contract, JSON_THROW_ON_ERROR),
+                            'first_seen_at' => now(),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                }
+
                 DB::table('buyback_system_status')->updateOrInsert(
-                    ['status_key' => self::STARTED_AT_KEY],
-                    ['status_value' => $startedAtValue, 'created_at' => now(), 'updated_at' => now()]
+                    ['status_key' => self::BASELINE_COMPLETE_KEY],
+                    ['status_value' => now()->toIso8601String(), 'created_at' => now(), 'updated_at' => now()]
                 );
+
+                return [
+                    'status' => 'ok',
+                    'message' => 'Initial contract baseline saved for My Eve Online. Future newly appearing incoming contracts will be sent to Discord.',
+                    'checked' => count($incoming),
+                    'notified' => 0,
+                    'failed' => 0,
+                ];
             }
-            $startedAt = Carbon::parse($startedAtValue);
 
             $notified = 0;
             $failed = 0;
@@ -131,8 +173,8 @@ class IncomingCharacterContractNotifier
                 }
 
                 $contractData = json_encode($contract, JSON_THROW_ON_ERROR);
-                if (!$issuedAt || $issuedAt->lt($startedAt)) {
-                    if (!$existing) {
+
+                if (!$existing) {
                         DB::table('eve_contract_notification_logs')->insert([
                             'eve_character_id' => $character->id,
                             'contract_id' => $contractId,
