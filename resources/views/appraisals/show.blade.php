@@ -55,9 +55,11 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <p class="muted">The contract should be issued specifically to My Eve Online, not left as a public contract. The serial in the description lets us match the EVE contract to this appraisal.</p>
 </div>
 </section>
-<section class="panel"><div class="grid">
+<section class="panel"><div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr));">
+@if(auth()->user()?->isAdmin())
 <div class="stat"><span class="muted">Gross market value</span><strong>{{ number_format((float)$quote->gross_value, 2) }} ISK</strong></div>
 <div class="stat"><span class="muted">Service fees</span><strong>{{ number_format((float)$quote->fees, 2) }} ISK</strong></div>
+@endif
 <div class="stat"><span class="muted">Estimated buyback</span><strong class="money">{{ number_format((float)$quote->payout_value, 2) }} ISK</strong></div>
 </div><p class="muted">Origin: {{ $quote->origin_system ?: 'Not specified' }} · Priced {{ $quote->priced_at }}</p></section>
 <section class="panel"><h2>Appraised items</h2><div class="table-wrap"><table><thead><tr><th>Item</th><th class="right">Quantity</th><th class="right">Buyback price</th><th class="right">Effective rate</th><th class="right">Calculation</th></tr></thead><tbody>
