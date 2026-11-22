@@ -59,7 +59,7 @@
 
     <section class="panel">
         <h2>Discord webhook</h2>
-        <p class="muted">Create an incoming webhook in the Discord channel where you want alerts. Paste its URL below and save it. The URL is encrypted before it is stored. It is never displayed again or committed to GitHub.</p>
+        <p class="muted">Create an incoming webhook in the Discord channel where you want alerts. Paste its URL below and save it. The URL is encrypted before it is stored in the database. This contract destination is configured separately from the repository's default appraisal destination.</p>
         <div class="status">
             Webhook status:
             @if($webhookConfigured)
@@ -99,7 +99,7 @@
 
     <section class="panel">
         <h2>New appraisal notifications</h2>
-        <p class="muted">Use a separate Discord incoming webhook for appraisals. Each new inventory or ship appraisal sends a message with the character (when signed in), estimated buyback amount, origin, item count, and a link to the appraisal.</p>
+        <p class="muted">The repository includes a default Discord webhook destination for appraisals. Each new inventory or ship appraisal sends a message with the character (when signed in), estimated buyback amount, origin, item count, and a link to the appraisal.</p>
         <div class="status">
             Appraisal webhook:
             @if($appraisalWebhookConfigured)
@@ -107,7 +107,7 @@
             @else
                 <span class="warn">Not configured</span>
             @endif
-            <div class="muted">The webhook URL is encrypted in the database and is never displayed again.</div>
+            <div class="muted">The repository default is in config/services.php. If an administrator saves an override here, that override is encrypted in the database and is never displayed again.</div>
         </div>
 
         <form method="post" action="{{ route('admin.discord-contract-notifications.appraisals.save') }}">
