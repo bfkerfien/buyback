@@ -1,13 +1,13 @@
 <?php
 
-namespace App\\Jobs;
+namespace App\Jobs;
 
-use App\\Services\\DiscordAppraisalNotifier;
-use Illuminate\\Bus\\Queueable;
-use Illuminate\\Contracts\\Queue\\ShouldQueue;
-use Illuminate\\Foundation\\Bus\\Dispatchable;
-use Illuminate\\Queue\\InteractsWithQueue;
-use Illuminate\\Queue\\SerializesModels;
+use App\Services\DiscordAppraisalNotifier;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
 
 class SendDiscordAppraisalNotification implements ShouldQueue
 {
