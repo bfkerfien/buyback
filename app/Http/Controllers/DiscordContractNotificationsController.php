@@ -36,7 +36,7 @@ class DiscordContractNotificationsController extends Controller
             'character' => $character,
             'hasContractScope' => is_array($scopes) && in_array(self::CONTRACT_SCOPE, $scopes, true),
             'webhookConfigured' => (bool) DB::table('buyback_system_status')->where('status_key', self::WEBHOOK_KEY)->value('status_value'),
-            'appraisalWebhookConfigured' => (bool) DB::table('buyback_system_status')->where('status_key', self::APPRAISAL_WEBHOOK_KEY)->value('status_value'),
+            'appraisalWebhookConfigured' => (bool) $this->appraisalWebhook(),
             'monitorStartedAt' => DB::table('buyback_system_status')->where('status_key', self::STARTED_AT_KEY)->value('status_value'),
         ]);
     }
@@ -103,7 +103,6 @@ class DiscordContractNotificationsController extends Controller
         }
 
         try {
-            $webhook = Crypt::decryptString((string) $encryptedWebhook);
             Http::asJson()->withoutRedirecting()->timeout(10)->post($webhook, [
                 'content' => 'EveBuyback Discord test: notifications for personal contracts received by My Eve Online are connected.',
             ])->throw();
@@ -119,7 +118,10 @@ class DiscordContractNotificationsController extends Controller
     public function saveAppraisal(Request $request): RedirectResponse
     {
         if ($request->boolean('clear_webhook')) {
-            DB::table('buyback_system_status')->where('status_key', self::APPRAISAL_WEBHOOK_KEY)->delete();
+            DB::table('buyback_system_status')->updateOrInsert(
+                ['status_key' => self::APPRAISAL_WEBHOOK_KEY],
+                ['status_value' => Crypt::encryptString('__disabled__'), 'created_at' => now(), 'updated_at' => now()]
+            );
             $this->audit($request, 'discord_appraisal_webhook.cleared', ['notification_type' => 'appraisal']);
             return back()->with('status', 'Discord appraisal notifications have been disabled.');
         }
@@ -144,11 +146,9 @@ class DiscordContractNotificationsController extends Controller
 
     public function testAppraisal(Request $request): RedirectResponse
     {
-        $encryptedWebhook = DB::table('buyback_system_status')
-            ->where('status_key', self::APPRAISAL_WEBHOOK_KEY)
-            ->value('status_value');
+        $webhook = $this->appraisalWebhook();
 
-        if (!$encryptedWebhook) {
+        if (!$webhook) {
             return back()->withErrors(['appraisal_webhook_url' => 'Save a Discord appraisal webhook URL before sending a test notification.']);
         }
 
@@ -165,6 +165,24 @@ class DiscordContractNotificationsController extends Controller
 
         $this->audit($request, 'discord_appraisal_webhook.tested', ['notification_type' => 'appraisal']);
         return back()->with('status', 'Appraisal test notification sent to Discord.');
+    }
+
+    private function appraisalWebhook(): ?string
+    {
+        $encryptedWebhook = DB::table('buyback_system_status')
+            ->where('status_key', self::APPRAISAL_WEBHOOK_KEY)
+            ->value('status_value');
+
+        if (!$encryptedWebhook) {
+            return config('services.discord.appraisal_webhook');
+        }
+
+        try {
+            $webhook = Crypt::decryptString((string) $encryptedWebhook);
+            return $webhook === '__disabled__' ? null : $webhook;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private function audit(Request $request, string $action, array $details = []): void
