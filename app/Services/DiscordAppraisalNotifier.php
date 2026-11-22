@@ -1,10 +1,10 @@
 <?php
 
-namespace App\\Services;
+namespace App\Services;
 
-use Illuminate\\Support\\Facades\\Crypt;
-use Illuminate\\Support\\Facades\\DB;
-use Illuminate\\Support\\Facades\\Http;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 final class DiscordAppraisalNotifier
@@ -31,7 +31,7 @@ final class DiscordAppraisalNotifier
                 if ($webhook === '__disabled__') {
                     return;
                 }
-            } catch (\\Throwable) {
+            } catch (\Throwable) {
                 throw new RuntimeException('The Discord appraisal webhook could not be decrypted.');
             }
         }
