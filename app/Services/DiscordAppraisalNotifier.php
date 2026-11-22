@@ -2,38 +2,20 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
 final class DiscordAppraisalNotifier
 {
-    private const WEBHOOK_KEY = 'discord_appraisal_webhook';
-
     /**
      * @param array{token:string, kind:string, payout_value:float|int|string, origin_system:?string, character_name:?string, item_count:int} $appraisal
      */
     public function send(array $appraisal): void
     {
-        $encryptedWebhook = DB::table('buyback_system_status')
-            ->where('status_key', self::WEBHOOK_KEY)
-            ->value('status_value');
+        $webhook = (string) config('services.discord.appraisal_webhook');
 
-        if (!$encryptedWebhook) {
-            $webhook = config('services.discord.appraisal_webhook');
-            if (!$webhook) {
-                return;
-            }
-        } else {
-            try {
-                $webhook = Crypt::decryptString((string) $encryptedWebhook);
-                if ($webhook === '__disabled__') {
-                    return;
-                }
-            } catch (\Throwable) {
-                throw new RuntimeException('The Discord appraisal webhook could not be decrypted.');
-            }
+        if ($webhook === '') {
+            return;
         }
 
         $title = $appraisal['kind'] === 'ship' ? 'New ship buyback appraisal' : 'New inventory appraisal';
