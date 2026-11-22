@@ -230,7 +230,7 @@ class PiPlannerController extends Controller
             ->where('item.type_id', $data['type_id'])
             ->where('item.published', true)
             ->where('groups.category_id', 43)
-            ->whereIn('groups.group_id', [1042, 1034, 1040])
+            ->whereIn('groups.group_id', [1042, 1034, 1040, 1041])
             ->first(['item.type_id', 'item.type_name']);
         abort_unless($item, 404);
 
