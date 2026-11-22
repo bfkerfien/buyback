@@ -19,8 +19,8 @@ class IncomingCharacterContractNotifier
     private const BASELINE_COMPLETE_KEY = 'discord_contract_baseline_complete';
 
     /**
-     * Poll the personal-character contracts endpoint and notify about new
-     * contracts received or accepted by the character named My Eve Online.
+     * Poll the personal-character contracts endpoint and notify Discord about
+     * new contracts assigned to or accepted by My Eve Online.
      *
      * @return array{status:string,message:string,checked?:int,notified?:int,failed?:int}
      */
@@ -53,6 +53,7 @@ class IncomingCharacterContractNotifier
         if (is_string($scopes)) {
             $scopes = preg_split('/\s+/', $scopes, -1, PREG_SPLIT_NO_EMPTY);
         }
+
         if (!is_array($scopes) || !in_array(self::CONTRACT_SCOPE, $scopes, true)) {
             return ['status' => 'reauthorize', 'message' => 'My Eve Online must be re-authorized with esi-contracts.read_character_contracts.v1.'];
         }
@@ -70,9 +71,11 @@ class IncomingCharacterContractNotifier
 
             $incoming = [];
             $pages = 1;
+            $characterId = (int) $character->eve_character_id;
+
             for ($page = 1; $page <= $pages; $page++) {
                 $response = $http->get(
-                    'https://esi.evetech.net/latest/characters/' . (int) $character->eve_character_id . '/contracts/',
+                    'https://esi.evetech.net/latest/characters/' . $characterId . '/contracts/',
                     ['page' => $page]
                 )->throw();
 
@@ -82,13 +85,16 @@ class IncomingCharacterContractNotifier
                     $assigneeId = (int) ($contract['assignee_id'] ?? 0);
                     $acceptorId = (int) ($contract['acceptor_id'] ?? 0);
                     $issuerId = (int) ($contract['issuer_id'] ?? 0);
-                    // The personal endpoint includes contracts where this pilot is
-                    // issuer, assignee, or acceptor. Notify only on incoming activity:
-                    // directly assigned contracts and contracts accepted by this pilot.
-                    if (($assigneeId !== (int) $character->eve_character_id && $acceptorId !== (int) $character->eve_character_id)
-                        || $issuerId === (int) $character->eve_character_id) {
+
+                    // This personal endpoint includes contracts issued by this
+                    // character. Only incoming assignments/acceptances qualify.
+                    if (
+                        ($assigneeId !== $characterId && $acceptorId !== $characterId)
+                        || $issuerId === $characterId
+                    ) {
                         continue;
                     }
+
                     $incoming[] = $contract;
                 }
             }
@@ -99,10 +105,8 @@ class IncomingCharacterContractNotifier
             ))));
             $issuerNames = $this->resolveNames($issuerIds);
 
-            // On first successful poll after a webhook is enabled or changed,
-            // snapshot contracts already visible to ESI. This prevents a historical
-            // notification burst without relying on date_issued, which can predate
-            // the moment a contract becomes visible to this character.
+            // The first successful poll after enabling/changing the webhook
+            // records existing contracts as history, without sending a burst.
             $baselineComplete = DB::table('buyback_system_status')
                 ->where('status_key', self::BASELINE_COMPLETE_KEY)
                 ->exists();
@@ -114,13 +118,16 @@ class IncomingCharacterContractNotifier
                         continue;
                     }
 
-                    $existing = DB::table('eve_contract_notification_logs')
+                    $exists = DB::table('eve_contract_notification_logs')
                         ->where('eve_character_id', $character->id)
                         ->where('contract_id', $contractId)
                         ->exists();
 
-                    if (!$existing) {
-                        $issuedAt = !empty($contract['date_issued']) ? Carbon::parse($contract['date_issued']) : null;
+                    if (!$exists) {
+                        $issuedAt = !empty($contract['date_issued'])
+                            ? Carbon::parse($contract['date_issued'])
+                            : null;
+
                         DB::table('eve_contract_notification_logs')->insert([
                             'eve_character_id' => $character->id,
                             'contract_id' => $contractId,
@@ -160,37 +167,21 @@ class IncomingCharacterContractNotifier
                     continue;
                 }
 
-                $issuedAt = !empty($contract['date_issued'])
-                    ? Carbon::parse($contract['date_issued'])
-                    : null;
                 $existing = DB::table('eve_contract_notification_logs')
                     ->where('eve_character_id', $character->id)
                     ->where('contract_id', $contractId)
                     ->first();
 
+                // Never repeat successful deliveries or baseline records.
+                // Pending/failed deliveries are retried on a later poll.
                 if ($existing && in_array($existing->notification_status, ['sent', 'ignored'], true)) {
                     continue;
                 }
 
+                $issuedAt = !empty($contract['date_issued'])
+                    ? Carbon::parse($contract['date_issued'])
+                    : null;
                 $contractData = json_encode($contract, JSON_THROW_ON_ERROR);
-
-                if (!$existing) {
-                        DB::table('eve_contract_notification_logs')->insert([
-                            'eve_character_id' => $character->id,
-                            'contract_id' => $contractId,
-                            'issuer_id' => (int) ($contract['issuer_id'] ?? 0) ?: null,
-                            'contract_type' => $contract['type'] ?? null,
-                            'contract_status' => $contract['status'] ?? null,
-                            'date_issued' => $issuedAt,
-                            'notification_status' => 'ignored',
-                            'contract_data' => $contractData,
-                            'first_seen_at' => now(),
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
-                    }
-                    continue;
-                }
 
                 if (!$existing) {
                     DB::table('eve_contract_notification_logs')->insert([
@@ -223,6 +214,7 @@ class IncomingCharacterContractNotifier
 
                 try {
                     $this->sendDiscordNotification($webhook, $character, $contract, $issuerName);
+
                     DB::table('eve_contract_notification_logs')
                         ->where('eve_character_id', $character->id)
                         ->where('contract_id', $contractId)
@@ -232,12 +224,14 @@ class IncomingCharacterContractNotifier
                             'last_error' => null,
                             'updated_at' => now(),
                         ]);
+
                     $notified++;
                 } catch (Throwable $exception) {
                     Log::warning('Discord contract webhook delivery failed.', [
                         'contract_id' => $contractId,
                         'exception' => class_basename($exception),
                     ]);
+
                     DB::table('eve_contract_notification_logs')
                         ->where('eve_character_id', $character->id)
                         ->where('contract_id', $contractId)
@@ -246,6 +240,7 @@ class IncomingCharacterContractNotifier
                             'last_error' => 'Discord delivery failed (' . class_basename($exception) . ').',
                             'updated_at' => now(),
                         ]);
+
                     $failed++;
                 }
             }
@@ -291,6 +286,7 @@ class IncomingCharacterContractNotifier
         }
 
         Http::asJson()->withoutRedirecting()->timeout(10)->post($webhook, [
+            'allowed_mentions' => ['parse' => []],
             'embeds' => [[
                 'title' => 'New EVE Contract Received',
                 'description' => mb_substr($description, 0, 3500),
@@ -336,7 +332,8 @@ class IncomingCharacterContractNotifier
                 'X-Compatibility-Date' => config('buyback.esi_compatibility_date'),
             ])->acceptJson()->timeout(10)
                 ->post('https://esi.evetech.net/latest/universe/names/', $ids)
-                ->throw()->json();
+                ->throw()
+                ->json();
 
             $names = [];
             foreach ($rows ?? [] as $row) {
