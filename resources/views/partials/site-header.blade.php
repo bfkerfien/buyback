@@ -2,6 +2,13 @@
     $siteCharacter = auth()->check() ? auth()->user()->characters()->orderByDesc('last_authenticated_at')->first() : null;
 @endphp
 
+<div class="slyce-buying-banner" role="status" aria-label="Buying PI and exploration gear in all SLYCE systems">
+    <div class="slyce-buying-banner-track">
+        <span>BUYING PI AND EXPLORATION GEAR IN SLYCE SPACE — ALL SYSTEMS</span>
+        <span aria-hidden="true">BUYING PI AND EXPLORATION GEAR IN SLYCE SPACE — ALL SYSTEMS</span>
+    </div>
+</div>
+
 <div class="acceptance-banner" role="status" aria-label="Current accepted items">
     <div class="acceptance-banner-track">
         <span>NOW ACCEPTING: Compressed Asteriod Ore / PI / Compressed Ice / Uncompressed Gas from any BRANCH system. Other items are a work in progress.</span>
@@ -69,6 +76,12 @@
 @endauth
 
 <style>
+.slyce-buying-banner{display:flex;align-items:center;overflow:hidden;min-height:48px;margin:0 0 10px;padding:0 14px;background:#6f42c1;color:#fff;border:1px solid #8a63d2;border-radius:9px;text-align:center;font-size:15px;font-weight:900;line-height:1.5;letter-spacing:.025em}
+.slyce-buying-banner-track{display:flex;width:max-content;min-width:100%;animation:slyce-buying-banner-scroll 32s linear infinite}
+.slyce-buying-banner span{display:block;flex:0 0 auto;padding:0 3rem;white-space:nowrap}
+.slyce-buying-banner:hover .slyce-buying-banner-track{animation-play-state:paused}
+@keyframes slyce-buying-banner-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){.slyce-buying-banner-track{animation:none}.slyce-buying-banner span+span{display:none}.slyce-buying-banner{justify-content:center;text-align:center}.slyce-buying-banner span{white-space:normal;padding:10px 4px}}
 .acceptance-banner{display:flex;align-items:center;overflow:hidden;min-height:48px;margin:0 0 10px;padding:0 14px;background:#00dff2;color:#000;border:1px solid #00b9cf;border-radius:9px;text-align:left;font-size:15px;font-weight:900;line-height:1.5;letter-spacing:.015em}
 .acceptance-banner-track{display:flex;width:max-content;min-width:100%;animation:acceptance-banner-scroll 30s linear infinite}
 .acceptance-banner span{display:block;flex:0 0 auto;padding:0 3rem;white-space:nowrap}
