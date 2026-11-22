@@ -98,6 +98,43 @@
     </section>
 
     <section class="panel">
+        <h2>New appraisal notifications</h2>
+        <p class="muted">Use a separate Discord incoming webhook for appraisals. Each new inventory or ship appraisal sends a message with the character (when signed in), estimated buyback amount, origin, item count, and a link to the appraisal.</p>
+        <div class="status">
+            Appraisal webhook:
+            @if($appraisalWebhookConfigured)
+                <span class="good">Configured</span>
+            @else
+                <span class="warn">Not configured</span>
+            @endif
+            <div class="muted">The webhook URL is encrypted in the database and is never displayed again.</div>
+        </div>
+
+        <form method="post" action="{{ route('admin.discord-contract-notifications.appraisals.save') }}">
+            @csrf
+            <label for="appraisal_webhook_url">Discord appraisal webhook URL</label>
+            <input id="appraisal_webhook_url" name="webhook_url" type="url" autocomplete="off" placeholder="https://discord.com/api/webhooks/..." required>
+            <div class="actions">
+                <button type="submit">Save appraisal webhook</button>
+            </div>
+        </form>
+
+        <div class="actions" style="margin-top:12px">
+            <form method="post" action="{{ route('admin.discord-contract-notifications.appraisals.test') }}">
+                @csrf
+                <button class="secondary" type="submit" @if(!$appraisalWebhookConfigured) disabled @endif>Send appraisal test</button>
+            </form>
+            @if($appraisalWebhookConfigured)
+                <form method="post" action="{{ route('admin.discord-contract-notifications.appraisals.save') }}" onsubmit="return confirm('Disable Discord appraisal notifications?')">
+                    @csrf
+                    <input type="hidden" name="clear_webhook" value="1">
+                    <button class="secondary" type="submit">Disable appraisal alerts</button>
+                </form>
+            @endif
+        </div>
+    </section>
+
+    <section class="panel">
         <h2>How monitoring works</h2>
         <ul class="muted">
             <li>The scheduler checks every two minutes.</li>
