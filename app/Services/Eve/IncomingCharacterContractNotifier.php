@@ -4,7 +4,6 @@ namespace App\Services\Eve;
 
 use App\Models\EveCharacter;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -15,7 +14,6 @@ class IncomingCharacterContractNotifier
 {
     private const TARGET_CHARACTER_NAME = 'My Eve Online';
     private const CONTRACT_SCOPE = 'esi-contracts.read_character_contracts.v1';
-    private const WEBHOOK_KEY = 'discord_contract_webhook';
     private const BASELINE_COMPLETE_KEY = 'discord_contract_baseline_complete';
 
     /**
@@ -26,19 +24,10 @@ class IncomingCharacterContractNotifier
      */
     public function poll(): array
     {
-        $encryptedWebhook = DB::table('buyback_system_status')
-            ->where('status_key', self::WEBHOOK_KEY)
-            ->value('status_value');
+        $webhook = (string) config('services.discord.contract_webhook');
 
-        if (!$encryptedWebhook) {
-            return ['status' => 'disabled', 'message' => 'Discord contract notifications are not configured.'];
-        }
-
-        try {
-            $webhook = Crypt::decryptString((string) $encryptedWebhook);
-        } catch (Throwable $exception) {
-            report($exception);
-            return ['status' => 'configuration_error', 'message' => 'The saved Discord webhook could not be decrypted. Check APP_KEY.'];
+        if ($webhook === '') {
+            return ['status' => 'disabled', 'message' => 'Discord contract notifications are not configured in application config.'];
         }
 
         $character = EveCharacter::query()
@@ -105,7 +94,7 @@ class IncomingCharacterContractNotifier
             ))));
             $issuerNames = $this->resolveNames($issuerIds);
 
-            // The first successful poll after enabling/changing the webhook
+            // The first successful poll after deployment
             // records existing contracts as history, without sending a burst.
             $baselineComplete = DB::table('buyback_system_status')
                 ->where('status_key', self::BASELINE_COMPLETE_KEY)
