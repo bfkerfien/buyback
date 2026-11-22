@@ -17,6 +17,7 @@ class DiscordContractNotificationsController extends Controller
     private const WEBHOOK_KEY = 'discord_contract_webhook';
     private const APPRAISAL_WEBHOOK_KEY = 'discord_appraisal_webhook';
     private const STARTED_AT_KEY = 'discord_contract_monitor_started_at';
+    private const BASELINE_COMPLETE_KEY = 'discord_contract_baseline_complete';
     private const TARGET_CHARACTER_NAME = 'My Eve Online';
     private const CONTRACT_SCOPE = 'esi-contracts.read_character_contracts.v1';
 
@@ -43,7 +44,7 @@ class DiscordContractNotificationsController extends Controller
     public function save(Request $request): RedirectResponse
     {
         if ($request->boolean('clear_webhook')) {
-            DB::table('buyback_system_status')->whereIn('status_key', [self::WEBHOOK_KEY, self::STARTED_AT_KEY])->delete();
+            DB::table('buyback_system_status')->whereIn('status_key', [self::WEBHOOK_KEY, self::STARTED_AT_KEY, self::BASELINE_COMPLETE_KEY])->delete();
             $this->audit($request, 'discord_contract_webhook.cleared');
             return back()->with('status', 'Discord contract notifications have been disabled.');
         }
@@ -73,6 +74,12 @@ class DiscordContractNotificationsController extends Controller
             ['status_key' => self::WEBHOOK_KEY],
             ['status_value' => Crypt::encryptString($data['webhook_url']), 'created_at' => now(), 'updated_at' => now()]
         );
+
+        if ($changed) {
+            // A new webhook starts with a fresh ESI snapshot so existing contracts
+            // are baselined and only contracts appearing afterward are announced.
+            DB::table('buyback_system_status')->where('status_key', self::BASELINE_COMPLETE_KEY)->delete();
+        }
 
         if ($changed || !DB::table('buyback_system_status')->where('status_key', self::STARTED_AT_KEY)->exists()) {
             DB::table('buyback_system_status')->updateOrInsert(
