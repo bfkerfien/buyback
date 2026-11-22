@@ -15,6 +15,7 @@ use Throwable;
 class DiscordContractNotificationsController extends Controller
 {
     private const WEBHOOK_KEY = 'discord_contract_webhook';
+    private const APPRAISAL_WEBHOOK_KEY = 'discord_appraisal_webhook';
     private const STARTED_AT_KEY = 'discord_contract_monitor_started_at';
     private const TARGET_CHARACTER_NAME = 'My Eve Online';
     private const CONTRACT_SCOPE = 'esi-contracts.read_character_contracts.v1';
@@ -34,6 +35,7 @@ class DiscordContractNotificationsController extends Controller
             'character' => $character,
             'hasContractScope' => is_array($scopes) && in_array(self::CONTRACT_SCOPE, $scopes, true),
             'webhookConfigured' => (bool) DB::table('buyback_system_status')->where('status_key', self::WEBHOOK_KEY)->value('status_value'),
+            'appraisalWebhookConfigured' => (bool) DB::table('buyback_system_status')->where('status_key', self::APPRAISAL_WEBHOOK_KEY)->value('status_value'),
             'monitorStartedAt' => DB::table('buyback_system_status')->where('status_key', self::STARTED_AT_KEY)->value('status_value'),
         ]);
     }
@@ -107,14 +109,65 @@ class DiscordContractNotificationsController extends Controller
         return back()->with('status', 'Test notification sent to Discord.');
     }
 
-    private function audit(Request $request, string $action): void
+    public function saveAppraisal(Request $request): RedirectResponse
+    {
+        if ($request->boolean('clear_webhook')) {
+            DB::table('buyback_system_status')->where('status_key', self::APPRAISAL_WEBHOOK_KEY)->delete();
+            $this->audit($request, 'discord_appraisal_webhook.cleared', ['notification_type' => 'appraisal']);
+            return back()->with('status', 'Discord appraisal notifications have been disabled.');
+        }
+
+        $data = $request->validate([
+            'webhook_url' => [
+                'required',
+                'string',
+                'url',
+                'regex:/^https:\/\/(?:discord\.com|discordapp\.com)\/api\/webhooks\/[0-9]+\/[A-Za-z0-9._-]+(?:\?.*)?$/i',
+            ],
+        ]);
+
+        DB::table('buyback_system_status')->updateOrInsert(
+            ['status_key' => self::APPRAISAL_WEBHOOK_KEY],
+            ['status_value' => Crypt::encryptString($data['webhook_url']), 'created_at' => now(), 'updated_at' => now()]
+        );
+
+        $this->audit($request, 'discord_appraisal_webhook.saved', ['notification_type' => 'appraisal']);
+        return back()->with('status', 'Discord appraisal webhook saved. Each new appraisal will be sent to this channel.');
+    }
+
+    public function testAppraisal(Request $request): RedirectResponse
+    {
+        $encryptedWebhook = DB::table('buyback_system_status')
+            ->where('status_key', self::APPRAISAL_WEBHOOK_KEY)
+            ->value('status_value');
+
+        if (!$encryptedWebhook) {
+            return back()->withErrors(['appraisal_webhook_url' => 'Save a Discord appraisal webhook URL before sending a test notification.']);
+        }
+
+        try {
+            $webhook = Crypt::decryptString((string) $encryptedWebhook);
+            Http::asJson()->withoutRedirecting()->timeout(10)->post($webhook, [
+                'content' => 'EveBuyback test: new appraisal notifications are connected.',
+                'allowed_mentions' => ['parse' => []],
+            ])->throw();
+        } catch (Throwable $exception) {
+            Log::warning('Discord appraisal webhook test failed.', ['exception' => class_basename($exception)]);
+            return back()->withErrors(['appraisal_webhook_url' => 'Discord appraisal test failed. Check the webhook URL and try again.']);
+        }
+
+        $this->audit($request, 'discord_appraisal_webhook.tested', ['notification_type' => 'appraisal']);
+        return back()->with('status', 'Appraisal test notification sent to Discord.');
+    }
+
+    private function audit(Request $request, string $action, array $details = []): void
     {
         DB::table('audit_logs')->insert([
             'user_id' => $request->user()->id,
             'action' => $action,
             'subject_type' => 'discord_contract_webhook',
             'subject_id' => null,
-            'details' => json_encode(['target_character' => self::TARGET_CHARACTER_NAME]),
+            'details' => json_encode($details ?: ['target_character' => self::TARGET_CHARACTER_NAME]),
             'ip_address' => $request->ip(),
             'created_at' => now(),
             'updated_at' => now(),
