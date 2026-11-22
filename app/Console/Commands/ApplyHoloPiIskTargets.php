@@ -147,7 +147,7 @@ class ApplyHoloPiIskTargets extends Command
         }
 
         $this->table(
-            ['Commodity', 'Old rate', 'New rate', 'Holo target ISK', 'Projected ISK', 'Jita snapshot'],
+            ['Commodity', 'Old rate', 'New rate', 'Target payout ISK', 'Projected ISK', 'Jita snapshot'],
             array_map(fn (array $row) => [
                 $row['type_name'],
                 $row['old_rate'] === null ? 'none' : number_format((float) $row['old_rate'], 2) . '%',
