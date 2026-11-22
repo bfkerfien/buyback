@@ -21,13 +21,19 @@ final class DiscordAppraisalNotifier
             ->value('status_value');
 
         if (!$encryptedWebhook) {
-            return;
-        }
-
-        try {
-            $webhook = Crypt::decryptString((string) $encryptedWebhook);
-        } catch (\\Throwable) {
-            throw new RuntimeException('The Discord appraisal webhook could not be decrypted.');
+            $webhook = config('services.discord.appraisal_webhook');
+            if (!$webhook) {
+                return;
+            }
+        } else {
+            try {
+                $webhook = Crypt::decryptString((string) $encryptedWebhook);
+                if ($webhook === '__disabled__') {
+                    return;
+                }
+            } catch (\\Throwable) {
+                throw new RuntimeException('The Discord appraisal webhook could not be decrypted.');
+            }
         }
 
         $title = $appraisal['kind'] === 'ship' ? 'New ship buyback appraisal' : 'New inventory appraisal';
