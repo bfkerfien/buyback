@@ -110,6 +110,15 @@ class AppraisalController extends Controller
             }
         });
 
+        SendDiscordAppraisalNotification::dispatch([
+            'token' => $token,
+            'kind' => $kind,
+            'payout_value' => $result['payout_value'],
+            'origin_system' => $validated['origin_system'] ?? null,
+            'character_name' => $request->user()?->characters()->orderByDesc('last_authenticated_at')->value('name'),
+            'item_count' => count($result['lines']),
+        ])->afterCommit();
+
         return redirect()->route('appraisals.show', $token);
     }
 
