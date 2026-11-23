@@ -245,7 +245,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </section>
 @endif
 @if($admin)
-<section class="tab-panel" id="tab-marketbaiters" role="tabpanel" hidden>
+<section class="tab-panel" id="tab-appraisal-manifests" role="tabpanel" hidden>
 <section class="panel">
 <h2>Copy appraisal inventory lists</h2>
 <p class="muted" style="line-height:1.7">Each button copies published SDE item names with 1,000 units per type. The ore list contains compressed asteroid ore, compressed moon ore and compressed ice only.</p>
