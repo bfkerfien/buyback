@@ -68,11 +68,10 @@ class AppraisalComparisonController extends Controller
         $data = $request->validate([
             'holo_input' => ['required', 'string', 'max:50000'],
             'buyback_input' => ['required', 'string', 'max:50000'],
-            'marketbaiters_input' => ['required', 'string', 'max:50000'],
         ]);
 
         $sources = [];
-        foreach (['Holo' => 'holo_input', 'EveBuyback' => 'buyback_input', 'MarketBaiters' => 'marketbaiters_input'] as $source => $field) {
+        foreach (['Holo' => 'holo_input', 'EveBuyback' => 'buyback_input'] as $source => $field) {
             $sources[$source] = array_values(array_filter(
                 $this->resolveInput($data[$field], $source, $field, $request, $parser),
                 fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
@@ -88,33 +87,28 @@ class AppraisalComparisonController extends Controller
         $rows = $names->map(function ($key) use ($indexed) {
             $holo = $indexed['Holo']->get($key);
             $buyback = $indexed['EveBuyback']->get($key);
-            $marketbaiters = $indexed['MarketBaiters']->get($key);
             $quantities = [
                 'holo' => (int) ($holo['quantity'] ?? 0),
                 'buyback' => (int) ($buyback['quantity'] ?? 0),
-                'marketbaiters' => (int) ($marketbaiters['quantity'] ?? 0),
             ];
             $present = array_filter($quantities, fn ($quantity) => $quantity > 0);
-            $allPresent = count($present) === 3;
+            $allPresent = count($present) === 2;
             $sameQuantity = $allPresent && count(array_unique(array_values($quantities))) === 1;
 
             $prices = [
                 'holo' => isset($holo['unit_payout']) ? (float) $holo['unit_payout'] : (isset($holo['unit_price']) ? (float) $holo['unit_price'] : null),
                 'buyback' => isset($buyback['unit_payout']) ? (float) $buyback['unit_payout'] : null,
-                'marketbaiters' => isset($marketbaiters['unit_payout']) ? (float) $marketbaiters['unit_payout'] : (isset($marketbaiters['unit_price']) ? (float) $marketbaiters['unit_price'] : null),
             ];
             $availablePrices = array_filter($prices, fn ($price) => $price !== null && $price > 0);
             $bestPrice = $availablePrices ? max($availablePrices) : null;
             $bestSource = $bestPrice === null ? null : array_search($bestPrice, $prices, true);
             $buybackGross = isset($buyback['unit_price']) ? (float) $buyback['unit_price'] : null;
             return [
-                'name' => $holo['name'] ?? $buyback['name'] ?? $marketbaiters['name'],
+                'name' => $holo['name'] ?? $buyback['name'],
                 'holo_quantity' => $quantities['holo'],
                 'buyback_quantity' => $quantities['buyback'],
-                'marketbaiters_quantity' => $quantities['marketbaiters'],
                 'holo_unit_price' => $prices['holo'],
                 'buyback_unit_payout' => $prices['buyback'],
-                'marketbaiters_unit_price' => $prices['marketbaiters'],
                 'best_source' => $bestSource,
                 'best_unit_payout' => $bestPrice,
                 'proposed_buyback_percent' => ($bestPrice !== null && $buybackGross !== null && $buybackGross > 0)
@@ -126,7 +120,6 @@ class AppraisalComparisonController extends Controller
         return response()->json([
             'holo_items' => count($sources['Holo']),
             'buyback_items' => count($sources['EveBuyback']),
-            'marketbaiters_items' => count($sources['MarketBaiters']),
             'matched' => $rows->where('status', 'match')->count(),
             'differences' => $rows->where('status', '!=', 'match')->count(),
             'rows' => $rows,
