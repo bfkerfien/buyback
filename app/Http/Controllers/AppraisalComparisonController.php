@@ -61,6 +61,41 @@ class AppraisalComparisonController extends Controller
         ]);
     }
 
+    public function saveItemRate(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $data = $request->validate([
+            'type_id' => ['required', 'integer', 'min:1'],
+            'holo_unit_payout' => ['required', 'numeric', 'gt:0'],
+            'buyback_unit_payout' => ['required', 'numeric', 'gt:0'],
+        ]);
+        $item = DB::table('eve_item_types')->where('type_id', $data['type_id'])
+            ->where('published', true)->first(['type_id', 'type_name']);
+        abort_unless($item, 404, 'Published item type not found.');
+
+        $current = DB::table('appraisal_item_payout_overrides')->where('type_id', $item->type_id)->value('payout_multiplier');
+        $current = $current === null ? 1.0 : (float) $current;
+        $factor = ((float) $data['holo_unit_payout'] * 1.0005) / (float) $data['buyback_unit_payout'];
+        $next = round($current * $factor, 6);
+        abort_if($next < 0.000001 || $next > 100000, 422, 'Calculated item adjustment is outside the allowed range.');
+
+        DB::table('appraisal_item_payout_overrides')->updateOrInsert(
+            ['type_id' => (int) $item->type_id],
+            ['type_name' => $item->type_name, 'payout_multiplier' => $next,
+             'updated_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]
+        );
+        DB::table('audit_logs')->insert([
+            'user_id' => $request->user()->id, 'action' => 'appraisal_item_payout_override.saved',
+            'subject_type' => 'eve_item_type', 'subject_id' => $item->type_id,
+            'details' => json_encode(['item' => $item->type_name, 'multiplier' => $next,
+                'target_vs_holo' => 0.05]),
+            'ip_address' => $request->ip(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        return response()->json(['saved' => true, 'name' => $item->type_name,
+            'multiplier' => $next, 'message' => $item->type_name . ' saved.']);
+    }
+
     public function compare(Request $request, InventoryParser $parser): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
@@ -110,6 +145,9 @@ class AppraisalComparisonController extends Controller
                 'holo_unit_payout' => $holoPayout,
                 'holo_payout_basis' => $holo['payout_basis'] ?? null,
                 'buyback_total_payout' => isset($buyback['total_payout']) ? (float) $buyback['total_payout'] : null,
+                'type_id' => isset($buyback['type_id']) ? (int) $buyback['type_id'] : null,
+                'recommended_percent' => ($comparable && !empty($buyback['type_id']) && isset($buyback['payout_percent']))
+                    ? round((float) $buyback['payout_percent'] * (1.0005 * $holoPayout / $buybackPayout), 2) : null,
                 'buyback_unit_payout' => $buybackPayout,
                 'payout_difference_per_unit' => $difference,
                 'payout_difference_percent' => $differencePercent,
@@ -147,12 +185,16 @@ class AppraisalComparisonController extends Controller
                 $quote = DB::table('appraisal_quotes')->where('public_token', $match[1])->first();
                 if (!$quote) throw ValidationException::withMessages([$field => 'That EveBuyback appraisal link was not found.']);
                 return DB::table('appraisal_quote_items')->where('appraisal_quote_id', $quote->id)
-                    ->orderBy('type_name')->get(['type_name', 'quantity', 'unit_price', 'source_data'])
+                    ->orderBy('type_name')->get(['id', 'type_id', 'type_name', 'quantity', 'unit_price', 'source_data'])
                     ->map(function ($row) {
                         $source = json_decode($row->source_data ?? '{}', true) ?: [];
                         $payout = isset($source['payout_value']) ? (float) $source['payout_value'] : null;
                         return [
                             'name' => $row->type_name,
+                            'type_id' => (int) $row->type_id,
+                            'quote_item_id' => (int) $row->id,
+                            'payout_percent' => isset($source['payout_percent']) ? (float) $source['payout_percent'] : null,
+                            'item_payout_multiplier' => isset($source['item_payout_multiplier']) ? (float) $source['item_payout_multiplier'] : 1.0,
                             'quantity' => (int) $row->quantity,
                             'unit_price' => (float) $row->unit_price,
                             'total_payout' => $payout,

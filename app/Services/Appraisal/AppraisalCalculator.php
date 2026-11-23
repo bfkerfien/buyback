@@ -63,6 +63,7 @@ final class AppraisalCalculator
             ->get(['type_id', 'type_name', 'volume'])->keyBy('type_id');
 
                 $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
+        $itemPayoutOverrides = DB::table('appraisal_item_payout_overrides')->pluck('payout_multiplier', 'type_id');
         $mineralPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key');
         $icePricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key');
         $gasPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key');
@@ -405,7 +406,8 @@ final class AppraisalCalculator
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
 
-            $payoutValue = round($lineValue * $rate / 100, 2);
+            $itemPayoutMultiplier = (float) $itemPayoutOverrides->get((int) $type->type_id, 1.0);
+            $payoutValue = round(($lineValue * $rate / 100) * $itemPayoutMultiplier, 2);
             if ($oreJitaBuyPrice !== null && $oreJitaBuyPrice > 0 && $pricingQuantity > 0) {
                 $effectiveRatePercent = round(($payoutValue / ($pricingQuantity * $oreJitaBuyPrice)) * 100, 4);
             }
@@ -418,6 +420,7 @@ final class AppraisalCalculator
                 'unit_price' => round($lineValue / (int) $item['quantity'], 4),
                 'line_value' => $lineValue,
                 'payout_percent' => $rate,
+                'item_payout_multiplier' => $itemPayoutMultiplier,
                 'payout_value' => $payoutValue,
                 'ore_jita_buy_price' => $oreJitaBuyPrice,
                 'effective_rate_percent' => $effectiveRatePercent,
