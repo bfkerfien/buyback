@@ -7,6 +7,6 @@ return [
     'esi_compatibility_date' => env('EVE_ESI_COMPATIBILITY_DATE', '2026-11-12'),
     // Buy-side valuation is the conservative default for a buyback service.
     'price_side' => env('BUYBACK_PRICE_SIDE', 'buy'),
-    'payout_percent' => (float) env('BUYBACK_PAYOUT_PERCENT', 90),
+    'payout_percent' => (float) env('BUYBACK_PAYOUT_PERCENT', 87),
     'eve_user_agent' => env('EVE_USER_AGENT', ''),
 ];
