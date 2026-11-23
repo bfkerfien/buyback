@@ -247,17 +247,6 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @if($admin)
 <section class="tab-panel" id="tab-appraisal-manifests" role="tabpanel" hidden>
 <section class="panel">
-<h2>Copy appraisal inventory lists</h2>
-<p class="muted" style="line-height:1.7">Each button copies published SDE item names with 1,000 units per type. The ore list contains compressed asteroid ore, compressed moon ore and compressed ice only.</p>
-<div style="display:flex;gap:10px;flex-wrap:wrap">
-<button type="button" class="copy-appraisal-manifest" data-kind="ore">Copy Ores, Ice &amp; Moon Ores</button>
-<button type="button" class="copy-appraisal-manifest" data-kind="pi">Copy PI</button>
-<button type="button" class="copy-appraisal-manifest" data-kind="exploration">Copy All Exploration Loot</button>
-</div>
-<p id="manifest-copy-status" class="muted" aria-live="polite"></p>
-<textarea id="appraisal-manifest-preview" readonly style="margin-top:12px;min-height:180px" placeholder="The selected inventory list will appear here."></textarea>
-</section>
-<section class="panel">
 <h2>Holo vs EveBuyback comparison</h2>
 <p class="muted" style="line-height:1.7">Compare the same inventory across Holo and EveBuyback. Paste a share link or copied item list into each source. Where a source exposes a per-item price, the comparison shows the observed rate and a proposed EveBuyback percentage. Proposed rates are recommendations only and are never saved automatically.</p>
 <p><a href="https://evebb.eu/" target="_blank" rel="noopener">Holo ↗</a></p>
@@ -269,6 +258,17 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <span id="appraisal-compare-status" class="muted" aria-live="polite" style="margin-left:10px"></span>
 <div id="appraisal-compare-results" style="display:none;margin-top:16px"></div>
 <input type="hidden" id="dashboard-csrf" value="{{ csrf_token() }}">
+</section>
+<section class="panel">
+<h2>Copy appraisal inventory lists</h2>
+<p class="muted" style="line-height:1.7">Each button copies published SDE item names with 1,000 units per type. The ore list contains compressed asteroid ore, compressed moon ore and compressed ice only.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button type="button" class="copy-appraisal-manifest" data-kind="ore">Copy Ores, Ice &amp; Moon Ores</button>
+<button type="button" class="copy-appraisal-manifest" data-kind="pi">Copy PI</button>
+<button type="button" class="copy-appraisal-manifest" data-kind="exploration">Copy All Exploration Loot</button>
+</div>
+<p id="manifest-copy-status" class="muted" aria-live="polite"></p>
+<textarea id="appraisal-manifest-preview" readonly style="margin-top:12px;min-height:180px" placeholder="The selected inventory list will appear here."></textarea>
 </section>
 </section>
 @endif
