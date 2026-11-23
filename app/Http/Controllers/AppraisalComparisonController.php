@@ -185,7 +185,7 @@ class AppraisalComparisonController extends Controller
                         ->acceptJson()
                         ->timeout(20)
                         ->get('https://marketbaiters.com/api/v1/appraise/'.rawurlencode($tokenMatch[1]));
-                } catch (\\Throwable $e) {
+                } catch (\Throwable $e) {
                     throw ValidationException::withMessages([$field => 'Could not load the MarketBaiters appraisal API. Paste the copied item list instead.']);
                 }
 
@@ -208,7 +208,7 @@ class AppraisalComparisonController extends Controller
                     ->accept('text/html')
                     ->timeout(20)
                     ->get($input);
-            } catch (\\Throwable $e) {
+            } catch (\Throwable $e) {
                 throw ValidationException::withMessages([$field => 'Could not load that '.$source.' link. Paste its copied item list instead.']);
             }
 
