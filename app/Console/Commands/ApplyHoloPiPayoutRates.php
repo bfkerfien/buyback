@@ -1,8 +1,8 @@
 <?php
 
-namespace App\\Console\\Commands;
+namespace App\Console\Commands;
 
-use Illuminate\\Console\\Command;
+use Illuminate\Console\Command;
 
 /**
  * Backwards-compatible entry point. The former implementation copied Holo's
