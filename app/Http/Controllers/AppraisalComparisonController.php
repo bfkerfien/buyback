@@ -87,7 +87,7 @@ class AppraisalComparisonController extends Controller
                     ->accept('text/html')
                     ->timeout(15)
                     ->get($input);
-            } catch (\\Throwable $e) {
+            } catch (\Throwable $e) {
                 throw ValidationException::withMessages(['holo_input' => 'Could not load that Holo link. Paste its copied item list instead.']);
             }
 
