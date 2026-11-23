@@ -149,7 +149,7 @@ class RefreshJitaPrices extends Command
             return self::FAILURE;
         }
         $result = $refresher->refreshTypes($typeIds);
-        $this->info($label . ': saved prices for ' . $result['saved'] . ' of ' . count($typeIds) . ' types; ' . $result['failed'] . ' failed. Order-book history was skipped.');
+        $this->info($label . ': saved prices for ' . $result['saved'] . ' of ' . count($typeIds) . ' types; ' . $result['failed'] . ' failed. Jita order-book depth was stored.');
         return $result['failed'] === 0 ? self::SUCCESS : self::FAILURE;
     }
 
