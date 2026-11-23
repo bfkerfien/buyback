@@ -37,6 +37,41 @@ class InventoryParserTest extends TestCase
     }
 
 
+    public function test_it_parses_marketbaiters_api_items_without_double_counting_reprocessing_sub_items(): void
+    {
+        $items = (new InventoryParser())->parseMarketBaitersJson([
+            'token' => 'mBLZSEgQ',
+            'total_payout' => 3089385232.64,
+            'items' => [
+                [
+                    'name' => 'Compressed Arkonor',
+                    'type_id' => 62568,
+                    'quantity' => 1000,
+                    'payout' => 2886188.14,
+                    'sub_items' => [
+                        ['name' => 'Pyerite', 'type_id' => 35, 'quantity' => 29001, 'payout' => 427451.54],
+                        ['name' => 'Mexallon', 'type_id' => 36, 'quantity' => 10875, 'payout' => 538606.12],
+                    ],
+                ],
+                [
+                    'name' => 'Compressed Arkonor II-Grade',
+                    'type_id' => 62569,
+                    'quantity' => 1000,
+                    'payout' => 3031758.83,
+                    'sub_items' => [],
+                ],
+            ],
+        ]);
+
+        $this->assertCount(2, $items);
+        $this->assertSame('Compressed Arkonor', $items[0]['name']);
+        $this->assertSame(1000, $items[0]['quantity']);
+        $this->assertEqualsWithDelta(2886.18814, $items[0]['unit_payout'], 0.00001);
+        $this->assertSame('Compressed Arkonor II-Grade', $items[1]['name']);
+        $this->assertSame(1000, $items[1]['quantity']);
+        $this->assertEqualsWithDelta(3031.75883, $items[1]['unit_price'], 0.00001);
+    }
+
     public function test_it_parses_marketbaiters_refine_cards_without_turning_result_columns_into_item_names(): void
     {
         $items = (new InventoryParser())->parseMarketBaiters(implode("\n", [
