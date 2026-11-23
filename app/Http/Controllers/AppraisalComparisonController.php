@@ -78,23 +78,6 @@ class AppraisalComparisonController extends Controller
                     ->map(fn ($row) => ['name' => $row->type_name, 'quantity' => (int) $row->quantity])->all();
             }
 
-            if ($source === 'Holo') {
-                abort_unless(in_array($host, ['evebb.eu', 'www.evebb.eu'], true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'Holo links must use https://evebb.eu/.');
-                abort_unless(($parts['scheme'] ?? '') === 'https', 422, 'Holo appraisal links must use HTTPS.');
-                try {
-                    $response = Http::withOptions(['allow_redirects' => false])->withHeaders(['User-Agent' => 'EveBuyback Holo Comparator'])->accept('text/html')->timeout(15)->get($input);
-                } catch (\Throwable $e) {
-                    throw ValidationException::withMessages(['holo_input' => 'Could not load that Holo page. Open Holo in a new tab and paste its copied appraisal item list here.']);
-                }
-                if (!$response->successful()) {
-                    throw ValidationException::withMessages(['holo_input' => 'Holo did not return that appraisal page. Paste the copied appraisal item table or inventory list instead.']);
-                }
-                $items = $this->parseHtml($response->body(), $parser);
-                if (!$items) {
-                    throw ValidationException::withMessages(['holo_input' => 'The Holo homepage does not contain your submitted appraisal. Run the appraisal on Holo, then paste its item list or table here.']);
-                }
-                return $items;
-            }
             abort_unless(in_array($host, ['marketbaiters.com', 'www.marketbaiters.com'], true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'Marketbaiters links must use https://marketbaiters.com/.');
             abort_unless(($parts['scheme'] ?? '') === 'https', 422, 'Marketbaiters appraisal links must use HTTPS.');
 
