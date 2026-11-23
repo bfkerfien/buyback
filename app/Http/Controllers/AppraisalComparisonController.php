@@ -159,8 +159,7 @@ class AppraisalComparisonController extends Controller
             abort_unless(in_array($host, $allowedHosts, true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, $source.' appraisal links must use the official '.$source.' host.');
             abort_unless(($parts['scheme'] ?? '') === 'https', 422, $source.' appraisal links must use HTTPS.');
 
-            $expectedPath = $source === 'MarketBaiters' ? '~/a/[A-Za-z0-9]+/?$~' : '~^/~';
-            if (!preg_match($expectedPath, $path)) {
+            if (!preg_match('~^/~', $path)) {
                 throw ValidationException::withMessages([$field => 'That does not look like a supported '.$source.' appraisal share link.']);
             }
 
@@ -210,9 +209,6 @@ class AppraisalComparisonController extends Controller
 
         if (!$items) {
             $plain = html_entity_decode(strip_tags(preg_replace('/<(script|style)\\b[^>]*>.*?<\\/\\1>/is', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            if ($source === 'MarketBaiters') {
-                return $parser->parseMarketBaiters($plain);
-            }
             foreach (preg_split('/\\r\\n|\\n|\\r/', $plain) ?: [] as $line) {
                 $line = trim($line);
                 if (preg_match('/^(.+?)\\s+[x×]?\\s*([0-9][0-9,]*)$/', $line, $match)) {
