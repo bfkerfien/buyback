@@ -188,21 +188,23 @@ class AppraisalComparisonController extends Controller
                 throw ValidationException::withMessages([$field => $source.' did not return that appraisal link. Paste its copied item list instead.']);
             }
 
-            $items = $this->parseHtml($response->body());
+            $items = $this->parseHtml($response->body(), $source, $parser);
             if (!$items) {
                 throw ValidationException::withMessages([$field => 'That '.$source.' page did not expose a readable item list. Paste the copied item list into this block instead.']);
             }
             return $items;
         }
 
-        $items = $parser->parse($input);
+        $items = $source === 'MarketBaiters'
+            ? $parser->parseMarketBaiters($input)
+            : $parser->parse($input);
         if (!$items) {
             throw ValidationException::withMessages([$field => 'No item names and quantities could be parsed. Paste the copied item list or a supported appraisal link.']);
         }
         return $items;
     }
 
-    private function parseHtml(string $html): array
+    private function parseHtml(string $html, string $source, InventoryParser $parser): array
     {
         $items = [];
         if (preg_match_all('/<tr\\b[^>]*>(.*?)<\\/tr>/is', $html, $matches)) {
@@ -228,6 +230,9 @@ class AppraisalComparisonController extends Controller
 
         if (!$items) {
             $plain = html_entity_decode(strip_tags(preg_replace('/<(script|style)\\b[^>]*>.*?<\\/\\1>/is', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($source === 'MarketBaiters') {
+                return $parser->parseMarketBaiters($plain);
+            }
             foreach (preg_split('/\\r\\n|\\n|\\r/', $plain) ?: [] as $line) {
                 $line = trim($line);
                 if (preg_match('/^(.+?)\\s+[x×]?\\s*([0-9][0-9,]*)$/', $line, $match)) {
