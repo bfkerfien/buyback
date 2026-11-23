@@ -297,18 +297,21 @@ class AppraisalComparisonController extends Controller
                     'name' => $item['name'],
                     'quantity' => 0,
                     'total_payout' => 0.0,
+                    'unit_payout_total' => 0.0,
                     'unit_payout' => null,
                     'payout_basis' => $item['payout_basis'] ?? null,
                 ];
             }
             $merged[$key]['quantity'] += $quantity;
             $merged[$key]['total_payout'] += (float) ($item['total_payout'] ?? 0);
+            $merged[$key]['unit_payout_total'] += (float) ($item['unit_payout'] ?? 0) * $quantity;
             if (!empty($item['payout_basis'])) $merged[$key]['payout_basis'] = $item['payout_basis'];
         }
 
         foreach ($merged as &$item) {
             $item['unit_payout'] = $item['quantity'] > 0
-                ? $item['total_payout'] / $item['quantity'] : null;
+                ? $item['unit_payout_total'] / $item['quantity'] : null;
+            unset($item['unit_payout_total']);
         }
         unset($item);
 
