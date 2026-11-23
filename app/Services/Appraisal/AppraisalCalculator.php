@@ -62,8 +62,7 @@ final class AppraisalCalculator
             ->whereIn('type_id', $mineralIds)->where('published', true)
             ->get(['type_id', 'type_name', 'volume'])->keyBy('type_id');
 
-        $rules = DB::table('appraisal_payout_rules')->get()->keyBy('category_id');
-        $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
+                $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
         $mineralPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key');
         $icePricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key');
         $gasPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key');
@@ -78,7 +77,7 @@ final class AppraisalCalculator
         $unpricedItemReasons = [];
         $lines = [];
         $side = config('buyback.price_side', 'buy');
-        $defaultRate = (float) config('buyback.payout_percent', 87);
+        $defaultRate = 87.0;
         $regionId = (string) config('buyback.region_id', '10000002');
 
         $appraisedTypeIds = $types->filter(fn ($type) => $requiredCategoryName === null
@@ -173,10 +172,9 @@ final class AppraisalCalculator
                 // Per-type overrides let admins tune individual raw gas prices
                 // against Holo without changing other gas types. The global rate
                 // remains the fallback for types without an individual override.
-                $customPayoutPercent = (float) $gasPricingSettings->get(
-                    $gasRateKey,
-                    $gasPricingSettings->get($globalGasRateKey, $isCompressedGas ? 60 : 85)
-                );
+                $customPayoutPercent = $gasPricingSettings->has($gasRateKey)
+                    ? (float) $gasPricingSettings->get($gasRateKey)
+                    : null;
                 $customRateSource = $isCompressedGas ? 'compressed_gas' : 'uncompressed_gas';
                 $valuationMode = 'gas_market';
             } elseif ($isIce && !$hasFactionIsotopeOutput) {
@@ -244,10 +242,9 @@ final class AppraisalCalculator
                     ? (float) $icePricingSettings->get($legacyPercentKey, $defaultProductPercent)
                     : $defaultProductPercent;
 
-                $customPayoutPercent = (float) $icePricingSettings->get(
-                    'ice_buy_percent_' . $typeId,
-                    $legacyPercent
-                );
+                $customPayoutPercent = $icePricingSettings->has('ice_buy_percent_' . $typeId)
+                    ? (float) $icePricingSettings->get('ice_buy_percent_' . $typeId)
+                    : null;
                 $customRateSource = 'individual_ice_product';
                 $valuationMode = 'ice_product_market';
             } elseif ((int) $type->category_id === 25) {
@@ -290,21 +287,11 @@ final class AppraisalCalculator
                     ], true);
 
                     if ($isIceRefiningProduct) {
-                        $defaultIcePercent = mb_strtolower($mineral->type_name) === 'heavy water' ? 10 : 100;
                         $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $mineralId, 1000));
-                        $buyPercent = (float) $icePricingSettings->get('ice_buy_percent_' . $mineralId, $defaultIcePercent);
+                        $buyPercent = (float) $icePricingSettings->get('ice_buy_percent_' . $mineralId, 87);
                     } else {
-                        $defaultMineralPercents = [
-                            'Tritanium' => 98,
-                            'Pyerite' => 95,
-                            'Zydrine' => 90,
-                            'Megacyte' => 90,
-                        ];
                         $depth = max(1, (int) $mineralPricingSettings->get('mineral_buy_depth_' . $mineralId, $defaultDepths[$mineral->type_name] ?? 50000));
-                        $buyPercent = (float) $mineralPricingSettings->get(
-                            'mineral_buy_percent_' . $mineralId,
-                            $defaultMineralPercents[$mineral->type_name] ?? 85
-                        );
+                        $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
                     }
 
                     $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy');
@@ -378,54 +365,22 @@ final class AppraisalCalculator
             $isDirectMineral = mb_strtolower((string) ($type->category_name ?? '')) === 'material'
                 && mb_strtolower((string) ($type->group_name ?? '')) === 'mineral';
             if ($isDirectMineral) {
-                $defaultMineralPercents = [
-                    'Tritanium' => 98,
-                    'Pyerite' => 95,
-                    'Zydrine' => 90,
-                    'Megacyte' => 90,
-                ];
-                $customPayoutPercent = (float) $mineralPricingSettings->get(
-                    'mineral_buy_percent_' . (int) $type->type_id,
-                    $defaultMineralPercents[$type->type_name] ?? 85
-                );
+                $customPayoutPercent = $mineralPricingSettings->has('mineral_buy_percent_' . (int) $type->type_id)
+                    ? (float) $mineralPricingSettings->get('mineral_buy_percent_' . (int) $type->type_id)
+                    : null;
                 $customRateSource = 'individual_mineral';
             }
 
-            $effectiveCategoryId = $pricingType->category_id;
-            $effectiveCategoryName = $pricingType->category_name;
-            $payoutRule = $effectiveCategoryId ? $rules->get($effectiveCategoryId) : null;
-            // Planetary commodities P1-P4 can use individual appraisal rates.
-            // This lets the PI matching tool tune each commodity independently
-            // instead of forcing one shared percentage across an entire tier.
+            // Individual item percentages win. Anything without an individual
+            // percentage uses the single 87% default; category pricing is disabled.
             $piBuyRule = ((int) $type->category_id === 43
                 && in_array((int) $type->group_id, [1042, 1034, 1040, 1041], true))
                 ? $piBuyRules->get($type->type_id)
                 : null;
-            // Mercoxit in every grade and Morphite have a fixed 87% buyback rate.
-            $special87PercentNames = [
-                'mercoxit',
-                'magma mercoxit',
-                'vitreous mercoxit',
-                'compressed mercoxit',
-                'compressed magma mercoxit',
-                'compressed vitreous mercoxit',
-                'morphite',
-            ];
-            $hasSpecial87Percent = in_array(mb_strtolower($type->type_name), $special87PercentNames, true);
-            $rate = $customPayoutPercent !== null
-                ? $customPayoutPercent
-                : ((int) $type->category_id === 25
-                    ? 100.0
-                    : ($fixedPayoutPercent !== null
-                        ? $fixedPayoutPercent
-                        : ($hasSpecial87Percent ? 87.0 : (float) ($piBuyRule->buy_percent ?? $payoutRule->payout_percent ?? $defaultRate))));
-            // Preserve explicit per-commodity PI rates, including 90%, so
-            // individual Holo-matched rates are not silently reduced to 87%.
-            // Keep the historical normalization for category/default and fixed rates.
-            $isIndividualPiRate = $piBuyRule !== null && $fixedPayoutPercent === null;
-            if (!$isIndividualPiRate && $customPayoutPercent === null && abs($rate - 90.0) < 0.000001) {
-                $rate = 87.0;
-            }
+            $rate = $customPayoutPercent
+                ?? ($fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($piBuyRule->buy_percent ?? $defaultRate));
+            $effectiveCategoryId = $pricingType->category_id;
+            $effectiveCategoryName = $pricingType->category_name;
 
             $payoutValue = round($lineValue * $rate / 100, 2);
             if ($oreJitaBuyPrice !== null && $oreJitaBuyPrice > 0 && $pricingQuantity > 0) {
@@ -445,7 +400,7 @@ final class AppraisalCalculator
                 'effective_rate_percent' => $effectiveRatePercent,
                 'category_id' => $effectiveCategoryId,
                 'category_name' => $effectiveCategoryName,
-                'rate_source' => $customRateSource ?? ($fixedPayoutPercent !== null ? 'fixed' : ($piBuyRule ? 'individual_pi' : ($payoutRule ? 'category' : 'default'))),
+                'rate_source' => $customRateSource ?? ($fixedPayoutPercent !== null ? 'fixed' : ($piBuyRule ? 'individual_pi' : 'default')),
                 'source' => $price->source,
                 'observed_at' => $price->observed_at,
                 'valuation_mode' => $valuationMode,
