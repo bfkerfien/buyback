@@ -143,13 +143,6 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <section class="panel" style="border-color:#8f3940!important"><h2>Danger zone · Purge all appraisals</h2><p class="muted">Permanently deletes every appraisal, including active, expired, archived, and contracted appraisal records, plus their saved item lines. Runner jobs are retained with their appraisal links cleared. Users, EVE characters, contracts, finance ledger entries, pricing rules, and market data are not deleted.</p><form method="post" action="{{ route('admin.appraisals.purge') }}" onsubmit="return confirm('FINAL WARNING: permanently delete ALL appraisal records and their item details? This cannot be undone. Runner jobs and finance ledger entries will be retained.')">@csrf<button type="submit" style="background:#8f3940!important;color:#fff!important">Purge all appraisals</button></form></section>
 <section class="panel" style="border-color:#a66b35!important"><h2>Archive cleanup · Purge archived appraisals</h2><p class="muted">Permanently deletes only appraisals currently in the archive and their saved item details. Active and expired non-archived appraisals are not touched. Runner jobs are retained with links to deleted archived appraisals cleared.</p><form method="post" action="{{ route('admin.appraisals.purge-archived') }}" onsubmit="return confirm('Permanently delete ONLY archived appraisals and their item details? Active and expired non-archived appraisals will be kept. This cannot be undone.')">@csrf<button type="submit" style="background:#a66b35!important;color:#fff!important">Purge archived appraisals only</button></form></section>
 <section class="panel"><h2>Administration</h2><div class="grid"><div class="stat">Open jobs<strong>{{ $adminMetrics['open_jobs'] }}</strong></div><div class="stat">Registered users<strong>{{ $adminMetrics['users'] }}</strong></div></div>
-<details class="pricing-settings"><summary>Category buyback rates</summary><div class="pricing-settings-content">
-<p class="muted">Set the percentage of Jita value paid for each EVE item category. Items inherit their category rate; categories without a rule use the default rate from BUYBACK_PAYOUT_PERCENT (currently {{ number_format((float)config('buyback.payout_percent'),2) }}%).</p>
-<form method="post" action="{{ route('admin.appraisal-rates.store') }}">@csrf
-<div class="row"><label>EVE item category<select name="category_id" required><option value="">Select category</option>@foreach($eveCategories as $category)<option value="{{ $category->category_id }}">{{ $category->category_name }}</option>@endforeach</select></label><label>Buyback rate (%)<input name="payout_percent" type="number" min="0.01" max="100" step="0.01" placeholder="80.00" required></label></div><button>Save category rate</button></form>
-<table><thead><tr><th>Category</th><th>Buyback rate</th><th>Action</th></tr></thead><tbody>@forelse($payoutRules as $rule)<tr><td>{{ $rule->category_name }}</td><td>{{ number_format((float)$rule->payout_percent,2) }}%</td><td><form class="inline" method="post" action="{{ route('admin.appraisal-rates.destroy',$rule->category_id) }}">@csrf @method('DELETE')<button style="background:#263b46;color:#eaf7f8">Remove</button></form></td></tr>@empty<tr><td colspan="3">No category-specific rates. All items use the default rate.</td></tr>@endforelse</tbody></table>
-<p class="muted">CCP SDE category data must be imported once before categories appear in this list.</p>
-</div></details>
 <details class="pricing-settings"><summary>Standard mineral buyback settings</summary><div class="pricing-settings-content">
 <p class="muted">Each mineral has its own buy percentage and cumulative Jita buy-order quantity. The calculator uses the price at that unit in the live Jita buy book. Save each mineral independently.</p>
 @php($standardMineralDepths = ['Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000, 'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000, 'Megacyte' => 500000, 'Morphite' => 45000])
@@ -245,66 +238,18 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 @if($admin)
 <section class="tab-panel" id="tab-marketbaiters" role="tabpanel" hidden>
 <section class="panel">
-<h2>Prepare a 10,000-unit ore manifest</h2>
-<p class="muted" style="line-height:1.7">Create a copy-ready list containing 10,000 units of every published asteroid ore type in the imported SDE, including compressed variants.</p>
-<button type="button" id="copy-compressed-ore">Copy 10,000 of every ore</button>
-<span id="compressed-ore-copy-status" class="muted" aria-live="polite" style="margin-left:10px"></span>
-<textarea id="compressed-ore-manifest" readonly style="margin-top:12px;min-height:180px">@foreach($oreTypes as $ore)
-@if(!\App\Services\Eve\ExcludedMissionOre::isExcluded($ore->type_name, (int) $ore->type_id))
-{{ $ore->type_name }}&#9;10000
-@endif
-@endforeach</textarea>
-</section>
-<section class="panel">
-<h2>Compare Marketbaiters with EveBuyback</h2>
-<p><a href="https://marketbaiters.com/" target="_blank" rel="noopener">Open Marketbaiters in a new tab ↗</a></p>
-<p class="muted" style="line-height:1.7">Paste a share link from each service. You can also paste the copied item list or appraisal table into either block. The comparison checks each item's name and quantity, not just the final ISK total.</p>
+<h2>Holo Check · Compare Holo with EveBuyback</h2>
+<p><a href="https://evebb.eu/" target="_blank" rel="noopener">Open Holo's Buyback ↗</a></p>
+<p class="muted" style="line-height:1.7">Paste a Holo appraisal share link or copied item list on the left, and an EveBuyback appraisal link or copied item list on the right. This compares item names and quantities line by line.</p>
 <div class="compare-blocks">
-<div><label for="marketbaiters-input">Marketbaiters appraisal link or copied appraisal</label><textarea id="marketbaiters-input" placeholder="Paste the Marketbaiters appraisal link or copied item table here"></textarea></div>
-<div><label for="buyback-input">EveBuyback appraisal link or copied appraisal</label><textarea id="buyback-input" placeholder="Paste an EveBuyback /q/ link or copied item list here"></textarea></div>
-</div>
-<button type="button" id="compare-appraisal-links">Compare appraisal contents</button>
-<span id="appraisal-compare-status" class="muted" aria-live="polite" style="margin-left:10px"></span>
-<div id="appraisal-compare-results" style="display:none;margin-top:16px"></div>
-<input type="hidden" id="dashboard-csrf" value="{{ csrf_token() }}">
-</section></section>
-<section class="tab-panel" id="tab-holo-compare" role="tabpanel" hidden>
-<section class="panel">
-<h2>Prepare the complete Holo test inventory</h2>
-<p class="muted" style="line-height:1.7">Copy the same test inventory into Holo and EveBuyback: every compressed asteroid ore, compressed ice, compressed gas and uncompressed gas type at 10,000 units each, plus every PI material from P0 through P4 at 1,000 units each.</p>
-<div class="grid">
-<div class="stat">Compressed ores<strong>{{ $compressedOreTypes->count() }}</strong></div>
-<div class="stat">Compressed ice<strong>{{ $iceTypes->count() }}</strong></div>
-<div class="stat">Compressed gas<strong>{{ $compressedGasTypes->count() }}</strong></div>
-<div class="stat">Uncompressed gas<strong>{{ $uncompressedGasTypes->count() }}</strong></div>
-<div class="stat">PI materials P0–P4<strong>{{ $piMaterialTypes->count() }}</strong></div>
-</div>
-<button type="button" id="copy-holo-test-inventory">Copy complete test inventory</button>
-<span id="holo-test-copy-status" class="muted" aria-live="polite" style="margin-left:10px"></span>
-<textarea id="holo-test-inventory" readonly style="margin-top:12px;min-height:220px">@foreach($compressedOreTypes as $item){{ $item->type_name }}&#9;10000
-@endforeach
-@foreach($iceTypes as $item){{ $item->type_name }}&#9;10000
-@endforeach
-@foreach($compressedGasTypes as $item){{ $item->type_name }}&#9;10000
-@endforeach
-@foreach($uncompressedGasTypes as $item){{ $item->type_name }}&#9;10000
-@endforeach
-@foreach($piMaterialTypes as $item){{ $item->type_name }}&#9;1000
-@endforeach</textarea>
-</section>
-<section class="panel">
-<h2>Compare Holo's Buyback with EveBuyback</h2>
-<p><a href="https://evebb.eu/" target="_blank" rel="noopener">Open Holo's Buyback in a new tab ↗</a></p>
-<p class="muted" style="line-height:1.7">Run the same inventory through Holo's appraisal page, then paste Holo's copied item list or appraisal table below. Compare it against an EveBuyback appraisal link or a copied EveBuyback item list. This compares item names and quantities line by line; it does not compare payout values.</p>
-<div class="compare-blocks">
-<div><label for="holo-input">Holo appraisal or copied item list</label><textarea id="holo-input" placeholder="Paste the item list copied from Holo's appraisal results here"></textarea></div>
-<div><label for="holo-buyback-input">EveBuyback appraisal link or copied item list</label><textarea id="holo-buyback-input" placeholder="Paste an EveBuyback /q/ link or copied item list here"></textarea></div>
+<div><label for="holo-input">Holo appraisal link or copied item list</label><textarea id="holo-input" placeholder="Paste the Holo share link or copied appraisal item list"></textarea></div>
+<div><label for="holo-buyback-input">EveBuyback appraisal link or copied item list</label><textarea id="holo-buyback-input" placeholder="Paste an EveBuyback /q/ link or copied item list"></textarea></div>
 </div>
 <button type="button" id="compare-holo-appraisals">Compare Holo with EveBuyback</button>
 <button type="button" id="export-holo-comparison" disabled>Export to Excel</button>
 <span id="holo-compare-status" class="muted" aria-live="polite" style="margin-left:10px"></span>
 <div id="holo-compare-results" style="display:none;margin-top:16px"></div>
-</section>
+<input type="hidden" id="dashboard-csrf" value="{{ csrf_token() }}">
 </section>
 </section>
 @endif
