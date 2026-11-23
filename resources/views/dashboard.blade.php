@@ -143,6 +143,15 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <section class="panel" style="border-color:#8f3940!important"><h2>Danger zone · Purge all appraisals</h2><p class="muted">Permanently deletes every appraisal, including active, expired, archived, and contracted appraisal records, plus their saved item lines. Runner jobs are retained with their appraisal links cleared. Users, EVE characters, contracts, finance ledger entries, pricing rules, and market data are not deleted.</p><form method="post" action="{{ route('admin.appraisals.purge') }}" onsubmit="return confirm('FINAL WARNING: permanently delete ALL appraisal records and their item details? This cannot be undone. Runner jobs and finance ledger entries will be retained.')">@csrf<button type="submit" style="background:#8f3940!important;color:#fff!important">Purge all appraisals</button></form></section>
 <section class="panel" style="border-color:#a66b35!important"><h2>Archive cleanup · Purge archived appraisals</h2><p class="muted">Permanently deletes only appraisals currently in the archive and their saved item details. Active and expired non-archived appraisals are not touched. Runner jobs are retained with links to deleted archived appraisals cleared.</p><form method="post" action="{{ route('admin.appraisals.purge-archived') }}" onsubmit="return confirm('Permanently delete ONLY archived appraisals and their item details? Active and expired non-archived appraisals will be kept. This cannot be undone.')">@csrf<button type="submit" style="background:#a66b35!important;color:#fff!important">Purge archived appraisals only</button></form></section>
 <section class="panel"><h2>Administration</h2><div class="grid"><div class="stat">Open jobs<strong>{{ $adminMetrics['open_jobs'] }}</strong></div><div class="stat">Registered users<strong>{{ $adminMetrics['users'] }}</strong></div></div>
+<details class="pricing-settings"><summary>Ore reprocessing shipping cost</summary><div class="pricing-settings-content">
+<p class="muted">Shipping is deducted from refined mineral output value based on each mineral's EVE volume.</p>
+<form method="post" action="{{ route('admin.ore-shipping-cost.store') }}">@csrf
+<label>Shipping cost per m³ (ISK)
+<input name="cost_per_m3" type="number" min="0" max="1000000" step="0.01" value="{{ number_format((float) $oreShippingCostPerM3, 2, '.', '') }}" required style="max-width:220px">
+</label>
+<button type="submit">Save shipping cost</button>
+</form>
+</div></details>
 <details class="pricing-settings"><summary>Standard mineral buyback settings</summary><div class="pricing-settings-content">
 <p class="muted">Each mineral has its own buy percentage and cumulative Jita buy-order quantity. The calculator uses the price at that unit in the live Jita buy book. Save each mineral independently.</p>
 @php($standardMineralDepths = ['Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000, 'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000, 'Megacyte' => 500000, 'Morphite' => 45000])
