@@ -38,7 +38,18 @@ final class JitaMarketPriceRefresher
             ->map(fn ($id) => (int) $id)
             ->all();
 
-        $this->refreshTypes(array_values(array_diff($typeIds, $pricedIds)));
+        $hasDepthIds = DB::table('market_order_book_snapshots')
+            ->where('region_id', $regionId)
+            ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
+            ->where('is_buy_order', $side === 'buy')
+            ->whereIn('type_id', $typeIds)
+            ->distinct()
+            ->pluck('type_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $readyIds = array_values(array_intersect($pricedIds, $hasDepthIds));
+        $this->refreshTypes(array_values(array_diff($typeIds, $readyIds)));
     }
 
     /** @return array{saved:int,failed:int} */
@@ -54,15 +65,29 @@ final class JitaMarketPriceRefresher
                 if ($orders) {
                     $buy = null;
                     $sell = null;
+                    $now = now();
+                    $orderBookRows = [];
                     foreach ($orders as $order) {
                         if ($order['is_buy_order']) {
                             $buy = $buy === null ? $order['price'] : max($buy, $order['price']);
                         } else {
                             $sell = $sell === null ? $order['price'] : min($sell, $order['price']);
                         }
+                        $orderBookRows[] = [
+                            'type_id' => $typeId,
+                            'region_id' => $regionId,
+                            'location_id' => (int) config('buyback.jita_station_id', 60003760),
+                            'is_buy_order' => $order['is_buy_order'],
+                            'price' => $order['price'],
+                            'volume_remain' => $order['volume_remain'],
+                            'observed_at' => $now,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
                     }
-
-                    $now = now();
+                    foreach (array_chunk($orderBookRows, 500) as $chunk) {
+                        DB::table('market_order_book_snapshots')->insert($chunk);
+                    }
                     app(MarketPriceSnapshotWriter::class)->store([[
                         'type_id' => $typeId,
                         'region_id' => (string) config('buyback.region_id', '10000002'),
@@ -114,6 +139,7 @@ final class JitaMarketPriceRefresher
                 $orders[] = [
                     'is_buy_order' => (bool) ($order['is_buy_order'] ?? false),
                     'price' => $price,
+                    'volume_remain' => $volume,
                 ];
             }
             usleep(100000);
