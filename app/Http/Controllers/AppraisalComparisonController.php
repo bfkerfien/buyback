@@ -17,12 +17,12 @@ class AppraisalComparisonController extends Controller
         abort_unless($request->user()->isAdmin(), 403);
 
         $data = $request->validate([
-            'holo_input' => ['required', 'string', 'max:50000'],
+            'marketbaiters_input' => ['required', 'string', 'max:50000'],
             'buyback_input' => ['required', 'string', 'max:50000'],
         ]);
 
-        $holo = array_values(array_filter(
-            $this->resolveInput($data['holo_input'], 'Holo', $request, $parser),
+        $marketbaiters = array_values(array_filter(
+            $this->resolveInput($data['marketbaiters_input'], 'Marketbaiters', $request, $parser),
             fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
         ));
         $buyback = array_values(array_filter(
@@ -30,7 +30,7 @@ class AppraisalComparisonController extends Controller
             fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
         ));
 
-        $left = collect($holo)->keyBy(fn ($item) => $this->key($item['name']));
+        $left = collect($marketbaiters)->keyBy(fn ($item) => $this->key($item['name']));
         $right = collect($buyback)->keyBy(fn ($item) => $this->key($item['name']));
         $names = $left->keys()->merge($right->keys())->unique()->sort()->values();
 
@@ -41,15 +41,15 @@ class AppraisalComparisonController extends Controller
             $bq = (int) ($b['quantity'] ?? 0);
             return [
                 'name' => $a['name'] ?? $b['name'],
-                'holo_quantity' => $aq,
+                'marketbaiters_quantity' => $aq,
                 'buyback_quantity' => $bq,
                 'difference' => $bq - $aq,
-                'status' => !$a ? 'missing_holo' : (!$b ? 'missing_buyback' : ($aq === $bq ? 'match' : 'quantity_mismatch')),
+                'status' => !$a ? 'missing_marketbaiters' : (!$b ? 'missing_buyback' : ($aq === $bq ? 'match' : 'quantity_mismatch')),
             ];
         })->values();
 
         return response()->json([
-            'holo_items' => count($holo),
+            'marketbaiters_items' => count($marketbaiters),
             'buyback_items' => count($buyback),
             'matched' => $rows->where('status', 'match')->count(),
             'differences' => $rows->where('status', '!=', 'match')->count(),
@@ -78,34 +78,33 @@ class AppraisalComparisonController extends Controller
                     ->map(fn ($row) => ['name' => $row->type_name, 'quantity' => (int) $row->quantity])->all();
             }
 
-            if ($source === 'Holo') {
-                abort_unless(in_array($host, ['evebb.eu', 'www.evebb.eu'], true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'Holo links must use https://evebb.eu/.');
-                abort_unless(($parts['scheme'] ?? '') === 'https', 422, 'Holo appraisal links must use HTTPS.');
-                try {
-                    $response = Http::withOptions(['allow_redirects' => false])
-                        ->withHeaders(['User-Agent' => 'EveBuyback Holo Comparator'])
-                        ->accept('text/html')
-                        ->timeout(15)
-                        ->get($input);
-                } catch (\Throwable $e) {
-                    throw ValidationException::withMessages(['holo_input' => 'Could not load that Holo page. Check the link and try again, or paste the copied appraisal item list.']);
-                }
-                if (!$response->successful()) {
-                    throw ValidationException::withMessages(['holo_input' => 'Holo did not return that appraisal page. Check that the appraisal link is public, or paste its copied item list.']);
-                }
-                $items = $this->parseHtml($response->body(), $parser);
-                if (!$items) {
-                    throw ValidationException::withMessages(['holo_input' => 'The Holo page loaded but no item rows could be read. This link may require a different parser; paste the copied item list for now.']);
-                }
-                return $items;
+            abort_unless(in_array($host, ['marketbaiters.com', 'www.marketbaiters.com'], true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'Marketbaiters links must use https://marketbaiters.com/.');
+            abort_unless(($parts['scheme'] ?? '') === 'https', 422, 'Marketbaiters appraisal links must use HTTPS.');
+
+            try {
+                $response = Http::withOptions(['allow_redirects' => false])
+                    ->withHeaders(['User-Agent' => 'EveBuyback Appraisal Comparator'])
+                    ->accept('text/html')
+                    ->timeout(15)
+                    ->get($input);
+            } catch (\Throwable $e) {
+                throw ValidationException::withMessages(['marketbaiters_input' => 'Could not load that Marketbaiters link. Paste its copied item list into this block instead.']);
             }
 
-            throw ValidationException::withMessages(['buyback_input' => 'Paste an EveBuyback /q/ link or copied item list.']);
+            if (!$response->successful()) {
+                throw ValidationException::withMessages(['marketbaiters_input' => 'Marketbaiters did not return that appraisal. Paste its copied item list into this block instead.']);
+            }
+
+            $items = $this->parseHtml($response->body(), $parser);
+            if (!$items) {
+                throw ValidationException::withMessages(['marketbaiters_input' => 'That Marketbaiters link does not expose a readable item list. Paste the appraisal item table or copied cargo list into this block.']);
+            }
+            return $items;
         }
 
         $items = $parser->parse($input);
         if (!$items) {
-            $field = $source === 'Holo' ? 'holo_input' : 'buyback_input';
+            $field = $source === 'Marketbaiters' ? 'marketbaiters_input' : 'buyback_input';
             throw ValidationException::withMessages([$field => 'No item names and quantities could be parsed. Paste the copied appraisal item list or a supported appraisal link.']);
         }
 
