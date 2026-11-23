@@ -17,12 +17,12 @@ class AppraisalComparisonController extends Controller
         abort_unless($request->user()->isAdmin(), 403);
 
         $data = $request->validate([
-            'marketbaiters_input' => ['required', 'string', 'max:50000'],
+            'holo_input' => ['required', 'string', 'max:50000'],
             'buyback_input' => ['required', 'string', 'max:50000'],
         ]);
 
-        $marketbaiters = array_values(array_filter(
-            $this->resolveInput($data['marketbaiters_input'], 'Marketbaiters', $request, $parser),
+        $holo = array_values(array_filter(
+            $this->resolveInput($data['holo_input'], 'Holo', $request, $parser),
             fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
         ));
         $buyback = array_values(array_filter(
@@ -30,7 +30,7 @@ class AppraisalComparisonController extends Controller
             fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
         ));
 
-        $left = collect($marketbaiters)->keyBy(fn ($item) => $this->key($item['name']));
+        $left = collect($holo)->keyBy(fn ($item) => $this->key($item['name']));
         $right = collect($buyback)->keyBy(fn ($item) => $this->key($item['name']));
         $names = $left->keys()->merge($right->keys())->unique()->sort()->values();
 
@@ -41,15 +41,15 @@ class AppraisalComparisonController extends Controller
             $bq = (int) ($b['quantity'] ?? 0);
             return [
                 'name' => $a['name'] ?? $b['name'],
-                'marketbaiters_quantity' => $aq,
+                'holo_quantity' => $aq,
                 'buyback_quantity' => $bq,
                 'difference' => $bq - $aq,
-                'status' => !$a ? 'missing_marketbaiters' : (!$b ? 'missing_buyback' : ($aq === $bq ? 'match' : 'quantity_mismatch')),
+                'status' => !$a ? 'missing_holo' : (!$b ? 'missing_buyback' : ($aq === $bq ? 'match' : 'quantity_mismatch')),
             ];
         })->values();
 
         return response()->json([
-            'marketbaiters_items' => count($marketbaiters),
+            'holo_items' => count($holo),
             'buyback_items' => count($buyback),
             'matched' => $rows->where('status', 'match')->count(),
             'differences' => $rows->where('status', '!=', 'match')->count(),
@@ -78,8 +78,8 @@ class AppraisalComparisonController extends Controller
                     ->map(fn ($row) => ['name' => $row->type_name, 'quantity' => (int) $row->quantity])->all();
             }
 
-            abort_unless(in_array($host, ['marketbaiters.com', 'www.marketbaiters.com'], true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'Marketbaiters links must use https://marketbaiters.com/.');
-            abort_unless(($parts['scheme'] ?? '') === 'https', 422, 'Marketbaiters appraisal links must use HTTPS.');
+            abort_unless(in_array($host, ['evebb.eu', 'www.evebb.eu'], true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'Holo appraisal links must use evebb.eu.');
+            abort_unless(($parts['scheme'] ?? '') === 'https', 422, 'Holo appraisal links must use HTTPS.');
 
             try {
                 $response = Http::withOptions(['allow_redirects' => false])
@@ -87,25 +87,25 @@ class AppraisalComparisonController extends Controller
                     ->accept('text/html')
                     ->timeout(15)
                     ->get($input);
-            } catch (\Throwable $e) {
-                throw ValidationException::withMessages(['marketbaiters_input' => 'Could not load that Marketbaiters link. Paste its copied item list into this block instead.']);
+            } catch (\\Throwable $e) {
+                throw ValidationException::withMessages(['holo_input' => 'Could not load that Holo link. Paste its copied item list instead.']);
             }
 
             if (!$response->successful()) {
-                throw ValidationException::withMessages(['marketbaiters_input' => 'Marketbaiters did not return that appraisal. Paste its copied item list into this block instead.']);
+                throw ValidationException::withMessages(['holo_input' => 'Holo did not return that appraisal link. Paste its copied item list instead.']);
             }
 
             $items = $this->parseHtml($response->body(), $parser);
             if (!$items) {
-                throw ValidationException::withMessages(['marketbaiters_input' => 'That Marketbaiters link does not expose a readable item list. Paste the appraisal item table or copied cargo list into this block.']);
+                throw ValidationException::withMessages(['holo_input' => 'That Holo page did not expose a readable item list. Paste the copied Holo item list into this block instead.']);
             }
             return $items;
         }
 
         $items = $parser->parse($input);
         if (!$items) {
-            $field = $source === 'Marketbaiters' ? 'marketbaiters_input' : 'buyback_input';
-            throw ValidationException::withMessages([$field => 'No item names and quantities could be parsed. Paste the copied appraisal item list or a supported appraisal link.']);
+            $field = $source === 'Holo' ? 'holo_input' : 'buyback_input';
+            throw ValidationException::withMessages([$field => 'No item names and quantities could be parsed. Paste the copied item list or a supported appraisal link.']);
         }
 
         return $items;
