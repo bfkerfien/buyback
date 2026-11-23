@@ -211,7 +211,7 @@ final class AppraisalCalculator
                     'ice_buy_depth_' . $typeId,
                     1000
                 ));
-                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy', $depth);
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
