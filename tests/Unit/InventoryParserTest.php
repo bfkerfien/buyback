@@ -43,7 +43,7 @@ class InventoryParserTest extends TestCase
             'Compressed Arkonor',
             'Refine',
             '10 batches · 90.63% yield',
-            "1,000\\t160\\tore\\trefined\\t\\t2.87M",
+            "1,000\t160\tore\trefined\t\t2.87M",
             'Compressed Arkonor II-Grade',
             'Refine',
             '10 batches · 90.63% yield',
@@ -63,7 +63,7 @@ class InventoryParserTest extends TestCase
     {
         $items = (new InventoryParser())->parseMarketBaiters(
             "Refine\n10 batches · 90.63% yield\n1,000 160 ore refined 2.87M\n"
-            ."This is not an item\\nSome unrelated 123"
+            ."This is not an item\nSome unrelated 123"
         );
 
         $this->assertSame([], $items);
