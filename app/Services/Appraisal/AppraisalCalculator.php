@@ -377,8 +377,16 @@ final class AppraisalCalculator
                 && in_array((int) $type->group_id, [1042, 1034, 1040, 1041], true))
                 ? $piBuyRules->get($type->type_id)
                 : null;
-            $rate = $customPayoutPercent
-                ?? ($fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($piBuyRule->buy_percent ?? $defaultRate));
+            // Reprocessed ore/faction ice has already had each refined
+            // mineral's individual buyback percentage applied above. Applying
+            // the generic item payout rate again here double-discounts the
+            // entire refined basket (e.g. 87% × 87% = 75.69%).
+            // Its final rate must therefore be 100%; all pricing/rates are
+            // already reflected in $lineValue.
+            $rate = $valuationMode === 'reprocessed'
+                ? 100.0
+                : ($customPayoutPercent
+                    ?? ($fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($piBuyRule->buy_percent ?? $defaultRate)));
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
 
