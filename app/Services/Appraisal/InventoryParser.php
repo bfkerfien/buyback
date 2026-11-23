@@ -22,7 +22,7 @@ final class InventoryParser
      */
     public function parseMarketBaiters(string $input): array
     {
-        $lines = preg_split('/\\r\\n|\\n|\\r/', str_replace("\\r", '', $input)) ?: [];
+        $lines = preg_split('/\\r\\n|\\n|\\r/', str_replace("\r", '', $input)) ?: [];
         $items = [];
 
         for ($i = 0, $count = count($lines); $i < $count - 1; $i++) {
