@@ -66,7 +66,7 @@
         <nav class="site-nav site-admin-nav" aria-label="Administration navigation">
             <a href="{{ route('pi-planner.index') }}" @if(request()->routeIs('pi-planner.*')) aria-current="page" @endif>Planetary Industry</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-ore-refining']) }}">Ore Refining</a>
-            <a href="{{ route('dashboard', ['tab' => 'tab-marketbaiters']) }}">Marketbaiters</a>
+            <a href="{{ route('dashboard', ['tab' => 'tab-appraisal-manifests']) }}" @if(request()->routeIs('dashboard') && request('tab') === 'tab-appraisal-manifests') aria-current="page" @endif>Appraisal Comparison</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-admin']) }}">Admin</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-admin-tools']) }}">Admin Tools</a>
         </nav>
