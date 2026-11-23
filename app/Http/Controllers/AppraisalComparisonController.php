@@ -91,37 +91,35 @@ class AppraisalComparisonController extends Controller
                 'holo' => (int) ($holo['quantity'] ?? 0),
                 'buyback' => (int) ($buyback['quantity'] ?? 0),
             ];
-            $present = array_filter($quantities, fn ($quantity) => $quantity > 0);
-            $allPresent = count($present) === 2;
-            $sameQuantity = $allPresent && count(array_unique(array_values($quantities))) === 1;
+            $holoPresent = $quantities['holo'] > 0;
+            $buybackPresent = $quantities['buyback'] > 0;
+            $sameQuantity = $holoPresent && $buybackPresent && $quantities['holo'] === $quantities['buyback'];
 
-            $prices = [
-                'holo' => isset($holo['unit_payout']) ? (float) $holo['unit_payout'] : (isset($holo['unit_price']) ? (float) $holo['unit_price'] : null),
-                'buyback' => isset($buyback['unit_payout']) ? (float) $buyback['unit_payout'] : null,
-            ];
-            $availablePrices = array_filter($prices, fn ($price) => $price !== null && $price > 0);
-            $bestPrice = $availablePrices ? max($availablePrices) : null;
-            $bestSource = $bestPrice === null ? null : array_search($bestPrice, $prices, true);
-            $buybackGross = isset($buyback['unit_price']) ? (float) $buyback['unit_price'] : null;
+            // Holo's fetched share page exposes inventory, not a verified per-item
+            // payout in the HTML available to this server. Never infer a price from
+            // arbitrary table columns (volume, batch size, etc.).
+            $buybackPayout = isset($buyback['unit_payout']) && (float) $buyback['unit_payout'] > 0
+                ? (float) $buyback['unit_payout'] : null;
             return [
                 'name' => $holo['name'] ?? $buyback['name'],
                 'holo_quantity' => $quantities['holo'],
                 'buyback_quantity' => $quantities['buyback'],
-                'holo_unit_price' => $prices['holo'],
-                'buyback_unit_payout' => $prices['buyback'],
-                'best_source' => $bestSource,
-                'best_unit_payout' => $bestPrice,
-                'proposed_buyback_percent' => ($bestPrice !== null && $buybackGross !== null && $buybackGross > 0)
-                    ? min(100, round(($bestPrice / $buybackGross) * 100, 2)) : null,
-                'status' => $sameQuantity ? 'match' : ($allPresent ? 'quantity_mismatch' : 'missing_source'),
+                'holo_unit_price' => null,
+                'buyback_unit_payout' => $buybackPayout,
+                'quantity_status' => !$holoPresent ? 'missing_from_holo'
+                    : (!$buybackPresent ? 'missing_from_buyback'
+                    : ($sameQuantity ? 'same_quantity' : 'quantity_mismatch')),
+                'price_status' => 'not_comparable_holo_price_unavailable',
+                'status' => !$holoPresent || !$buybackPresent ? 'missing_source'
+                    : ($sameQuantity ? 'same_quantity' : 'quantity_mismatch'),
             ];
         })->values();
 
         return response()->json([
             'holo_items' => count($sources['Holo']),
             'buyback_items' => count($sources['EveBuyback']),
-            'matched' => $rows->where('status', 'match')->count(),
-            'differences' => $rows->where('status', '!=', 'match')->count(),
+            'same_quantity' => $rows->where('status', 'same_quantity')->count(),
+            'differences' => $rows->where('status', '!=', 'same_quantity')->count(),
             'rows' => $rows,
         ]);
     }
@@ -156,43 +154,14 @@ class AppraisalComparisonController extends Controller
                     })->all();
             }
 
-            $allowedHosts = $source === 'Holo'
-                ? ['evebb.eu', 'www.evebb.eu']
-                : ['marketbaiters.com', 'www.marketbaiters.com'];
+            abort_unless($source === 'Holo', 422, 'Only Holo share links and EveBuyback appraisal links are supported.');
+            $allowedHosts = ['evebb.eu', 'www.evebb.eu'];
             abort_unless(in_array($host, $allowedHosts, true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, $source.' appraisal links must use the official '.$source.' host.');
             abort_unless(($parts['scheme'] ?? '') === 'https', 422, $source.' appraisal links must use HTTPS.');
 
             $expectedPath = $source === 'MarketBaiters' ? '~/a/[A-Za-z0-9]+/?$~' : '~^/~';
             if (!preg_match($expectedPath, $path)) {
                 throw ValidationException::withMessages([$field => 'That does not look like a supported '.$source.' appraisal share link.']);
-            }
-
-            if ($source === 'MarketBaiters') {
-                if (!preg_match('~^/a/([A-Za-z0-9]+)/?$~', $path, $tokenMatch)) {
-                    throw ValidationException::withMessages([$field => 'Use a MarketBaiters share link in the form /a/{token}.']);
-                }
-
-                try {
-                    $response = Http::withOptions(['allow_redirects' => false])
-                        ->withHeaders(['User-Agent' => 'EveBuyback Appraisal Comparator'])
-                        ->acceptJson()
-                        ->timeout(20)
-                        ->get('https://marketbaiters.com/api/v1/appraise/'.rawurlencode($tokenMatch[1]));
-                } catch (\Throwable $e) {
-                    throw ValidationException::withMessages([$field => 'Could not load the MarketBaiters appraisal API. Paste the copied item list instead.']);
-                }
-
-                if (!$response->successful()) {
-                    throw ValidationException::withMessages([$field => 'MarketBaiters did not return that appraisal from its API. Paste the copied item list instead.']);
-                }
-
-                $payload = $response->json();
-                $items = is_array($payload) ? $parser->parseMarketBaitersJson($payload) : [];
-                if (!$items) {
-                    throw ValidationException::withMessages([$field => 'The MarketBaiters API response did not contain readable appraisal items. Paste the copied item list instead.']);
-                }
-
-                return $items;
             }
 
             try {
@@ -216,9 +185,7 @@ class AppraisalComparisonController extends Controller
             return $items;
         }
 
-        $items = $source === 'MarketBaiters'
-            ? $parser->parseMarketBaiters($input)
-            : $parser->parse($input);
+        $items = $parser->parse($input);
         if (!$items) {
             throw ValidationException::withMessages([$field => 'No item names and quantities could be parsed. Paste the copied item list or a supported appraisal link.']);
         }
@@ -227,13 +194,6 @@ class AppraisalComparisonController extends Controller
 
     private function parseHtml(string $html, string $source, InventoryParser $parser): array
     {
-        if ($source === 'MarketBaiters') {
-            $marketBaitersItems = $parser->parseMarketBaitersHtml($html);
-            if ($marketBaitersItems) {
-                return $marketBaitersItems;
-            }
-        }
-
         $items = [];
         if (preg_match_all('/<tr\\b[^>]*>(.*?)<\\/tr>/is', $html, $matches)) {
             foreach ($matches[1] as $row) {
@@ -244,15 +204,7 @@ class AppraisalComparisonController extends Controller
                 if ($name === '' || !preg_match('/^[0-9][0-9,]*$/', $quantityText)) continue;
                 if (preg_match('/^(item|type|name|quantity|total|subtotal)$/i', $name)) continue;
                 $quantity = (int) str_replace(',', '', $quantityText);
-                $unitPrice = null;
-                foreach (array_slice($values, 2) as $value) {
-                    $normalized = preg_replace('/[^0-9.\\-]/', '', str_replace(',', '', $value));
-                    if ($normalized !== '' && is_numeric($normalized) && (float) $normalized > 0) {
-                        $unitPrice = (float) $normalized;
-                        break;
-                    }
-                }
-                $items[] = ['name' => $name, 'quantity' => $quantity, 'unit_payout' => $unitPrice, 'unit_price' => $unitPrice];
+                $items[] = ['name' => $name, 'quantity' => $quantity];
             }
         }
 
@@ -276,7 +228,7 @@ class AppraisalComparisonController extends Controller
         foreach ($items as $item) {
             if ($item['quantity'] < 1) continue;
             $key = $this->key($item['name']);
-            if (!isset($merged[$key])) $merged[$key] = ['name' => $item['name'], 'quantity' => 0, 'unit_price' => $item['unit_price'] ?? null, 'unit_payout' => $item['unit_payout'] ?? null];
+            if (!isset($merged[$key])) $merged[$key] = ['name' => $item['name'], 'quantity' => 0, 'unit_price' => null, 'unit_payout' => null];
             $merged[$key]['quantity'] += $item['quantity'];
         }
         return array_values($merged);
