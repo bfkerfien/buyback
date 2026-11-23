@@ -26,7 +26,6 @@ Route::get('/q/{token}', [AppraisalController::class, 'show'])->whereAlphaNumeri
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    Route::get('/admin/holo-comparison', [DashboardController::class, 'holoComparison'])->middleware('admin')->name('admin.holo-comparison.index');
     Route::get('/pi-planner', [PiPlannerController::class, 'index'])->middleware('admin')->name('pi-planner.index');
     Route::post('/pi-planner/p1-buy-rule', [PiPlannerController::class, 'setP1BuyRule'])->middleware('admin')->name('pi-planner.p1-buy-rule');
     Route::get('/link-character/eve', [EveSsoController::class, 'linkCharacter'])->name('login.eve.link');
@@ -35,7 +34,6 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/admin/appraisals/purge', [AdminAppraisalController::class, 'purge'])->middleware('admin')->name('admin.appraisals.purge');
     Route::post('/admin/appraisals/purge-archived', [AdminAppraisalController::class, 'purgeArchived'])->middleware('admin')->name('admin.appraisals.purge-archived');
     Route::post('/admin/appraisal-comparison', [AppraisalComparisonController::class, 'compare'])->middleware('admin')->name('admin.appraisal-comparison');
-    Route::post('/admin/holo-comparison', [AppraisalComparisonController::class, 'compareHolo'])->middleware('admin')->name('admin.holo-comparison');
     Route::post('/admin/appraisals/{quote}/contract', [AppraisalVisibilityController::class, 'markContracted'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.contract');
     Route::post('/admin/appraisals/{quote}/archive', [AppraisalVisibilityController::class, 'archive'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.archive');
     Route::post('/admin/appraisals/{quote}/restore', [AppraisalVisibilityController::class, 'restore'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.restore');
