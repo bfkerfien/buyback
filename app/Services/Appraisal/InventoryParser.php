@@ -11,6 +11,75 @@ final class InventoryParser
      *
      * @return array<int, array{name:string, quantity:int}>
      */
+
+    /**
+     * Parse MarketBaiters' copied appraisal cards. Each card has an item-name
+     * heading, a "Refine" action, a batches/yield line, and a result row such
+     * as "1,000 160 ore refined 2.87M". Only card headings are item names;
+     * action labels and refinement-result columns must never become items.
+     *
+     * @return array<int, array{name:string, quantity:int, unit_price:?float, unit_payout:?float}>
+     */
+    public function parseMarketBaiters(string $input): array
+    {
+        $lines = preg_split('/\\r\\n|\\n|\\r/', str_replace("\\r", '', $input)) ?: [];
+        $items = [];
+
+        for ($i = 0, $count = count($lines); $i < $count - 1; $i++) {
+            $name = trim($lines[$i]);
+            if ($name === '' || strcasecmp(trim($lines[$i + 1]), 'Refine') !== 0) {
+                continue;
+            }
+
+            $quantity = null;
+            $totalValue = null;
+            for ($j = $i + 2; $j < min($count, $i + 6); $j++) {
+                $row = trim($lines[$j]);
+                if (preg_match('/^([0-9][0-9,]*)\\s+.*\\b(?:moon\\s+ore|ore|ice)\\s+refined\\b/i', $row, $match)) {
+                    $quantity = (int) str_replace(',', '', $match[1]);
+                    if (preg_match('/([0-9][0-9,]*(?:\\.[0-9]+)?\\s*[KMB])\\s*(?:ISK)?\\s*$/i', $row, $money)) {
+                        $token = strtoupper(preg_replace('/\\s+/', '', $money[1]));
+                        $suffix = substr($token, -1);
+                        $amount = (float) substr($token, 0, -1);
+                        $totalValue = $amount * match ($suffix) {
+                            'K' => 1000,
+                            'M' => 1000000,
+                            'B' => 1000000000,
+                        };
+                    }
+                    break;
+                }
+            }
+
+            if ($quantity === null || $quantity < 1 || $quantity > 1000000000) {
+                continue;
+            }
+
+            $key = mb_strtolower(preg_replace('/\\s+/', ' ', $name));
+            if (!isset($items[$key])) {
+                $items[$key] = ['name' => $name, 'quantity' => 0, 'total_value' => 0.0, 'has_value' => false];
+            }
+            $items[$key]['quantity'] += $quantity;
+            if ($totalValue !== null) {
+                $items[$key]['total_value'] += $totalValue;
+                $items[$key]['has_value'] = true;
+            }
+        }
+
+        return array_values(array_map(static function (array $item): array {
+            $unitPrice = $item['has_value'] && $item['quantity'] > 0
+                ? $item['total_value'] / $item['quantity']
+                : null;
+
+            return [
+                'name' => $item['name'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $unitPrice,
+                'unit_payout' => $unitPrice,
+            ];
+        }, $items));
+    }
+
     public function parse(string $input): array
     {
         $items = [];
