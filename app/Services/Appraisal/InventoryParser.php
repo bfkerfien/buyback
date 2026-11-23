@@ -95,6 +95,68 @@ final class InventoryParser
     }
 
     /**
+     * Parse the JSON payload returned by MarketBaiters' public appraisal API.
+     * Only top-level appraisal rows are imported. Reprocessing sub_items are
+     * breakdowns of their parent ore and must not be counted as extra inventory.
+     *
+     * @return array<int, array{name:string, quantity:int, unit_price:?float, unit_payout:?float}>
+     */
+    public function parseMarketBaitersJson(array $payload): array
+    {
+        $rows = $payload['items'] ?? null;
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $name = trim((string) ($row['name'] ?? ''));
+            $quantity = filter_var($row['quantity'] ?? null, FILTER_VALIDATE_INT);
+            if ($name === '' || $quantity === false || $quantity < 1 || $quantity > 1000000000) {
+                continue;
+            }
+
+            $payout = $row['payout'] ?? null;
+            $unitPayout = is_numeric($payout) && (float) $payout >= 0
+                ? (float) $payout / $quantity
+                : null;
+
+            $key = mb_strtolower(preg_replace('/\\s+/', ' ', $name));
+            if (!isset($items[$key])) {
+                $items[$key] = [
+                    'name' => $name,
+                    'quantity' => 0,
+                    'total_payout' => 0.0,
+                    'has_payout' => false,
+                ];
+            }
+
+            $items[$key]['quantity'] += $quantity;
+            if ($unitPayout !== null) {
+                $items[$key]['total_payout'] += $unitPayout * $quantity;
+                $items[$key]['has_payout'] = true;
+            }
+        }
+
+        return array_values(array_map(static function (array $item): array {
+            $unitPayout = $item['has_payout'] && $item['quantity'] > 0
+                ? $item['total_payout'] / $item['quantity']
+                : null;
+
+            return [
+                'name' => $item['name'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $unitPayout,
+                'unit_payout' => $unitPayout,
+            ];
+        }, $items));
+    }
+
+    /**
      * Parse MarketBaiters' copied appraisal cards. Each card has an item-name
      * heading, a "Refine" action, a batches/yield line, and a result row such
      * as "1,000 160 ore refined 2.87M". Only card headings are item names;
