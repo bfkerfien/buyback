@@ -64,36 +64,81 @@ class AppraisalComparisonController extends Controller
     public function saveItemRate(Request $request): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
+
         $data = $request->validate([
             'type_id' => ['required', 'integer', 'min:1'],
+            'name' => ['required', 'string', 'max:255'],
             'holo_unit_payout' => ['required', 'numeric', 'gt:0'],
             'buyback_unit_payout' => ['required', 'numeric', 'gt:0'],
         ]);
-        $item = DB::table('eve_item_types')->where('type_id', $data['type_id'])
-            ->where('published', true)->first(['type_id', 'type_name']);
-        abort_unless($item, 404, 'Published item type not found.');
 
-        $current = DB::table('appraisal_item_payout_overrides')->where('type_id', $item->type_id)->value('payout_multiplier');
-        $current = $current === null ? 1.0 : (float) $current;
-        $factor = ((float) $data['holo_unit_payout'] * 1.0005) / (float) $data['buyback_unit_payout'];
-        $next = round($current * $factor, 6);
-        abort_if($next < 0.000001 || $next > 100000, 422, 'Calculated item adjustment is outside the allowed range.');
+        $item = DB::table('eve_item_types')
+            ->where('type_id', $data['type_id'])
+            ->where('type_name', $data['name'])
+            ->where('published', true)
+            ->first(['type_id', 'type_name']);
+        abort_unless($item, 422, 'The compared item no longer matches a published SDE item. Run the comparison again.');
 
-        DB::table('appraisal_item_payout_overrides')->updateOrInsert(
-            ['type_id' => (int) $item->type_id],
-            ['type_name' => $item->type_name, 'payout_multiplier' => $next,
-             'updated_by' => $request->user()->id, 'created_at' => now(), 'updated_at' => now()]
-        );
-        DB::table('audit_logs')->insert([
-            'user_id' => $request->user()->id, 'action' => 'appraisal_item_payout_override.saved',
-            'subject_type' => 'eve_item_type', 'subject_id' => $item->type_id,
-            'details' => json_encode(['item' => $item->type_name, 'multiplier' => $next,
-                'target_vs_holo' => 0.05]),
-            'ip_address' => $request->ip(), 'created_at' => now(), 'updated_at' => now(),
+        $next = null;
+        $targetUnitPayout = (float) $data['holo_unit_payout'] * 1.0005;
+
+        DB::transaction(function () use ($request, $data, $item, $targetUnitPayout, &$next): void {
+            $storedMultiplier = DB::table('appraisal_item_payout_overrides')
+                ->where('type_id', $item->type_id)
+                ->value('payout_multiplier');
+            $currentMultiplier = $storedMultiplier === null ? 1.0 : (float) $storedMultiplier;
+
+            // Each item gets its own multiplier. The item's existing category/base
+            // pricing remains unchanged; only this exact SDE type is adjusted.
+            $next = round(
+                $currentMultiplier * ($targetUnitPayout / (float) $data['buyback_unit_payout']),
+                6
+            );
+            abort_if(
+                !is_finite($next) || $next < 0.000001 || $next > 999999.999999,
+                422,
+                'Calculated item adjustment is outside the supported range.'
+            );
+
+            DB::table('appraisal_item_payout_overrides')->updateOrInsert(
+                ['type_id' => (int) $item->type_id],
+                [
+                    'type_name' => $item->type_name,
+                    'payout_multiplier' => number_format($next, 6, '.', ''),
+                    'updated_by' => $request->user()->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+
+            DB::table('audit_logs')->insert([
+                'user_id' => $request->user()->id,
+                'action' => 'appraisal_item_payout_override.saved_from_holo',
+                'subject_type' => 'eve_item_type',
+                'subject_id' => $item->type_id,
+                'details' => json_encode([
+                    'item' => $item->type_name,
+                    'holo_unit_payout' => (float) $data['holo_unit_payout'],
+                    'target_unit_payout' => $targetUnitPayout,
+                    'buyback_unit_payout_before_save' => (float) $data['buyback_unit_payout'],
+                    'previous_multiplier' => $currentMultiplier,
+                    'saved_multiplier' => $next,
+                    'margin_percent' => 0.05,
+                ]),
+                'ip_address' => $request->ip(),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        return response()->json([
+            'saved' => true,
+            'type_id' => (int) $item->type_id,
+            'name' => $item->type_name,
+            'multiplier' => $next,
+            'target_unit_payout' => round($targetUnitPayout, 2),
+            'message' => $item->type_name . ' saved at 0.05% above Holo. You can save the next item.',
         ]);
-
-        return response()->json(['saved' => true, 'name' => $item->type_name,
-            'multiplier' => $next, 'message' => $item->type_name . ' saved.']);
     }
 
     public function compare(Request $request, InventoryParser $parser): JsonResponse
@@ -147,7 +192,12 @@ class AppraisalComparisonController extends Controller
                 'buyback_total_payout' => isset($buyback['total_payout']) ? (float) $buyback['total_payout'] : null,
                 'type_id' => isset($buyback['type_id']) ? (int) $buyback['type_id'] : null,
                 'recommended_percent' => ($comparable && !empty($buyback['type_id']) && isset($buyback['payout_percent']))
-                    ? round((float) $buyback['payout_percent'] * (1.0005 * $holoPayout / $buybackPayout), 2) : null,
+                    ? round(
+                        (float) $buyback['payout_percent']
+                        * (float) ($buyback['item_payout_multiplier'] ?? 1.0)
+                        * (1.0005 * $holoPayout / $buybackPayout),
+                        2
+                    ) : null,
                 'buyback_unit_payout' => $buybackPayout,
                 'payout_difference_per_unit' => $difference,
                 'payout_difference_percent' => $differencePercent,
