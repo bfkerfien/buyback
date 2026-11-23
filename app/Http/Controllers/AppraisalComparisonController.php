@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\\Http\\Controllers;
 
-use App\Services\Eve\ExcludedMissionOre;
-use App\Services\Appraisal\InventoryParser;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Validation\ValidationException;
+use App\\Services\\Eve\\ExcludedMissionOre;
+use App\\Services\\Appraisal\\InventoryParser;
+use Illuminate\\Http\\JsonResponse;
+use Illuminate\\Http\\Request;
+use Illuminate\\Support\\Facades\\DB;
+use Illuminate\\Support\\Facades\\Http;
+use Illuminate\\Validation\\ValidationException;
 
 class AppraisalComparisonController extends Controller
 {
@@ -19,45 +19,56 @@ class AppraisalComparisonController extends Controller
         $data = $request->validate([
             'holo_input' => ['required', 'string', 'max:50000'],
             'buyback_input' => ['required', 'string', 'max:50000'],
+            'marketbaiters_input' => ['required', 'string', 'max:50000'],
         ]);
 
-        $holo = array_values(array_filter(
-            $this->resolveInput($data['holo_input'], 'Holo', $request, $parser),
-            fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
-        ));
-        $buyback = array_values(array_filter(
-            $this->resolveInput($data['buyback_input'], 'EveBuyback', $request, $parser),
-            fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
-        ));
+        $sources = [];
+        foreach (['Holo' => 'holo_input', 'EveBuyback' => 'buyback_input', 'MarketBaiters' => 'marketbaiters_input'] as $source => $field) {
+            $sources[$source] = array_values(array_filter(
+                $this->resolveInput($data[$field], $source, $field, $request, $parser),
+                fn ($item) => !ExcludedMissionOre::isExcluded($item['name'])
+            ));
+        }
 
-        $left = collect($holo)->keyBy(fn ($item) => $this->key($item['name']));
-        $right = collect($buyback)->keyBy(fn ($item) => $this->key($item['name']));
-        $names = $left->keys()->merge($right->keys())->unique()->sort()->values();
+        $indexed = [];
+        foreach ($sources as $source => $items) {
+            $indexed[$source] = collect($items)->keyBy(fn ($item) => $this->key($item['name']));
+        }
+        $names = collect($indexed)->flatMap(fn ($items) => $items->keys())->unique()->sort()->values();
 
-        $rows = $names->map(function ($key) use ($left, $right) {
-            $a = $left->get($key);
-            $b = $right->get($key);
-            $aq = (int) ($a['quantity'] ?? 0);
-            $bq = (int) ($b['quantity'] ?? 0);
+        $rows = $names->map(function ($key) use ($indexed) {
+            $holo = $indexed['Holo']->get($key);
+            $buyback = $indexed['EveBuyback']->get($key);
+            $marketbaiters = $indexed['MarketBaiters']->get($key);
+            $quantities = [
+                'holo' => (int) ($holo['quantity'] ?? 0),
+                'buyback' => (int) ($buyback['quantity'] ?? 0),
+                'marketbaiters' => (int) ($marketbaiters['quantity'] ?? 0),
+            ];
+            $present = array_filter($quantities, fn ($quantity) => $quantity > 0);
+            $allPresent = count($present) === 3;
+            $sameQuantity = $allPresent && count(array_unique(array_values($quantities))) === 1;
+
             return [
-                'name' => $a['name'] ?? $b['name'],
-                'holo_quantity' => $aq,
-                'buyback_quantity' => $bq,
-                'difference' => $bq - $aq,
-                'status' => !$a ? 'missing_holo' : (!$b ? 'missing_buyback' : ($aq === $bq ? 'match' : 'quantity_mismatch')),
+                'name' => $holo['name'] ?? $buyback['name'] ?? $marketbaiters['name'],
+                'holo_quantity' => $quantities['holo'],
+                'buyback_quantity' => $quantities['buyback'],
+                'marketbaiters_quantity' => $quantities['marketbaiters'],
+                'status' => $sameQuantity ? 'match' : ($allPresent ? 'quantity_mismatch' : 'missing_source'),
             ];
         })->values();
 
         return response()->json([
-            'holo_items' => count($holo),
-            'buyback_items' => count($buyback),
+            'holo_items' => count($sources['Holo']),
+            'buyback_items' => count($sources['EveBuyback']),
+            'marketbaiters_items' => count($sources['MarketBaiters']),
             'matched' => $rows->where('status', 'match')->count(),
             'differences' => $rows->where('status', '!=', 'match')->count(),
             'rows' => $rows,
         ]);
     }
 
-    private function resolveInput(string $input, string $source, Request $request, InventoryParser $parser): array
+    private function resolveInput(string $input, string $source, string $field, Request $request, InventoryParser $parser): array
     {
         $input = trim($input);
         if (filter_var($input, FILTER_VALIDATE_URL)) {
@@ -69,49 +80,55 @@ class AppraisalComparisonController extends Controller
                 $allowedHost = strtolower((string) (parse_url(config('app.url'), PHP_URL_HOST) ?: $request->getHost()));
                 abort_unless($host === $allowedHost && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'The EveBuyback link must point to this EveBuyback site.');
                 if (!preg_match('~/q/([A-Za-z0-9]+)~', $path, $match)) {
-                    throw ValidationException::withMessages(['buyback_input' => 'Use an EveBuyback appraisal link in the form /q/{quote-token}.']);
+                    throw ValidationException::withMessages([$field => 'Use an EveBuyback appraisal link in the form /q/{quote-token}.']);
                 }
                 $quote = DB::table('appraisal_quotes')->where('public_token', $match[1])->first();
-                if (!$quote) throw ValidationException::withMessages(['buyback_input' => 'That EveBuyback appraisal link was not found.']);
+                if (!$quote) throw ValidationException::withMessages([$field => 'That EveBuyback appraisal link was not found.']);
                 return DB::table('appraisal_quote_items')->where('appraisal_quote_id', $quote->id)
                     ->orderBy('type_name')->get(['type_name', 'quantity'])
                     ->map(fn ($row) => ['name' => $row->type_name, 'quantity' => (int) $row->quantity])->all();
             }
 
-            abort_unless(in_array($host, ['evebb.eu', 'www.evebb.eu'], true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, 'Holo appraisal links must use evebb.eu.');
-            abort_unless(($parts['scheme'] ?? '') === 'https', 422, 'Holo appraisal links must use HTTPS.');
+            $allowedHosts = $source === 'Holo'
+                ? ['evebb.eu', 'www.evebb.eu']
+                : ['marketbaiters.com', 'www.marketbaiters.com'];
+            abort_unless(in_array($host, $allowedHosts, true) && !isset($parts['user']) && !isset($parts['pass']) && (!isset($parts['port']) || (int) $parts['port'] === 443), 422, $source.' appraisal links must use the official '.$source.' host.');
+            abort_unless(($parts['scheme'] ?? '') === 'https', 422, $source.' appraisal links must use HTTPS.');
+
+            $expectedPath = $source === 'MarketBaiters' ? '~/a/[A-Za-z0-9]+/?$~' : '~^/~';
+            if (!preg_match($expectedPath, $path)) {
+                throw ValidationException::withMessages([$field => 'That does not look like a supported '.$source.' appraisal share link.']);
+            }
 
             try {
-                $response = Http::withOptions(['allow_redirects' => false])
+                $response = Http::withOptions(['allow_redirects' => ['max' => 3, 'strict' => true]])
                     ->withHeaders(['User-Agent' => 'EveBuyback Appraisal Comparator'])
                     ->accept('text/html')
-                    ->timeout(15)
+                    ->timeout(20)
                     ->get($input);
-            } catch (\Throwable $e) {
-                throw ValidationException::withMessages(['holo_input' => 'Could not load that Holo link. Paste its copied item list instead.']);
+            } catch (\\Throwable $e) {
+                throw ValidationException::withMessages([$field => 'Could not load that '.$source.' link. Paste its copied item list instead.']);
             }
 
             if (!$response->successful()) {
-                throw ValidationException::withMessages(['holo_input' => 'Holo did not return that appraisal link. Paste its copied item list instead.']);
+                throw ValidationException::withMessages([$field => $source.' did not return that appraisal link. Paste its copied item list instead.']);
             }
 
-            $items = $this->parseHtml($response->body(), $parser);
+            $items = $this->parseHtml($response->body());
             if (!$items) {
-                throw ValidationException::withMessages(['holo_input' => 'That Holo page did not expose a readable item list. Paste the copied Holo item list into this block instead.']);
+                throw ValidationException::withMessages([$field => 'That '.$source.' page did not expose a readable item list. Paste the copied item list into this block instead.']);
             }
             return $items;
         }
 
         $items = $parser->parse($input);
         if (!$items) {
-            $field = $source === 'Holo' ? 'holo_input' : 'buyback_input';
             throw ValidationException::withMessages([$field => 'No item names and quantities could be parsed. Paste the copied item list or a supported appraisal link.']);
         }
-
         return $items;
     }
 
-    private function parseHtml(string $html, InventoryParser $parser): array
+    private function parseHtml(string $html): array
     {
         $items = [];
         if (preg_match_all('/<tr\\b[^>]*>(.*?)<\\/tr>/is', $html, $matches)) {
@@ -125,29 +142,25 @@ class AppraisalComparisonController extends Controller
             }
         }
 
-        if ($items) return $this->mergeItems($items);
-        // Only parse explicit name/quantity lines from page text. Passing an entire
-        // generic app page to InventoryParser would treat navigation labels as qty=1.
-        $plain = html_entity_decode(strip_tags(preg_replace('/<(script|style)\\b[^>]*>.*?<\\/\\1>/is', " ", $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $lines = preg_split('/\\r\\n|\\n|\\r/', $plain) ?: [];
-        $structured = [];
-        foreach ($lines as $line) {
-            $line = trim(preg_replace('/[ \\t]+/', ' ', $line));
-            if ($line === '') continue;
-            if (str_contains($line, "\t") || str_contains($line, ',' ) || preg_match('/^(?:[0-9][0-9,]*\\s*(?:[x×]\\s*)?.+|.+\\s+[x×]?\\s*[0-9][0-9,]*)$/i', $line)) {
-                $structured[] = $line;
+        if (!$items) {
+            $plain = html_entity_decode(strip_tags(preg_replace('/<(script|style)\\b[^>]*>.*?<\\/\\1>/is', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            foreach (preg_split('/\\r\\n|\\n|\\r/', $plain) ?: [] as $line) {
+                $line = trim($line);
+                if (preg_match('/^(.+?)\\s+[x×]?\\s*([0-9][0-9,]*)$/', $line, $match)) {
+                    $name = trim($match[1]);
+                    if ($name !== '' && !preg_match('/^(item|type|name|quantity|total|subtotal)$/i', $name)) {
+                        $items[] = ['name' => $name, 'quantity' => (int) str_replace(',', '', $match[2])];
+                    }
+                }
             }
         }
-        return $structured ? $parser->parse(implode("\n", $structured)) : [];
-    }
 
-    private function mergeItems(array $items): array
-    {
         $merged = [];
         foreach ($items as $item) {
+            if ($item['quantity'] < 1) continue;
             $key = $this->key($item['name']);
             if (!isset($merged[$key])) $merged[$key] = ['name' => $item['name'], 'quantity' => 0];
-            $merged[$key]['quantity'] += (int) $item['quantity'];
+            $merged[$key]['quantity'] += $item['quantity'];
         }
         return array_values($merged);
     }
