@@ -58,6 +58,7 @@ final class JitaMarketPriceRefresher
         $typeIds = $this->normalizeTypeIds($typeIds);
         $saved = 0;
         $failed = 0;
+        $regionId = (string) config('buyback.region_id', '10000002');
 
         foreach ($typeIds as $typeId) {
             try {
