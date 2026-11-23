@@ -68,6 +68,7 @@ class AppraisalComparisonController extends Controller
         $data = $request->validate([
             'type_id' => ['required', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
+            'quote_item_multiplier' => ['required', 'numeric', 'gt:0', 'max:999999.999999'],
             'holo_unit_payout' => ['required', 'numeric', 'gt:0'],
             'buyback_unit_payout' => ['required', 'numeric', 'gt:0'],
         ]);
@@ -87,11 +88,21 @@ class AppraisalComparisonController extends Controller
                 ->where('type_id', $item->type_id)
                 ->value('payout_multiplier');
             $currentMultiplier = $storedMultiplier === null ? 1.0 : (float) $storedMultiplier;
+            $quoteMultiplier = (float) $data['quote_item_multiplier'];
+
+            // Refuse to apply a stale comparison if this item's saved rate changed
+            // after the EveBuyback quote was generated. The quote payout is based
+            // on quoteMultiplier, not necessarily today's stored multiplier.
+            abort_if(
+                abs($currentMultiplier - $quoteMultiplier) > 0.000001,
+                409,
+                'This item rate changed after the compared quote was created. Generate a fresh EveBuyback appraisal before saving this item.'
+            );
 
             // Each item gets its own multiplier. The item's existing category/base
             // pricing remains unchanged; only this exact SDE type is adjusted.
             $next = round(
-                $currentMultiplier * ($targetUnitPayout / (float) $data['buyback_unit_payout']),
+                $quoteMultiplier * ($targetUnitPayout / (float) $data['buyback_unit_payout']),
                 6
             );
             abort_if(
@@ -122,6 +133,7 @@ class AppraisalComparisonController extends Controller
                     'target_unit_payout' => $targetUnitPayout,
                     'buyback_unit_payout_before_save' => (float) $data['buyback_unit_payout'],
                     'previous_multiplier' => $currentMultiplier,
+                    'quote_multiplier' => $quoteMultiplier,
                     'saved_multiplier' => $next,
                     'margin_percent' => 0.05,
                 ]),
@@ -191,6 +203,8 @@ class AppraisalComparisonController extends Controller
                 'holo_payout_basis' => $holo['payout_basis'] ?? null,
                 'buyback_total_payout' => isset($buyback['total_payout']) ? (float) $buyback['total_payout'] : null,
                 'type_id' => isset($buyback['type_id']) ? (int) $buyback['type_id'] : null,
+                'buyback_name' => $buyback['name'] ?? null,
+                'quote_item_multiplier' => isset($buyback['item_payout_multiplier']) ? (float) $buyback['item_payout_multiplier'] : 1.0,
                 'recommended_percent' => ($comparable && !empty($buyback['type_id']) && isset($buyback['payout_percent']))
                     ? round(
                         (float) $buyback['payout_percent']
