@@ -39,6 +39,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::post('/admin/appraisals/{quote}/archive', [AppraisalVisibilityController::class, 'archive'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.archive');
     Route::post('/admin/appraisals/{quote}/restore', [AppraisalVisibilityController::class, 'restore'])->middleware('admin')->whereNumber('quote')->name('admin.appraisals.restore');
     Route::post('/admin/mineral-pricing', [PayoutRuleController::class, 'storeMineralPricing'])->middleware('admin')->name('admin.mineral-pricing.store');
+    Route::post('/admin/ore-shipping-cost', [PayoutRuleController::class, 'storeOreShippingCost'])->middleware('admin')->name('admin.ore-shipping-cost.store');
     Route::post('/admin/ice-pricing', [PayoutRuleController::class, 'storeIcePricing'])->middleware('admin')->name('admin.ice-pricing.store');
     Route::post('/admin/gas-pricing', [PayoutRuleController::class, 'storeGasPricing'])->middleware('admin')->name('admin.gas-pricing.store');
     Route::post('/admin/appraisal-ore-rules', [PayoutRuleController::class, 'storeOre'])->middleware('admin')->name('admin.appraisal-ore-rules.store');
