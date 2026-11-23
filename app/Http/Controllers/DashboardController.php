@@ -20,7 +20,6 @@ class DashboardController extends Controller
         $loadAdminQueue = $admin && $activeTab === 'tab-admin';
         $loadAdminTools = $admin && $activeTab === 'tab-admin-tools';
         $loadMarketbaiters = $admin && $activeTab === 'tab-marketbaiters';
-        $loadHoloCatalog = $admin && $activeTab === 'tab-holo-compare';
         $characterIds = $user->characters()->pluck('id');
 
         $visibleQuotes = DB::table('appraisal_quotes')
@@ -126,11 +125,6 @@ class DashboardController extends Controller
         $lastJitaPriceRefreshAt = $loadAdminQueue ? $priceRefreshStatus->get('jita_full_refresh_at') : null;
         $lastJitaPriceRefreshCount = $loadAdminQueue ? (int) $priceRefreshStatus->get('jita_full_refresh_items', 0) : 0;
         $catalogPublishedTypeCount = $loadAdminQueue ? DB::table('eve_item_types')->where('published', true)->count() : 0;
-        $compressedOreTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
-            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-            ->where('t.published', true)->where('g.category_name', 'Asteroid')
-            ->where('t.type_name', 'like', 'Compressed %')
-            ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
         $oreTypes = $loadMarketbaiters ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
@@ -164,7 +158,7 @@ class DashboardController extends Controller
             ->get(['material.type_id', 'material.type_name', 'mg.group_name'])
             : collect();
 
-        $iceTypes = ($loadHoloCatalog || $loadAdminTools) ? DB::table('eve_item_types as t')
+        $iceTypes = $loadAdminTools ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('t.type_name', 'like', 'Compressed %')
@@ -203,114 +197,19 @@ class DashboardController extends Controller
                 ->get(['p.type_id', 'p.buy_price'])
                 ->keyBy('type_id')
             : collect();
-        $compressedGasTypes = ($loadHoloCatalog || $loadAdminTools) ? DB::table('eve_item_types as t')
+        $compressedGasTypes = $loadAdminTools ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)
             ->where('g.group_name', 'Compressed Gas')
             ->orderBy('t.type_name')
             ->get(['t.type_id', 't.type_name'])
             : collect();
-        $uncompressedGasTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
-            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-            ->where('t.published', true)
-            ->where('g.group_name', 'Harvestable Cloud')
-            ->where('t.type_name', 'not like', 'Compressed %')
-            ->orderBy('t.type_name')
-            ->get(['t.type_id', 't.type_name'])
-            : collect();
-
-        // PI test inventory is the complete set of published planetary commodities
-        // appearing as either an input or output in the imported SDE schematics.
-        $piTypeIds = $loadHoloCatalog
-            ? DB::table('eve_planet_schematics')->select('product_type_id as type_id')
-                ->union(DB::table('eve_planet_schematic_inputs')->select('type_id'))
-                ->pluck('type_id')->unique()->values()
-            : collect();
-        $piMaterialTypes = $loadHoloCatalog && $piTypeIds->isNotEmpty()
-            ? DB::table('eve_item_types as t')
-                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-                ->where('t.published', true)
-                ->where('g.category_id', 43)
-                ->whereIn('t.type_id', $piTypeIds)
-                ->orderBy('t.type_name')
-                ->get(['t.type_id', 't.type_name'])
-            : collect();
-
         $gasPricingSettings = $loadAdminTools
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key')
             : collect();
 
-        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'oreTypes', 'compressedOreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'iceProductTypes', 'icePricingSettings', 'iceProductPrices', 'compressedGasTypes', 'uncompressedGasTypes', 'piMaterialTypes', 'gasPricingSettings'));
+        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'oreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'iceProductTypes', 'icePricingSettings', 'iceProductPrices', 'compressedGasTypes', 'gasPricingSettings'));
     }
 
-    /**
-     * Lightweight, dedicated Holo comparison page.
-     *
-     * Keep this out of DashboardController::index(): the full dashboard loads
-     * appraisal history, item rows, pricing rules and several unrelated SDE
-     * catalogs. The Holo tool needs only its test-inventory catalogs.
-     */
-    public function holoComparison(): View
-    {
-        $catalog = Cache::remember('buyback:holo-comparison:catalog:v1', now()->addHour(), function () {
-            $compressedOreTypes = DB::table('eve_item_types as t')
-                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-                ->where('t.published', true)
-                ->where('g.category_name', 'Asteroid')
-                ->where('t.type_name', 'like', 'Compressed %')
-                ->orderBy('t.type_name')
-                ->get(['t.type_id', 't.type_name']);
 
-            $iceTypes = DB::table('eve_item_types as t')
-                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-                ->where('t.published', true)
-                ->where('t.type_name', 'like', 'Compressed %')
-                ->where(function ($query) {
-                    $query->where('g.group_name', 'like', '%ice%')
-                        ->orWhere('g.category_name', 'like', '%ice%')
-                        ->orWhereIn('t.type_name', [
-                            'Compressed Clear Icicle', 'Compressed Glacial Mass', 'Compressed Blue Ice',
-                            'Compressed White Glaze', 'Compressed Enriched Clear Icicle',
-                            'Compressed Smooth Glacial Mass', 'Compressed Thick Blue Ice',
-                            'Compressed Pristine White Glaze',
-                        ]);
-                })
-                ->orderBy('t.type_name')
-                ->get(['t.type_id', 't.type_name']);
-
-            $compressedGasTypes = DB::table('eve_item_types as t')
-                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-                ->where('t.published', true)
-                ->where('g.group_name', 'Compressed Gas')
-                ->orderBy('t.type_name')
-                ->get(['t.type_id', 't.type_name']);
-
-            $uncompressedGasTypes = DB::table('eve_item_types as t')
-                ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-                ->where('t.published', true)
-                ->where('g.group_name', 'Harvestable Cloud')
-                ->where('t.type_name', 'not like', 'Compressed %')
-                ->orderBy('t.type_name')
-                ->get(['t.type_id', 't.type_name']);
-
-            $piTypeIds = DB::table('eve_planet_schematics')
-                ->select('product_type_id as type_id')
-                ->union(DB::table('eve_planet_schematic_inputs')->select('type_id'))
-                ->pluck('type_id')->unique()->values();
-
-            $piMaterialTypes = $piTypeIds->isNotEmpty()
-                ? DB::table('eve_item_types as t')
-                    ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
-                    ->where('t.published', true)
-                    ->where('g.category_id', 43)
-                    ->whereIn('t.type_id', $piTypeIds)
-                    ->orderBy('t.type_name')
-                    ->get(['t.type_id', 't.type_name'])
-                : collect();
-
-            return compact('compressedOreTypes', 'iceTypes', 'compressedGasTypes', 'uncompressedGasTypes', 'piMaterialTypes');
-        });
-
-        return view('holo-comparison', $catalog);
-    }
 }
