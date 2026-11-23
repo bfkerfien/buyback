@@ -39,7 +39,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <h2>Buyback instructions</h2>
 <ol style="color:#c5dbe0;line-height:1.9;padding-left:24px;margin:0">
 <li><strong>Currently accepting:</strong> Ore, Ice, PI Goods, and Exploration Loot only.</li>
-<li><strong>Appraisals only — do not create a contract.</strong> Buyback price settings are fluctuating. Submit your appraisal form and wait for us to review it and confirm whether the quoted values are approved before taking any further action. This is a temporary process.</li>
+<li><strong>Include your appraisal number on the contract.</strong> Reference the appraisal number in the contract description or reference field for faster service. If a contract is rejected, it may be due to the experimental nature of the Buyback evaluation. If you are logged in to the site when this happens, an email will follow. If you prefer not to log in, you can always get that information from me on Discord.</li>
 </ol>
 </section>
 <section class="panel">
