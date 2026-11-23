@@ -104,7 +104,7 @@ final class InventoryParser
      */
     public function parseMarketBaiters(string $input): array
     {
-        $lines = preg_split('/\\r\\n|\\n|\\r/', str_replace("\\r", '', $input)) ?: [];
+        $lines = preg_split('/\\r\\n|\\n|\\r/', str_replace("\r", '', $input)) ?: [];
         $items = [];
 
         for ($i = 0, $count = count($lines); $i < $count - 1; $i++) {
@@ -188,8 +188,8 @@ final class InventoryParser
                 // Supports the exact pasted format: "Compressed Mercoxit 100000".
                 $name = trim($m[1]);
                 $quantity = (int) str_replace(',', '', $m[2]);
-            } elseif (str_contains($line, "\\t")) {
-                $parts = array_map('trim', explode("\\t", $line));
+            } elseif (str_contains($line, "\t")) {
+                $parts = array_map('trim', explode("\t", $line));
                 if (count($parts) >= 2) {
                     if (is_numeric(str_replace(',', '', $parts[0]))) {
                         $quantity = (int) str_replace(',', '', $parts[0]);
