@@ -159,6 +159,7 @@ class AppraisalComparisonController extends Controller
                             'name' => $row->type_name,
                             'quantity' => (int) $row->quantity,
                             'unit_price' => (float) $row->unit_price,
+                            'total_payout' => $payout,
                             'unit_payout' => $payout !== null && (int) $row->quantity > 0 ? $payout / (int) $row->quantity : null,
                         ];
                     })->all();
