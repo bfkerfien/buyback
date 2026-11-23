@@ -126,8 +126,6 @@ class DashboardController extends Controller
         $lastJitaPriceRefreshAt = $loadAdminQueue ? $priceRefreshStatus->get('jita_full_refresh_at') : null;
         $lastJitaPriceRefreshCount = $loadAdminQueue ? (int) $priceRefreshStatus->get('jita_full_refresh_items', 0) : 0;
         $catalogPublishedTypeCount = $loadAdminQueue ? DB::table('eve_item_types')->where('published', true)->count() : 0;
-        $payoutRules = $loadAdminTools ? DB::table('appraisal_payout_rules')->whereNotIn('category_name', ['Asteroid', 'Material'])->orderBy('category_name')->get() : collect();
-        $eveCategories = $loadAdminTools ? DB::table('eve_item_groups')->whereNotIn('category_name', ['Asteroid', 'Material'])->select('category_id', 'category_name')->distinct()->orderBy('category_name')->get() : collect();
         $compressedOreTypes = $loadHoloCatalog ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
