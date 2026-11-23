@@ -98,11 +98,27 @@ class AppraisalComparisonController extends Controller
             $allPresent = count($present) === 3;
             $sameQuantity = $allPresent && count(array_unique(array_values($quantities))) === 1;
 
+            $prices = [
+                'holo' => isset($holo['unit_payout']) ? (float) $holo['unit_payout'] : (isset($holo['unit_price']) ? (float) $holo['unit_price'] : null),
+                'buyback' => isset($buyback['unit_payout']) ? (float) $buyback['unit_payout'] : null,
+                'marketbaiters' => isset($marketbaiters['unit_payout']) ? (float) $marketbaiters['unit_payout'] : (isset($marketbaiters['unit_price']) ? (float) $marketbaiters['unit_price'] : null),
+            ];
+            $availablePrices = array_filter($prices, fn ($price) => $price !== null && $price > 0);
+            $bestPrice = $availablePrices ? max($availablePrices) : null;
+            $bestSource = $bestPrice === null ? null : array_search($bestPrice, $prices, true);
+            $buybackGross = isset($buyback['unit_price']) ? (float) $buyback['unit_price'] : null;
             return [
                 'name' => $holo['name'] ?? $buyback['name'] ?? $marketbaiters['name'],
                 'holo_quantity' => $quantities['holo'],
                 'buyback_quantity' => $quantities['buyback'],
                 'marketbaiters_quantity' => $quantities['marketbaiters'],
+                'holo_unit_price' => $prices['holo'],
+                'buyback_unit_payout' => $prices['buyback'],
+                'marketbaiters_unit_price' => $prices['marketbaiters'],
+                'best_source' => $bestSource,
+                'best_unit_payout' => $bestPrice,
+                'proposed_buyback_percent' => ($bestPrice !== null && $buybackGross !== null && $buybackGross > 0)
+                    ? min(100, round(($bestPrice / $buybackGross) * 100, 2)) : null,
                 'status' => $sameQuantity ? 'match' : ($allPresent ? 'quantity_mismatch' : 'missing_source'),
             ];
         })->values();
@@ -134,8 +150,17 @@ class AppraisalComparisonController extends Controller
                 $quote = DB::table('appraisal_quotes')->where('public_token', $match[1])->first();
                 if (!$quote) throw ValidationException::withMessages([$field => 'That EveBuyback appraisal link was not found.']);
                 return DB::table('appraisal_quote_items')->where('appraisal_quote_id', $quote->id)
-                    ->orderBy('type_name')->get(['type_name', 'quantity'])
-                    ->map(fn ($row) => ['name' => $row->type_name, 'quantity' => (int) $row->quantity])->all();
+                    ->orderBy('type_name')->get(['type_name', 'quantity', 'unit_price', 'source_data'])
+                    ->map(function ($row) {
+                        $source = json_decode($row->source_data ?? '{}', true) ?: [];
+                        $payout = isset($source['payout_value']) ? (float) $source['payout_value'] : null;
+                        return [
+                            'name' => $row->type_name,
+                            'quantity' => (int) $row->quantity,
+                            'unit_price' => (float) $row->unit_price,
+                            'unit_payout' => $payout !== null && (int) $row->quantity > 0 ? $payout / (int) $row->quantity : null,
+                        ];
+                    })->all();
             }
 
             $allowedHosts = $source === 'Holo'
@@ -183,11 +208,21 @@ class AppraisalComparisonController extends Controller
         if (preg_match_all('/<tr\\b[^>]*>(.*?)<\\/tr>/is', $html, $matches)) {
             foreach ($matches[1] as $row) {
                 if (!preg_match_all('/<t[dh]\\b[^>]*>(.*?)<\\/t[dh]>/is', $row, $cells) || count($cells[1]) < 2) continue;
-                $name = trim(html_entity_decode(strip_tags($cells[1][0]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-                $quantityText = trim(html_entity_decode(strip_tags($cells[1][1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                $values = array_map(fn ($cell) => trim(html_entity_decode(strip_tags($cell), ENT_QUOTES | ENT_HTML5, 'UTF-8')), $cells[1]);
+                $name = $values[0] ?? '';
+                $quantityText = $values[1] ?? '';
                 if ($name === '' || !preg_match('/^[0-9][0-9,]*$/', $quantityText)) continue;
                 if (preg_match('/^(item|type|name|quantity|total|subtotal)$/i', $name)) continue;
-                $items[] = ['name' => $name, 'quantity' => (int) str_replace(',', '', $quantityText)];
+                $quantity = (int) str_replace(',', '', $quantityText);
+                $unitPrice = null;
+                foreach (array_slice($values, 2) as $value) {
+                    $normalized = preg_replace('/[^0-9.\\-]/', '', str_replace(',', '', $value));
+                    if ($normalized !== '' && is_numeric($normalized) && (float) $normalized > 0) {
+                        $unitPrice = (float) $normalized;
+                        break;
+                    }
+                }
+                $items[] = ['name' => $name, 'quantity' => $quantity, 'unit_payout' => $unitPrice, 'unit_price' => $unitPrice];
             }
         }
 
@@ -208,7 +243,7 @@ class AppraisalComparisonController extends Controller
         foreach ($items as $item) {
             if ($item['quantity'] < 1) continue;
             $key = $this->key($item['name']);
-            if (!isset($merged[$key])) $merged[$key] = ['name' => $item['name'], 'quantity' => 0];
+            if (!isset($merged[$key])) $merged[$key] = ['name' => $item['name'], 'quantity' => 0, 'unit_price' => $item['unit_price'] ?? null, 'unit_payout' => $item['unit_payout'] ?? null];
             $merged[$key]['quantity'] += $item['quantity'];
         }
         return array_values($merged);
