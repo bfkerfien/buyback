@@ -95,31 +95,41 @@ class AppraisalComparisonController extends Controller
             $buybackPresent = $quantities['buyback'] > 0;
             $sameQuantity = $holoPresent && $buybackPresent && $quantities['holo'] === $quantities['buyback'];
 
-            // Holo's fetched share page exposes inventory, not a verified per-item
-            // payout in the HTML available to this server. Never infer a price from
-            // arbitrary table columns (volume, batch size, etc.).
+            $holoPayout = isset($holo['unit_payout']) && (float) $holo['unit_payout'] > 0
+                ? (float) $holo['unit_payout'] : null;
             $buybackPayout = isset($buyback['unit_payout']) && (float) $buyback['unit_payout'] > 0
                 ? (float) $buyback['unit_payout'] : null;
+            $comparable = $holoPayout !== null && $buybackPayout !== null;
+            $difference = $comparable ? $buybackPayout - $holoPayout : null;
+            $differencePercent = $comparable && $holoPayout > 0
+                ? ($difference / $holoPayout) * 100 : null;
+            $priceStatus = !$comparable ? 'not_comparable'
+                : (abs($difference) < 0.005 ? 'equal'
+                : ($difference > 0 ? 'buyback_higher' : 'holo_higher'));
             return [
                 'name' => $holo['name'] ?? $buyback['name'],
                 'holo_quantity' => $quantities['holo'],
                 'buyback_quantity' => $quantities['buyback'],
-                'holo_unit_price' => null,
+                'holo_total_payout' => isset($holo['total_payout']) ? (float) $holo['total_payout'] : null,
+                'holo_unit_payout' => $holoPayout,
+                'holo_payout_basis' => $holo['payout_basis'] ?? null,
+                'buyback_total_payout' => isset($buyback['total_payout']) ? (float) $buyback['total_payout'] : null,
                 'buyback_unit_payout' => $buybackPayout,
-                'quantity_status' => !$holoPresent ? 'missing_from_holo'
-                    : (!$buybackPresent ? 'missing_from_buyback'
-                    : ($sameQuantity ? 'same_quantity' : 'quantity_mismatch')),
-                'price_status' => 'not_comparable_holo_price_unavailable',
-                'status' => !$holoPresent || !$buybackPresent ? 'missing_source'
-                    : ($sameQuantity ? 'same_quantity' : 'quantity_mismatch'),
+                'payout_difference_per_unit' => $difference,
+                'payout_difference_percent' => $differencePercent,
+                'price_status' => $priceStatus,
+                'status' => $priceStatus,
             ];
         })->values();
 
         return response()->json([
             'holo_items' => count($sources['Holo']),
             'buyback_items' => count($sources['EveBuyback']),
-            'same_quantity' => $rows->where('status', 'same_quantity')->count(),
-            'differences' => $rows->where('status', '!=', 'same_quantity')->count(),
+            'comparable_items' => $rows->whereIn('price_status', ['equal', 'buyback_higher', 'holo_higher'])->count(),
+            'holo_higher' => $rows->where('price_status', 'holo_higher')->count(),
+            'buyback_higher' => $rows->where('price_status', 'buyback_higher')->count(),
+            'equal_payout' => $rows->where('price_status', 'equal')->count(),
+            'not_comparable' => $rows->where('price_status', 'not_comparable')->count(),
             'rows' => $rows,
         ]);
     }
@@ -184,6 +194,11 @@ class AppraisalComparisonController extends Controller
             return $items;
         }
 
+        if ($source === 'Holo') {
+            $holoItems = $this->parseHoloText($input);
+            if ($holoItems) return $holoItems;
+        }
+
         $items = $parser->parse($input);
         if (!$items) {
             throw ValidationException::withMessages([$field => 'No item names and quantities could be parsed. Paste the copied item list or a supported appraisal link.']);
@@ -194,39 +209,108 @@ class AppraisalComparisonController extends Controller
     private function parseHtml(string $html, string $source, InventoryParser $parser): array
     {
         $items = [];
-        if (preg_match_all('/<tr\\b[^>]*>(.*?)<\\/tr>/is', $html, $matches)) {
+        if (preg_match_all('/<tr\b[^>]*>(.*?)<\/tr>/is', $html, $matches)) {
             foreach ($matches[1] as $row) {
-                if (!preg_match_all('/<t[dh]\\b[^>]*>(.*?)<\\/t[dh]>/is', $row, $cells) || count($cells[1]) < 2) continue;
+                if (!preg_match_all('/<t[dh]\b[^>]*>(.*?)<\/t[dh]>/is', $row, $cells) || count($cells[1]) < 3) continue;
                 $values = array_map(fn ($cell) => trim(html_entity_decode(strip_tags($cell), ENT_QUOTES | ENT_HTML5, 'UTF-8')), $cells[1]);
                 $name = $values[0] ?? '';
                 $quantityText = $values[1] ?? '';
                 if ($name === '' || !preg_match('/^[0-9][0-9,]*$/', $quantityText)) continue;
                 if (preg_match('/^(item|type|name|quantity|total|subtotal)$/i', $name)) continue;
                 $quantity = (int) str_replace(',', '', $quantityText);
-                $items[] = ['name' => $name, 'quantity' => $quantity];
+                if ($quantity < 1) continue;
+                $valuation = implode(' ', array_slice($values, 2));
+                $parsed = $this->parseHoloValuation($valuation, $quantity);
+                if (!$parsed) continue;
+                $items[] = array_merge(['name' => $name, 'quantity' => $quantity], $parsed);
             }
         }
 
         if (!$items) {
-            $plain = html_entity_decode(strip_tags(preg_replace('/<(script|style)\\b[^>]*>.*?<\\/\\1>/is', ' ', $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-            foreach (preg_split('/\\r\\n|\\n|\\r/', $plain) ?: [] as $line) {
-                $line = trim($line);
-                if (preg_match('/^(.+?)\\s+[x×]?\\s*([0-9][0-9,]*)$/', $line, $match)) {
-                    $name = trim($match[1]);
-                    if ($name !== '' && !preg_match('/^(item|type|name|quantity|total|subtotal)$/i', $name)) {
-                        $items[] = ['name' => $name, 'quantity' => (int) str_replace(',', '', $match[2])];
-                    }
-                }
-            }
+            $plain = html_entity_decode(strip_tags(preg_replace('/<(script|style)\b[^>]*>.*?<\/\1>/is', "\n", $html)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            return $this->parseHoloText($plain);
         }
 
+        return $this->mergeHoloItems($items);
+    }
+
+    /**
+     * Parse Holo's copied appraisal result:
+     * item name, quantity, then total ISK and the pricing basis.
+     * Some special items also expose a separate per-unit ISK amount.
+     */
+    private function parseHoloText(string $text): array
+    {
+        $lines = array_values(array_filter(
+            array_map('trim', preg_split('/\r\n|\n|\r/', html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?: []),
+            fn ($line) => $line !== ''
+        ));
+        $items = [];
+
+        for ($i = 0; $i < count($lines) - 2; $i++) {
+            $name = $lines[$i];
+            $quantityText = $lines[$i + 1];
+            if (!preg_match('/^[0-9][0-9,]*$/', $quantityText)) continue;
+            if (preg_match('/^(item|type|name|quantity|total|subtotal)$/i', $name)) continue;
+
+            $quantity = (int) str_replace(',', '', $quantityText);
+            if ($quantity < 1) continue;
+            $valuation = $this->parseHoloValuation($lines[$i + 2], $quantity);
+            if (!$valuation) continue;
+
+            $items[] = array_merge(['name' => $name, 'quantity' => $quantity], $valuation);
+            $i += 2;
+        }
+
+        return $this->mergeHoloItems($items);
+    }
+
+    private function parseHoloValuation(string $text, int $quantity): ?array
+    {
+        if (!preg_match_all('/([0-9][0-9,]*(?:\.[0-9]+)?)\s*ISK/i', $text, $matches) || empty($matches[1])) {
+            return null;
+        }
+
+        $amounts = array_map(fn ($amount) => (float) str_replace(',', '', $amount), $matches[1]);
+        $total = $amounts[0];
+        $unit = isset($amounts[1]) ? $amounts[1] : ($quantity > 0 ? $total / $quantity : null);
+        if ($unit === null || $unit < 0) return null;
+
+        $basis = trim(preg_replace('/[0-9][0-9,]*(?:\.[0-9]+)?\s*ISK/i', '', $text));
+        return [
+            'total_payout' => $total,
+            'unit_payout' => $unit,
+            'payout_basis' => $basis !== '' ? $basis : null,
+        ];
+    }
+
+    private function mergeHoloItems(array $items): array
+    {
         $merged = [];
         foreach ($items as $item) {
-            if ($item['quantity'] < 1) continue;
+            $quantity = (int) ($item['quantity'] ?? 0);
+            if ($quantity < 1) continue;
             $key = $this->key($item['name']);
-            if (!isset($merged[$key])) $merged[$key] = ['name' => $item['name'], 'quantity' => 0, 'unit_price' => null, 'unit_payout' => null];
-            $merged[$key]['quantity'] += $item['quantity'];
+            if (!isset($merged[$key])) {
+                $merged[$key] = [
+                    'name' => $item['name'],
+                    'quantity' => 0,
+                    'total_payout' => 0.0,
+                    'unit_payout' => null,
+                    'payout_basis' => $item['payout_basis'] ?? null,
+                ];
+            }
+            $merged[$key]['quantity'] += $quantity;
+            $merged[$key]['total_payout'] += (float) ($item['total_payout'] ?? 0);
+            if (!empty($item['payout_basis'])) $merged[$key]['payout_basis'] = $item['payout_basis'];
         }
+
+        foreach ($merged as &$item) {
+            $item['unit_payout'] = $item['quantity'] > 0
+                ? $item['total_payout'] / $item['quantity'] : null;
+        }
+        unset($item);
+
         return array_values($merged);
     }
 
