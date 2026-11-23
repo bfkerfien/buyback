@@ -5,12 +5,94 @@ namespace App\Services\Appraisal;
 final class InventoryParser
 {
     /**
-     * Accepts common EVE inventory exports:
-     * Item Name<TAB>Quantity, Item Name,Quantity, Quantity x Item Name,
-     * Quantity Item Name, and Item Name x Quantity / Item Name Quantity.
+     * Parse MarketBaiters rendered appraisal table rows. The share page is a
+     * Next.js client page, but its rendered HTML contains a normal table with
+     * item name, quantity, volume, category, and payout columns.
      *
-     * @return array<int, array{name:string, quantity:int}>
+     * @return array<int, array{name:string, quantity:int, unit_price:?float, unit_payout:?float}>
      */
+    public function parseMarketBaitersHtml(string $html): array
+    {
+        $items = [];
+
+        if (!preg_match_all('/<tr\\b[^>]*>(.*?)<\\/tr>/is', $html, $rows)) {
+            return [];
+        }
+
+        foreach ($rows[1] as $row) {
+            if (!preg_match_all('/<td\\b[^>]*>(.*?)<\\/td>/is', $row, $cells) || count($cells[1]) < 3) {
+                continue;
+            }
+
+            $firstCell = $cells[1][0];
+
+            // The item title is deliberately selected from its title span;
+            // the same cell also contains the Refine button and yield text.
+            if (!preg_match('/<span\\b(?=[^>]*\\bfont-medium\\b)(?=[^>]*\\btext-bright\\b)[^>]*>(.*?)<\\/span>/is', $firstCell, $title)) {
+                continue;
+            }
+
+            $name = trim(html_entity_decode(strip_tags($title[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $quantityText = trim(html_entity_decode(strip_tags($cells[1][1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if ($name === '' || !preg_match('/^[0-9][0-9,]*$/', $quantityText)) {
+                continue;
+            }
+
+            $quantity = (int) str_replace(',', '', $quantityText);
+            if ($quantity < 1 || $quantity > 1000000000) {
+                continue;
+            }
+
+            $payoutText = trim(html_entity_decode(strip_tags($cells[1][count($cells[1]) - 1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $totalPayout = $this->parseMarketBaitersAmount($payoutText);
+            $key = mb_strtolower(preg_replace('/\\s+/', ' ', $name));
+
+            if (!isset($items[$key])) {
+                $items[$key] = [
+                    'name' => $name,
+                    'quantity' => 0,
+                    'total_payout' => 0.0,
+                    'has_payout' => false,
+                ];
+            }
+
+            $items[$key]['quantity'] += $quantity;
+            if ($totalPayout !== null) {
+                $items[$key]['total_payout'] += $totalPayout;
+                $items[$key]['has_payout'] = true;
+            }
+        }
+
+        return array_values(array_map(static function (array $item): array {
+            $unitPayout = $item['has_payout'] && $item['quantity'] > 0
+                ? $item['total_payout'] / $item['quantity']
+                : null;
+
+            return [
+                'name' => $item['name'],
+                'quantity' => $item['quantity'],
+                'unit_price' => $unitPayout,
+                'unit_payout' => $unitPayout,
+            ];
+        }, $items));
+    }
+
+    private function parseMarketBaitersAmount(string $value): ?float
+    {
+        $value = strtoupper(str_replace([',', ' ', 'ISK'], '', trim($value)));
+        if (!preg_match('/^([0-9]+(?:\\.[0-9]+)?)([KMB])?$/', $value, $match)) {
+            return null;
+        }
+
+        $multiplier = match ($match[2] ?? '') {
+            'K' => 1000,
+            'M' => 1000000,
+            'B' => 1000000000,
+            default => 1,
+        };
+
+        return (float) $match[1] * $multiplier;
+    }
 
     /**
      * Parse MarketBaiters' copied appraisal cards. Each card has an item-name

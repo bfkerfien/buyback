@@ -206,6 +206,13 @@ class AppraisalComparisonController extends Controller
 
     private function parseHtml(string $html, string $source, InventoryParser $parser): array
     {
+        if ($source === 'MarketBaiters') {
+            $marketBaitersItems = $parser->parseMarketBaitersHtml($html);
+            if ($marketBaitersItems) {
+                return $marketBaitersItems;
+            }
+        }
+
         $items = [];
         if (preg_match_all('/<tr\\b[^>]*>(.*?)<\\/tr>/is', $html, $matches)) {
             foreach ($matches[1] as $row) {

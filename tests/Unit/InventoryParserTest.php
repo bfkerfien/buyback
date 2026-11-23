@@ -77,4 +77,54 @@ class InventoryParserTest extends TestCase
             ['name' => 'Compressed Mercoxit', 'quantity' => 100000],
         ], $items);
     }
+    public function test_it_parses_rendered_marketbaiters_appraisal_table_html(): void
+    {
+        $html = <<<'HTML'
+<table>
+    <tbody>
+        <tr>
+            <td>
+                <div>
+                    <span class="font-medium text-bright">Compressed Arkonor</span>
+                    <button>Refine</button>
+                </div>
+                <div>10 batches · 90.63% yield</div>
+            </td>
+            <td>1,000</td>
+            <td>160</td>
+            <td data-line-type="true">ore</td>
+            <td><span>refined</span></td>
+            <td></td>
+            <td><span class="text-money">2.89M</span></td>
+        </tr>
+        <tr>
+            <td>
+                <div>
+                    <span class="font-medium text-bright">Compressed Arkonor II-Grade</span>
+                    <button>Refine</button>
+                </div>
+                <div>10 batches · 90.63% yield</div>
+            </td>
+            <td>1,000</td>
+            <td>160</td>
+            <td data-line-type="true">ore</td>
+            <td><span>refined</span></td>
+            <td></td>
+            <td><span class="text-money">3.03M</span></td>
+        </tr>
+    </tbody>
+</table>
+HTML;
+
+        $items = (new InventoryParser())->parseMarketBaitersHtml($html);
+
+        $this->assertCount(2, $items);
+        $this->assertSame('Compressed Arkonor', $items[0]['name']);
+        $this->assertSame(1000, $items[0]['quantity']);
+        $this->assertEqualsWithDelta(2890.0, $items[0]['unit_payout'], 0.01);
+        $this->assertSame('Compressed Arkonor II-Grade', $items[1]['name']);
+        $this->assertSame(1000, $items[1]['quantity']);
+        $this->assertEqualsWithDelta(3030.0, $items[1]['unit_price'], 0.01);
+    }
+
 }
