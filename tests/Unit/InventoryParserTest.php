@@ -39,7 +39,7 @@ class InventoryParserTest extends TestCase
 
     public function test_it_parses_marketbaiters_refine_cards_without_turning_result_columns_into_item_names(): void
     {
-        $items = (new InventoryParser())->parseMarketBaiters(implode("\\n", [
+        $items = (new InventoryParser())->parseMarketBaiters(implode("\n", [
             'Compressed Arkonor',
             'Refine',
             '10 batches · 90.63% yield',
@@ -62,7 +62,7 @@ class InventoryParserTest extends TestCase
     public function test_it_ignores_marketbaiters_refine_labels_and_non_item_lines(): void
     {
         $items = (new InventoryParser())->parseMarketBaiters(
-            "Refine\\n10 batches · 90.63% yield\\n1,000 160 ore refined 2.87M\\n"
+            "Refine\n10 batches · 90.63% yield\n1,000 160 ore refined 2.87M\n"
             ."This is not an item\\nSome unrelated 123"
         );
 
