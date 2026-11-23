@@ -19,7 +19,7 @@ class DashboardController extends Controller
         // only the data required by the selected tab.
         $loadAdminQueue = $admin && $activeTab === 'tab-admin';
         $loadAdminTools = $admin && $activeTab === 'tab-admin-tools';
-        $loadMarketbaiters = $admin && $activeTab === 'tab-marketbaiters';
+        $loadAppraisalManifests = $admin && $activeTab === 'tab-appraisal-manifests';
         $characterIds = $user->characters()->pluck('id');
 
         $visibleQuotes = DB::table('appraisal_quotes')
@@ -125,7 +125,7 @@ class DashboardController extends Controller
         $lastJitaPriceRefreshAt = $loadAdminQueue ? $priceRefreshStatus->get('jita_full_refresh_at') : null;
         $lastJitaPriceRefreshCount = $loadAdminQueue ? (int) $priceRefreshStatus->get('jita_full_refresh_items', 0) : 0;
         $catalogPublishedTypeCount = $loadAdminQueue ? DB::table('eve_item_types')->where('published', true)->count() : 0;
-        $oreTypes = $loadMarketbaiters ? DB::table('eve_item_types as t')
+        $oreTypes = $loadAppraisalManifests ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
