@@ -47,7 +47,7 @@ class AppraisalComparisonController extends Controller
             })->orderBy('t.type_name')->get(['t.type_id', 't.type_name']);
 
         $format = fn ($items) => $items->unique('type_id')
-            ->map(fn ($item) => $item->type_name . "\\t1000")->implode("\\n");
+            ->map(fn ($item) => $item->type_name . "\t1000")->implode("\n");
 
         return response()->json([
             'ore' => $format($compressedOres->concat($compressedIce)),
