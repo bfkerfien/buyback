@@ -174,13 +174,41 @@ class AppraisalComparisonController extends Controller
                 throw ValidationException::withMessages([$field => 'That does not look like a supported '.$source.' appraisal share link.']);
             }
 
+            if ($source === 'MarketBaiters') {
+                if (!preg_match('~^/a/([A-Za-z0-9]+)/?$~', $path, $tokenMatch)) {
+                    throw ValidationException::withMessages([$field => 'Use a MarketBaiters share link in the form /a/{token}.']);
+                }
+
+                try {
+                    $response = Http::withOptions(['allow_redirects' => false])
+                        ->withHeaders(['User-Agent' => 'EveBuyback Appraisal Comparator'])
+                        ->acceptJson()
+                        ->timeout(20)
+                        ->get('https://marketbaiters.com/api/v1/appraise/'.rawurlencode($tokenMatch[1]));
+                } catch (\\Throwable $e) {
+                    throw ValidationException::withMessages([$field => 'Could not load the MarketBaiters appraisal API. Paste the copied item list instead.']);
+                }
+
+                if (!$response->successful()) {
+                    throw ValidationException::withMessages([$field => 'MarketBaiters did not return that appraisal from its API. Paste the copied item list instead.']);
+                }
+
+                $payload = $response->json();
+                $items = is_array($payload) ? $parser->parseMarketBaitersJson($payload) : [];
+                if (!$items) {
+                    throw ValidationException::withMessages([$field => 'The MarketBaiters API response did not contain readable appraisal items. Paste the copied item list instead.']);
+                }
+
+                return $items;
+            }
+
             try {
                 $response = Http::withOptions(['allow_redirects' => false])
                     ->withHeaders(['User-Agent' => 'EveBuyback Appraisal Comparator'])
                     ->accept('text/html')
                     ->timeout(20)
                     ->get($input);
-            } catch (\Throwable $e) {
+            } catch (\\Throwable $e) {
                 throw ValidationException::withMessages([$field => 'Could not load that '.$source.' link. Paste its copied item list instead.']);
             }
 
