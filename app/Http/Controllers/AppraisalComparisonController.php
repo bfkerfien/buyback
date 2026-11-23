@@ -12,6 +12,55 @@ use Illuminate\Validation\ValidationException;
 
 class AppraisalComparisonController extends Controller
 {
+    public function manifests(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $compressedOres = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)->where('g.category_name', 'Asteroid')
+            ->where('t.type_name', 'like', 'Compressed %')
+            ->orderBy('t.type_name')->get(['t.type_id', 't.type_name'])
+            ->reject(fn ($type) => ExcludedMissionOre::isExcluded($type->type_name, (int) $type->type_id));
+
+        $compressedIce = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)->where('t.type_name', 'like', 'Compressed %')
+            ->where(function ($query) {
+                $query->where('g.group_name', 'like', '%ice%')
+                    ->orWhere('g.category_name', 'like', '%ice%');
+            })->orderBy('t.type_name')->get(['t.type_id', 't.type_name']);
+
+        $pi = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)->where('g.category_id', 43)
+            ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']);
+
+        $exploration = DB::table('eve_item_types as t')
+            ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
+            ->where('t.published', true)
+            ->where(function ($query) {
+                $query->where('g.group_name', 'like', '%salvage%')
+                    ->orWhere('g.group_name', 'like', '%ancient relic%')
+                    ->orWhere('g.group_name', 'like', '%data site%')
+                    ->orWhere('g.group_name', 'like', '%relic site%');
+            })->orderBy('t.type_name')->get(['t.type_id', 't.type_name']);
+
+        $format = fn ($items) => $items->unique('type_id')
+            ->map(fn ($item) => $item->type_name . "\\t1000")->implode("\\n");
+
+        return response()->json([
+            'ore' => $format($compressedOres->concat($compressedIce)),
+            'pi' => $format($pi),
+            'exploration' => $format($exploration),
+            'counts' => [
+                'ore' => $compressedOres->count() + $compressedIce->count(),
+                'pi' => $pi->count(),
+                'exploration' => $exploration->count(),
+            ],
+        ]);
+    }
+
     public function compare(Request $request, InventoryParser $parser): JsonResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
