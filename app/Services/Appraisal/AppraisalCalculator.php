@@ -499,7 +499,7 @@ final class AppraisalCalculator
         ];
     }
 
-    /** Read the latest usable value from the compact current-price table. */
+    /** Read a best price or the marginal price at a configured Jita order-book depth. */
     private function snapshotJitaPrice(int $typeId, string $regionId, string $side, ?int $depth = null): ?array
     {
         // A configured depth means the marginal price at the Nth unit in the
@@ -562,4 +562,5 @@ final class AppraisalCalculator
             'price' => (float) $snapshot->{$column},
             'observed_at' => $snapshot->{$observedAtColumn},
         ];
-    }}
+    }
+}
