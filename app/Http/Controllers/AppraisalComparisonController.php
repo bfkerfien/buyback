@@ -101,12 +101,12 @@ class AppraisalComparisonController extends Controller
             }
 
             try {
-                $response = Http::withOptions(['allow_redirects' => ['max' => 3, 'strict' => true]])
+                $response = Http::withOptions(['allow_redirects' => false])
                     ->withHeaders(['User-Agent' => 'EveBuyback Appraisal Comparator'])
                     ->accept('text/html')
                     ->timeout(20)
                     ->get($input);
-            } catch (\\Throwable $e) {
+            } catch (\Throwable $e) {
                 throw ValidationException::withMessages([$field => 'Could not load that '.$source.' link. Paste its copied item list instead.']);
             }
 
