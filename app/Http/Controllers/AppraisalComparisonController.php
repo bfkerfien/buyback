@@ -91,10 +91,6 @@ class AppraisalComparisonController extends Controller
                 'holo' => (int) ($holo['quantity'] ?? 0),
                 'buyback' => (int) ($buyback['quantity'] ?? 0),
             ];
-            $holoPresent = $quantities['holo'] > 0;
-            $buybackPresent = $quantities['buyback'] > 0;
-            $sameQuantity = $holoPresent && $buybackPresent && $quantities['holo'] === $quantities['buyback'];
-
             $holoPayout = isset($holo['unit_payout']) && (float) $holo['unit_payout'] > 0
                 ? (float) $holo['unit_payout'] : null;
             $buybackPayout = isset($buyback['unit_payout']) && (float) $buyback['unit_payout'] > 0
