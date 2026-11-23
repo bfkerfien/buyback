@@ -262,6 +262,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 <input type="hidden" id="dashboard-csrf" value="{{ csrf_token() }}">
 </section>
 </section>
+@endif
 
 <section class="tab-panel" id="tab-how-to" role="tabpanel" hidden>
 <section class="panel">
