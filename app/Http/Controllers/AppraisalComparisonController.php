@@ -1,14 +1,14 @@
 <?php
 
-namespace App\\Http\\Controllers;
+namespace App\Http\Controllers;
 
-use App\\Services\\Eve\\ExcludedMissionOre;
-use App\\Services\\Appraisal\\InventoryParser;
-use Illuminate\\Http\\JsonResponse;
-use Illuminate\\Http\\Request;
-use Illuminate\\Support\\Facades\\DB;
-use Illuminate\\Support\\Facades\\Http;
-use Illuminate\\Validation\\ValidationException;
+use App\Services\Eve\ExcludedMissionOre;
+use App\Services\Appraisal\InventoryParser;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 
 class AppraisalComparisonController extends Controller
 {
