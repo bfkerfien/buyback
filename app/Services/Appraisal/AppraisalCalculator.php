@@ -304,7 +304,8 @@ final class AppraisalCalculator
                     $mineralValue = round($grossMineralValue * $buyPercent / 100, 2);
                     $mineralVolume = (float) ($mineral->volume ?? 0);
                     $shippingVolume = $yieldedQuantity * $mineralVolume;
-                    $shippingCost = round($shippingVolume * 320, 2);
+                    $shippingCostPerM3 = max(0, (float) DB::table('buyback_system_status')->where('status_key', 'ore_shipping_cost_per_m3')->value('status_value', 350));
+                    $shippingCost = round($shippingVolume * $shippingCostPerM3, 2);
                     $refinedLineValue += $mineralValue - $shippingCost;
                     $refinedMineralDetails[] = [
                         'type_id' => $mineralId,
