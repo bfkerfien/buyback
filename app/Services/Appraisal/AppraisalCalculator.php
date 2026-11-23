@@ -112,6 +112,7 @@ final class AppraisalCalculator
             $refinedMineralDetails = [];
             $customPayoutPercent = null;
             $customRateSource = null;
+            $depth = null;
             $isIce = in_array(mb_strtolower((string) ($type->group_name ?? '')), ['ice', 'compressed ice'], true);
             $baseTypeName = str_starts_with(mb_strtolower($type->type_name), 'compressed ')
                 ? trim(mb_substr($type->type_name, mb_strlen('Compressed ')))
@@ -152,7 +153,7 @@ final class AppraisalCalculator
             // between compressed and uncompressed inventory submissions.
             if ($isGas) {
                 $depth = max(1, (int) $gasPricingSettings->get('gas_buy_depth', 50000));
-                $marketPrice = $this->snapshotJitaPrice((int) $compressedGasType->type_id, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice((int) $compressedGasType->type_id, $regionId, 'buy', $depth);
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name'] . ' (no stored Jita buy-price snapshot for its compressed gas reference)';
                     $unpricedItemReasons[$item['name']] = 'No stored compressed-gas Jita buy-price snapshot is available yet.';
@@ -182,7 +183,7 @@ final class AppraisalCalculator
                 // from its stored Jita buy-price snapshot, preserving its individual rate.
                 $typeId = (int) $type->type_id;
                 $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $typeId, 1000));
-                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy', $depth);
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
@@ -294,7 +295,7 @@ final class AppraisalCalculator
                         $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
                     }
 
-                    $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy');
+                    $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy', $depth);
                     if ($mineralPrice === null) {
                         $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': no stored Jita buy-price snapshot)';
                         $unpricedItemReasons[$item['name']] = 'Missing Jita price for refined output ' . $mineral->type_name . '.';
@@ -329,13 +330,26 @@ final class AppraisalCalculator
                 $price = (object) ['source' => 'database-snapshot-refined-outputs', 'observed_at' => collect($refinedMineralDetails)->pluck('observed_at')->filter()->max()];
                 $lineValue = $refinedLineValue;
             } else {
+                $isDirectMineralForDepth = mb_strtolower((string) ($type->category_name ?? '')) === 'material'
+                    && mb_strtolower((string) ($type->group_name ?? '')) === 'mineral';
+                if ($isDirectMineralForDepth) {
+                    $defaultMineralDepths = [
+                        'Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000,
+                        'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000,
+                        'Megacyte' => 500000, 'Morphite' => 45000,
+                    ];
+                    $depth = max(1, (int) $mineralPricingSettings->get(
+                        'mineral_buy_depth_' . (int) $type->type_id,
+                        $defaultMineralDepths[$type->type_name] ?? 50000
+                    ));
+                }
                 $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
                 if ($side === 'sell') {
-                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'sell');
+                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'sell', $depth);
                     $unitPrice = $marketPrice['price'] ?? null;
                     $price = $marketPrice ? (object) ['source' => 'database-snapshot-jita-sell', 'observed_at' => $marketPrice['observed_at']] : null;
                 } else {
-                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy');
+                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy', $depth);
                     $unitPrice = $marketPrice['price'] ?? null;
                     $price = $marketPrice ? (object) ['source' => 'database-snapshot-jita-buy', 'observed_at' => $marketPrice['observed_at']] : null;
                 }
@@ -486,8 +500,48 @@ final class AppraisalCalculator
     }
 
     /** Read the latest usable value from the compact current-price table. */
-    private function snapshotJitaPrice(int $typeId, string $regionId, string $side): ?array
+    private function snapshotJitaPrice(int $typeId, string $regionId, string $side, ?int $depth = null): ?array
     {
+        // A configured depth means the marginal price at the Nth unit in the
+        // Jita IV - Moon 4 order book, not the best top-of-book price. This is
+        // what the per-mineral depth controls in the admin pricing panel mean.
+        if ($depth !== null && $depth > 1) {
+            $isBuy = $side !== 'sell';
+            $locationId = (int) config('buyback.jita_station_id', 60003760);
+            $latest = DB::table('market_order_book_snapshots')
+                ->where('type_id', $typeId)
+                ->where('region_id', $regionId)
+                ->where('location_id', $locationId)
+                ->where('is_buy_order', $isBuy)
+                ->max('observed_at');
+
+            if (!$latest) {
+                return null;
+            }
+
+            $orders = DB::table('market_order_book_snapshots')
+                ->where('type_id', $typeId)
+                ->where('region_id', $regionId)
+                ->where('location_id', $locationId)
+                ->where('is_buy_order', $isBuy)
+                ->where('observed_at', $latest)
+                ->orderBy('price', $isBuy ? 'desc' : 'asc')
+                ->get(['price', 'volume_remain']);
+
+            $remaining = $depth;
+            foreach ($orders as $order) {
+                $volume = (int) $order->volume_remain;
+                if ($volume >= $remaining) {
+                    return ['price' => (float) $order->price, 'observed_at' => $latest];
+                }
+                $remaining -= $volume;
+            }
+
+            // Never silently substitute the best order when the configured
+            // depth is unavailable; that would materially overstate value.
+            return null;
+        }
+
         $column = $side === 'sell' ? 'sell_price' : 'buy_price';
         $snapshotIdColumn = $side === 'sell' ? 'sell_snapshot_id' : 'buy_snapshot_id';
         $observedAtColumn = $side === 'sell' ? 'sell_observed_at' : 'buy_observed_at';
@@ -508,5 +562,4 @@ final class AppraisalCalculator
             'price' => (float) $snapshot->{$column},
             'observed_at' => $snapshot->{$observedAtColumn},
         ];
-    }
-}
+    }}
