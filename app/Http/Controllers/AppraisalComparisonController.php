@@ -44,7 +44,7 @@ class AppraisalComparisonController extends Controller
                 'holo_quantity' => $aq,
                 'buyback_quantity' => $bq,
                 'difference' => $bq - $aq,
-                'status' => !$a ? 'missing_marketbaiters' : (!$b ? 'missing_buyback' : ($aq === $bq ? 'match' : 'quantity_mismatch')),
+                'status' => !$a ? 'missing_holo' : (!$b ? 'missing_buyback' : ($aq === $bq ? 'match' : 'quantity_mismatch')),
             ];
         })->values();
 
@@ -87,7 +87,7 @@ class AppraisalComparisonController extends Controller
                         ->accept('text/html')
                         ->timeout(15)
                         ->get($input);
-                } catch (\\Throwable $e) {
+                } catch (\Throwable $e) {
                     throw ValidationException::withMessages(['holo_input' => 'Could not load that Holo page. Check the link and try again, or paste the copied appraisal item list.']);
                 }
                 if (!$response->successful()) {
