@@ -294,8 +294,17 @@ final class AppraisalCalculator
                         $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $mineralId, 1000));
                         $buyPercent = (float) $icePricingSettings->get('ice_buy_percent_' . $mineralId, $defaultIcePercent);
                     } else {
+                        $defaultMineralPercents = [
+                            'Tritanium' => 98,
+                            'Pyerite' => 95,
+                            'Zydrine' => 90,
+                            'Megacyte' => 90,
+                        ];
                         $depth = max(1, (int) $mineralPricingSettings->get('mineral_buy_depth_' . $mineralId, $defaultDepths[$mineral->type_name] ?? 50000));
-                        $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
+                        $buyPercent = (float) $mineralPricingSettings->get(
+                            'mineral_buy_percent_' . $mineralId,
+                            $defaultMineralPercents[$mineral->type_name] ?? 85
+                        );
                     }
 
                     $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy');
@@ -360,6 +369,26 @@ final class AppraisalCalculator
                 // Read the latest stored Jita buy snapshot for display metadata.
                 $oreMarket = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy');
                 $oreJitaBuyPrice = $oreMarket['price'] ?? null;
+            }
+
+            // Direct appraisals of standard minerals must use the same
+            // per-mineral payout setting as minerals produced by ore refining.
+            // Otherwise a mineral submitted on its own falls through to the
+            // Material category/default rate and can show a different percentage.
+            $isDirectMineral = mb_strtolower((string) ($type->category_name ?? '')) === 'material'
+                && mb_strtolower((string) ($type->group_name ?? '')) === 'mineral';
+            if ($isDirectMineral) {
+                $defaultMineralPercents = [
+                    'Tritanium' => 98,
+                    'Pyerite' => 95,
+                    'Zydrine' => 90,
+                    'Megacyte' => 90,
+                ];
+                $customPayoutPercent = (float) $mineralPricingSettings->get(
+                    'mineral_buy_percent_' . (int) $type->type_id,
+                    $defaultMineralPercents[$type->type_name] ?? 85
+                );
+                $customRateSource = 'individual_mineral';
             }
 
             $effectiveCategoryId = $pricingType->category_id;
