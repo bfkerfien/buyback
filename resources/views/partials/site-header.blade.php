@@ -9,10 +9,10 @@
     </div>
 </div>
 
-<div class="acceptance-banner" role="status" aria-label="Current accepted items">
+<div class="acceptance-banner" role="status" aria-label="Accepting compressed ore, compressed ice, uncompressed gas, PI materials, and exploration loot; no uncompressed ore or raw minerals">
     <div class="acceptance-banner-track">
-        <span>NOW ACCEPTING: Compressed Asteriod Ore / PI / Compressed Ice / Uncompressed Gas from any BRANCH system. Other items are a work in progress.</span>
-        <span aria-hidden="true">NOW ACCEPTING: Compressed Asteriod Ore / PI / Compressed Ice / Uncompressed Gas from any BRANCH system. Other items are a work in progress.</span>
+        <span>ACCEPTING: Compressed Ore - Compressed Ice - Uncompressed Gas - PI Materials - Exploration Loot || NO UNCOMPRESSED ORE OR RAW MINERALS</span>
+        <span aria-hidden="true">ACCEPTING: Compressed Ore - Compressed Ice - Uncompressed Gas - PI Materials - Exploration Loot || NO UNCOMPRESSED ORE OR RAW MINERALS</span>
     </div>
 </div>
 
