@@ -30,7 +30,7 @@ final class AppraisalCalculator
         $types = DB::table('eve_item_types as t')
             ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->whereIn('t.type_name', $names)
-            ->get(['t.type_id','t.type_name','t.group_id','t.portion_size','g.category_id','g.category_name','g.group_name'])
+            ->get(['t.type_id','t.type_name','t.group_id','t.meta_group_id','t.portion_size','g.category_id','g.category_name','g.group_name'])
             ->keyBy(fn ($type) => mb_strtolower($type->type_name));
 
         // Compressed ore is always valued from the mineral output of its
@@ -406,10 +406,14 @@ final class AppraisalCalculator
             // entire refined basket (e.g. 87% × 87% = 75.69%).
             // Its final rate must therefore be 100%; all pricing/rates are
             // already reflected in $lineValue.
+            $isTechTwoShip = mb_strtolower((string) ($type->category_name ?? '')) === 'ship'
+                && (int) ($type->meta_group_id ?? 0) === 2;
             $rate = $valuationMode === 'reprocessed'
                 ? 100.0
-                : ($customPayoutPercent
-                    ?? ($fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($piBuyRule->buy_percent ?? $defaultRate)));
+                : ($isTechTwoShip
+                    ? 91.5
+                    : ($customPayoutPercent
+                        ?? ($fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($piBuyRule->buy_percent ?? $defaultRate))));
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
 
@@ -437,6 +441,7 @@ final class AppraisalCalculator
                 'effective_rate_percent' => $effectiveRatePercent,
                 'category_id' => $effectiveCategoryId,
                 'category_name' => $effectiveCategoryName,
+                'meta_group_id' => (int) ($type->meta_group_id ?? 0),
                 'rate_source' => $customRateSource ?? ($fixedPayoutPercent !== null ? 'fixed' : ($piBuyRule ? 'individual_pi' : 'default')),
                 'source' => $price->source,
                 'observed_at' => $price->observed_at,
