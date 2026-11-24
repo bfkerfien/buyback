@@ -46,8 +46,23 @@ class AppraisalController extends Controller
         }
 
         // EVE SDE category "Ship" is authoritative. Modules, rigs, cargo, and other
-        // non-hull entries are skipped; valid hulls are paid at a fixed 80% rate.
-        $result = $calculator->calculate($items, 'Ship', 80.0, true);
+        // non-hull entries are skipped. Hull payout is 84% of Jita buy value,
+        // less a flat 250,000 ISK handling deduction per hull.
+        $result = $calculator->calculate($items, 'Ship', 84.0, true);
+
+        foreach ($result['lines'] as &$line) {
+            $perHullDeduction = 250000 * (int) $line['quantity'];
+            $line['payout_value'] = max(
+                0,
+                round(($line['line_value'] * 0.84) - $perHullDeduction, 2)
+            );
+            $line['payout_percent'] = 84.0;
+        }
+        unset($line);
+
+        $result['payout_value'] = round(array_sum(array_column($result['lines'], 'payout_value')), 2);
+        $result['fees'] = round($result['gross_value'] - $result['payout_value'], 2);
+
         return $this->saveQuote($request, $validated, $result, 'ship');
     }
 
