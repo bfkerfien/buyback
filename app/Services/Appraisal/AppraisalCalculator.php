@@ -408,6 +408,9 @@ final class AppraisalCalculator
             // already reflected in $lineValue.
             $isTechTwoShip = mb_strtolower((string) ($type->category_name ?? '')) === 'ship'
                 && (int) ($type->meta_group_id ?? 0) === 2;
+            if ($isTechTwoShip) {
+                $customRateSource = 'tech_ii_ship';
+            }
             $rate = $valuationMode === 'reprocessed'
                 ? 100.0
                 : ($isTechTwoShip
