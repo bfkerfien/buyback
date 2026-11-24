@@ -16,10 +16,10 @@
     </div>
 </div>
 
-<div class="evaluation-banner" role="status" aria-label="Evaluation mode notice">
+<div class="evaluation-banner" role="status" aria-label="Evaluation mode: if I cancel your contract, watch for EVE Mail. I verify to ensure the evaluation is fair to you and accurate for me.">
     <div class="evaluation-banner-track">
-        <span>EVALUATION MODE: SOME APPRAISALS MAY BE INCORRECT — WE WILL EMAIL YOU IF YOURS IS INCORRECT. SORRY FOR THE INCONVENIENCE.</span>
-        <span aria-hidden="true">EVALUATION MODE: SOME APPRAISALS MAY BE INCORRECT — WE WILL EMAIL YOU IF YOURS IS INCORRECT. SORRY FOR THE INCONVENIENCE.</span>
+        <span>EVALUATION MODE: IF I CANCEL YOUR CONTRACT, WATCH FOR EVE MAIL. I VERIFY TO ENSURE THE EVALUATION IS FAIR TO YOU AND ACCURATE FOR ME.</span>
+        <span aria-hidden="true">EVALUATION MODE: IF I CANCEL YOUR CONTRACT, WATCH FOR EVE MAIL. I VERIFY TO ENSURE THE EVALUATION IS FAIR TO YOU AND ACCURATE FOR ME.</span>
     </div>
 </div>
 
