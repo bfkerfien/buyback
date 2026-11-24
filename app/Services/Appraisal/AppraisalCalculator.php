@@ -84,8 +84,8 @@ final class AppraisalCalculator
         $appraisedTypeIds = $types->filter(fn ($type) => $requiredCategoryName === null
                 || mb_strtolower((string) $type->category_name) === mb_strtolower($requiredCategoryName))
             ->pluck('type_id');
-        $this->priceRefresher->registerForPriceRefresh($appraisedTypeIds->all(), $side);
-        $this->priceRefresher->registerForPriceRefresh($mineralIds->all(), 'buy');
+        $this->priceRefresher->registerForPriceRefresh($appraisedTypeIds->all());
+        $this->priceRefresher->registerForPriceRefresh($mineralIds->all());
 
         foreach ($parsedItems as $item) {
             $type = $types->get(mb_strtolower($item['name']));

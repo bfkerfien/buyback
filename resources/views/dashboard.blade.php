@@ -43,7 +43,7 @@ th{color:#9deaf0!important}td{border-color:rgba(91,193,210,.18)!important}
 </ol>
 </section>
 <section class="panel">
-<h2>Create an appraisal</h2><p class="muted">Paste item names and quantities from your inventory. Supported formats include EVE tab-separated exports, CSV, and “quantity x item name”.</p><p class="muted">Uncommon items may take a little longer the first time while their Jita price is added to the refresh list. This is expected; there’s no need to worry.</p>
+<h2>Create an appraisal</h2><p class="muted">Paste item names and quantities from your inventory. Supported formats include EVE tab-separated exports, CSV, and “quantity x item name”.</p><p class="muted">New or uncommon items may show as unpriced until the next scheduled Jita market refresh.</p>
 <form method="post" action="{{ route('appraisals.store') }}">@csrf
 <label>Origin system (optional)<input name="origin_system" value="{{ old('origin_system') }}" placeholder="Jita, Amarr, etc."></label>
 <label>Inventory list<textarea name="inventory" required placeholder="Tritanium&#9;100000&#10;Pyerite&#9;25000&#10;Mexallon&#9;5000">{{ old('inventory') }}</textarea></label>
