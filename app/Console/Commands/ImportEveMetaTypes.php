@@ -1,14 +1,14 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\\Console\\Commands;
 
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
+use Illuminate\\Console\\Command;
+use Illuminate\\Support\\Facades\\DB;
 use Throwable;
 
 class ImportEveMetaTypes extends Command
 {
-    protected $signature = 'buyback:import-meta-types {file : Path to the CCP SDE invMetaTypes.jsonl file}';
+    protected $signature = 'buyback:import-meta-types {file : Path to the CCP SDE types.jsonl file}';
     protected $description = 'Import EVE item meta group IDs, including Tech II classification, from CCP SDE JSONL.';
 
     public function handle(): int
@@ -26,7 +26,7 @@ class ImportEveMetaTypes extends Command
         }
 
         $batch = [];
-        $updated = 0;
+        $imported = 0;
         $lineNumber = 0;
         $now = now();
 
@@ -46,23 +46,28 @@ class ImportEveMetaTypes extends Command
 
             $typeId = $raw['_key'] ?? $value['typeID'] ?? $value['type_id'] ?? null;
             $metaGroupId = $value['metaGroupID'] ?? $value['meta_group_id'] ?? null;
+            $typeName = $value['name']['en'] ?? $value['typeName'] ?? null;
 
-            if (!is_numeric($typeId) || !is_numeric($metaGroupId)) {
+            if (!is_numeric($typeId) || !is_numeric($metaGroupId) || !is_string($typeName) || trim($typeName) === '') {
                 continue;
             }
 
             $batch[] = [
                 'type_id' => (int) $typeId,
+                'type_name' => trim($typeName),
+                'published' => (bool) ($value['published'] ?? true),
                 'meta_group_id' => (int) $metaGroupId,
+                'created_at' => $now,
                 'updated_at' => $now,
             ];
 
-            if (count($batch) >= 1000) {
-                $updated += DB::table('eve_item_types')->upsert(
+            if (count($batch) >= 500) {
+                DB::table('eve_item_types')->upsert(
                     $batch,
                     ['type_id'],
                     ['meta_group_id', 'updated_at']
                 );
+                $imported += count($batch);
                 $batch = [];
                 $this->output->write('.');
             }
@@ -71,15 +76,16 @@ class ImportEveMetaTypes extends Command
         fclose($handle);
 
         if ($batch) {
-            $updated += DB::table('eve_item_types')->upsert(
+            DB::table('eve_item_types')->upsert(
                 $batch,
                 ['type_id'],
                 ['meta_group_id', 'updated_at']
             );
+            $imported += count($batch);
         }
 
         $this->newLine();
-        $this->info("Imported meta group IDs for {$updated} EVE item types.");
+        $this->info("Imported meta group IDs for {$imported} EVE item types.");
         $this->info('Tech II items use meta group ID 2.');
         return self::SUCCESS;
     }
