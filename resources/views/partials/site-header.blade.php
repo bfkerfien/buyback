@@ -2,10 +2,10 @@
     $siteCharacter = auth()->check() ? auth()->user()->characters()->orderByDesc('last_authenticated_at')->first() : null;
 @endphp
 
-<div class="slyce-buying-banner" role="status" aria-label="Buying PI and exploration gear in all SLYCE systems">
+<div class="slyce-buying-banner" role="status" aria-label="Now serving Branch, Tenal, and Northern Deklein at any station. Join our Discord for help or comments.">
     <div class="slyce-buying-banner-track">
-        <span>BUYING PI AND EXPLORATION GEAR IN SLYCE SPACE — ALL SYSTEMS</span>
-        <span aria-hidden="true">BUYING PI AND EXPLORATION GEAR IN SLYCE SPACE — ALL SYSTEMS</span>
+        <span>NOW SERVING: Branch - Tenal - Northern Deklein Any Station || Join our Discord for help or comments.</span>
+        <span aria-hidden="true">NOW SERVING: Branch - Tenal - Northern Deklein Any Station || Join our Discord for help or comments.</span>
     </div>
 </div>
 
