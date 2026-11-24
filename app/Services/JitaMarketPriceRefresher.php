@@ -8,15 +8,16 @@ use Throwable;
 
 final class JitaMarketPriceRefresher
 {
-    public function ensureCurrentPrices(array $typeIds, string $side = 'buy'): void
+    /**
+     * Add appraisal types to the market watchlist. Price collection is performed
+     * by the scheduled market refresh, never synchronously during a user request.
+     */
+    public function registerForPriceRefresh(array $typeIds): void
     {
         $typeIds = $this->normalizeTypeIds($typeIds);
         if (!$typeIds) {
             return;
         }
-        $side = $side === 'sell' ? 'sell' : 'buy';
-        $priceColumn = $side . '_price';
-        $snapshotColumn = $side . '_snapshot_id';
 
         $regionId = (string) config('buyback.region_id', '10000002');
         $now = now();
@@ -27,29 +28,6 @@ final class JitaMarketPriceRefresher
             'created_at' => $now,
             'updated_at' => $now,
         ], $typeIds));
-
-        $pricedIds = DB::table('market_price_current')
-            ->where('region_id', $regionId)
-            ->whereIn('type_id', $typeIds)
-            ->whereNotNull($snapshotColumn)
-            ->where($priceColumn, '>', 0)
-            ->distinct()
-            ->pluck('type_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        $hasDepthIds = DB::table('market_order_book_snapshots')
-            ->where('region_id', $regionId)
-            ->where('location_id', (int) config('buyback.jita_station_id', 60003760))
-            ->where('is_buy_order', $side === 'buy')
-            ->whereIn('type_id', $typeIds)
-            ->distinct()
-            ->pluck('type_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        $readyIds = array_values(array_intersect($pricedIds, $hasDepthIds));
-        $this->refreshTypes(array_values(array_diff($typeIds, $readyIds)));
     }
 
     /** @return array{saved:int,failed:int} */

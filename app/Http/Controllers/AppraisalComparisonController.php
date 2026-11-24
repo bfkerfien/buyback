@@ -68,7 +68,10 @@ class AppraisalComparisonController extends Controller
         $data = $request->validate([
             'type_id' => ['required', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
-            'quote_item_multiplier' => ['required', 'numeric', 'gt:0', 'max:999999.999999'],
+            'quote_item_price_multiplier' => ['required', 'numeric', 'gt:0', 'max:999999.999999'],
+            'buyback_quantity' => ['required', 'integer', 'min:1'],
+            'price_multiplier_base_value' => ['required', 'numeric', 'gt:0'],
+            'price_multiplier_fixed_cost' => ['required', 'numeric', 'min:0'],
             'holo_unit_payout' => ['required', 'numeric', 'gt:0'],
             'buyback_unit_payout' => ['required', 'numeric', 'gt:0'],
         ]);
@@ -82,13 +85,14 @@ class AppraisalComparisonController extends Controller
 
         $next = null;
         $targetUnitPayout = (float) $data['holo_unit_payout'] * 1.0005;
+        $targetTotalPayout = $targetUnitPayout * (int) $data['buyback_quantity'];
 
-        DB::transaction(function () use ($request, $data, $item, $targetUnitPayout, &$next): void {
-            $storedMultiplier = DB::table('appraisal_item_payout_overrides')
+        DB::transaction(function () use ($request, $data, $item, $targetUnitPayout, $targetTotalPayout, &$next): void {
+            $storedMultiplier = DB::table('appraisal_item_price_overrides')
                 ->where('type_id', $item->type_id)
-                ->value('payout_multiplier');
+                ->value('price_multiplier');
             $currentMultiplier = $storedMultiplier === null ? 1.0 : (float) $storedMultiplier;
-            $quoteMultiplier = (float) $data['quote_item_multiplier'];
+            $quoteMultiplier = (float) $data['quote_item_price_multiplier'];
 
             // Refuse to apply a stale comparison if this item's saved rate changed
             // after the EveBuyback quote was generated. The quote payout is based
@@ -99,10 +103,12 @@ class AppraisalComparisonController extends Controller
                 'This item rate changed after the compared quote was created. Generate a fresh EveBuyback appraisal before saving this item.'
             );
 
-            // Each item gets its own multiplier. The item's existing category/base
-            // pricing remains unchanged; only this exact SDE type is adjusted.
+            // Solve for the multiplier on the underlying Jita buy-order price.
+            // The fixed cost is normally zero; reprocessed ore includes shipping
+            // deductions which must not themselves be multiplied.
             $next = round(
-                $quoteMultiplier * ($targetUnitPayout / (float) $data['buyback_unit_payout']),
+                ($targetTotalPayout + (float) $data['price_multiplier_fixed_cost'])
+                    / (float) $data['price_multiplier_base_value'],
                 6
             );
             abort_if(
@@ -111,11 +117,11 @@ class AppraisalComparisonController extends Controller
                 'Calculated item adjustment is outside the supported range.'
             );
 
-            DB::table('appraisal_item_payout_overrides')->updateOrInsert(
+            DB::table('appraisal_item_price_overrides')->updateOrInsert(
                 ['type_id' => (int) $item->type_id],
                 [
                     'type_name' => $item->type_name,
-                    'payout_multiplier' => number_format($next, 6, '.', ''),
+                    'price_multiplier' => number_format($next, 6, '.', ''),
                     'updated_by' => $request->user()->id,
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -124,7 +130,7 @@ class AppraisalComparisonController extends Controller
 
             DB::table('audit_logs')->insert([
                 'user_id' => $request->user()->id,
-                'action' => 'appraisal_item_payout_override.saved_from_holo',
+                'action' => 'appraisal_item_price_override.saved_from_holo',
                 'subject_type' => 'eve_item_type',
                 'subject_id' => $item->type_id,
                 'details' => json_encode([
@@ -133,8 +139,10 @@ class AppraisalComparisonController extends Controller
                     'target_unit_payout' => $targetUnitPayout,
                     'buyback_unit_payout_before_save' => (float) $data['buyback_unit_payout'],
                     'previous_multiplier' => $currentMultiplier,
-                    'quote_multiplier' => $quoteMultiplier,
-                    'saved_multiplier' => $next,
+                    'quote_price_multiplier' => $quoteMultiplier,
+                    'price_multiplier_base_value' => (float) $data['price_multiplier_base_value'],
+                    'price_multiplier_fixed_cost' => (float) $data['price_multiplier_fixed_cost'],
+                    'saved_price_multiplier' => $next,
                     'margin_percent' => 0.05,
                 ]),
                 'ip_address' => $request->ip(),
@@ -147,9 +155,9 @@ class AppraisalComparisonController extends Controller
             'saved' => true,
             'type_id' => (int) $item->type_id,
             'name' => $item->type_name,
-            'multiplier' => $next,
+            'price_multiplier' => $next,
             'target_unit_payout' => round($targetUnitPayout, 2),
-            'message' => $item->type_name . ' saved at 0.05% above Holo. You can save the next item.',
+            'message' => $item->type_name . ' Jita price multiplier saved at a payout 0.05% above Holo. You can save the next item.',
         ]);
     }
 
@@ -204,13 +212,16 @@ class AppraisalComparisonController extends Controller
                 'buyback_total_payout' => isset($buyback['total_payout']) ? (float) $buyback['total_payout'] : null,
                 'type_id' => isset($buyback['type_id']) ? (int) $buyback['type_id'] : null,
                 'buyback_name' => $buyback['name'] ?? null,
-                'quote_item_multiplier' => isset($buyback['item_payout_multiplier']) ? (float) $buyback['item_payout_multiplier'] : 1.0,
-                'recommended_percent' => ($comparable && !empty($buyback['type_id']) && isset($buyback['payout_percent']))
+                'quote_item_price_multiplier' => isset($buyback['item_price_multiplier']) ? (float) $buyback['item_price_multiplier'] : 1.0,
+                'price_multiplier_base_value' => isset($buyback['price_multiplier_base_value']) ? (float) $buyback['price_multiplier_base_value'] : null,
+                'price_multiplier_fixed_cost' => isset($buyback['price_multiplier_fixed_cost']) ? (float) $buyback['price_multiplier_fixed_cost'] : 0.0,
+                'recommended_price_multiplier' => ($comparable && !empty($buyback['type_id'])
+                    && isset($buyback['price_multiplier_base_value']) && (float) $buyback['price_multiplier_base_value'] > 0)
                     ? round(
-                        (float) $buyback['payout_percent']
-                        * (float) ($buyback['item_payout_multiplier'] ?? 1.0)
-                        * (1.0005 * $holoPayout / $buybackPayout),
-                        2
+                        (($holoPayout * (int) ($buyback['quantity'] ?? 0) * 1.0005)
+                            + (float) ($buyback['price_multiplier_fixed_cost'] ?? 0))
+                            / (float) $buyback['price_multiplier_base_value'],
+                        6
                     ) : null,
                 'buyback_unit_payout' => $buybackPayout,
                 'payout_difference_per_unit' => $difference,
@@ -258,7 +269,9 @@ class AppraisalComparisonController extends Controller
                             'type_id' => (int) $row->type_id,
                             'quote_item_id' => (int) $row->id,
                             'payout_percent' => isset($source['payout_percent']) ? (float) $source['payout_percent'] : null,
-                            'item_payout_multiplier' => isset($source['item_payout_multiplier']) ? (float) $source['item_payout_multiplier'] : 1.0,
+                            'item_price_multiplier' => isset($source['item_price_multiplier']) ? (float) $source['item_price_multiplier'] : 1.0,
+                            'price_multiplier_base_value' => isset($source['price_multiplier_base_value']) ? (float) $source['price_multiplier_base_value'] : null,
+                            'price_multiplier_fixed_cost' => isset($source['price_multiplier_fixed_cost']) ? (float) $source['price_multiplier_fixed_cost'] : 0.0,
                             'quantity' => (int) $row->quantity,
                             'unit_price' => (float) $row->unit_price,
                             'total_payout' => $payout,

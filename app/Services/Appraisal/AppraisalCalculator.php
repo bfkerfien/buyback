@@ -63,7 +63,7 @@ final class AppraisalCalculator
             ->get(['type_id', 'type_name', 'volume'])->keyBy('type_id');
 
                 $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
-        $itemPayoutOverrides = DB::table('appraisal_item_payout_overrides')->pluck('payout_multiplier', 'type_id');
+        $itemPriceMultipliers = DB::table('appraisal_item_price_overrides')->pluck('price_multiplier', 'type_id');
         $mineralPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key');
         $icePricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key');
         $gasPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key');
@@ -84,8 +84,8 @@ final class AppraisalCalculator
         $appraisedTypeIds = $types->filter(fn ($type) => $requiredCategoryName === null
                 || mb_strtolower((string) $type->category_name) === mb_strtolower($requiredCategoryName))
             ->pluck('type_id');
-        $this->priceRefresher->ensureCurrentPrices($appraisedTypeIds->all(), $side);
-        $this->priceRefresher->ensureCurrentPrices($mineralIds->all(), 'buy');
+        $this->priceRefresher->registerForPriceRefresh($appraisedTypeIds->all(), $side);
+        $this->priceRefresher->registerForPriceRefresh($mineralIds->all(), 'buy');
 
         foreach ($parsedItems as $item) {
             $type = $types->get(mb_strtolower($item['name']));
@@ -93,6 +93,10 @@ final class AppraisalCalculator
                 if (!$ignoreNonMatching) $unresolvedTypes[] = $item['name'];
                 continue;
             }
+
+            $itemPriceMultiplier = (float) $itemPriceMultipliers->get((int) $type->type_id, 1.0);
+            $priceMultiplierBaseValue = 0.0;
+            $priceMultiplierFixedCost = 0.0;
 
             if ($requiredCategoryName !== null && mb_strtolower((string) $type->category_name) !== mb_strtolower($requiredCategoryName)) {
                 if (!$ignoreNonMatching) $unresolved[] = $item['name'] . ' (not in the ' . $requiredCategoryName . ' category)';
@@ -160,7 +164,7 @@ final class AppraisalCalculator
                     $unpricedItemReasons[$item['name']] = 'No stored compressed-gas Jita buy-price snapshot is available yet.';
                     continue;
                 }
-                $unitPrice = $marketPrice['price'];
+                $unitPrice = $marketPrice['price'] * $itemPriceMultiplier;
                 $price = (object) [
                     'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-depth',
                     'observed_at' => $marketPrice['observed_at'],
@@ -193,7 +197,7 @@ final class AppraisalCalculator
                     continue;
                 }
 
-                $unitPrice = $marketPrice['price'];
+                $unitPrice = $marketPrice['price'] * $itemPriceMultiplier;
                 $price = (object) [
                     'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-quantity',
                     'observed_at' => $marketPrice['observed_at'],
@@ -222,7 +226,7 @@ final class AppraisalCalculator
                     continue;
                 }
 
-                $unitPrice = $marketPrice['price'];
+                $unitPrice = $marketPrice['price'] * $itemPriceMultiplier;
                 $price = (object) [
                     'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-quantity',
                     'observed_at' => $marketPrice['observed_at'],
@@ -302,12 +306,14 @@ final class AppraisalCalculator
                         $unpricedItemReasons[$item['name']] = 'Missing Jita price for refined output ' . $mineral->type_name . '.';
                         continue 2;
                     }
-                    $grossMineralValue = round($yieldedQuantity * $mineralPrice['price'], 2);
+                    $priceMultiplierBaseValue += round($yieldedQuantity * $mineralPrice['price'] * $buyPercent / 100, 2);
+                    $grossMineralValue = round($yieldedQuantity * $mineralPrice['price'] * $itemPriceMultiplier, 2);
                     $mineralValue = round($grossMineralValue * $buyPercent / 100, 2);
                     $mineralVolume = (float) ($mineral->volume ?? 0);
                     $shippingVolume = $yieldedQuantity * $mineralVolume;
                     $shippingCostPerM3 = max(0, (float) DB::table('buyback_system_status')->where('status_key', 'ore_shipping_cost_per_m3')->value('status_value', 350));
                     $shippingCost = round($shippingVolume * $shippingCostPerM3, 2);
+                    $priceMultiplierFixedCost += $shippingCost;
                     $refinedLineValue += $mineralValue - $shippingCost;
                     $refinedMineralDetails[] = [
                         'type_id' => $mineralId,
@@ -359,6 +365,7 @@ final class AppraisalCalculator
                     $unpricedItemReasons[$item['name']] = 'No stored Jita market-price snapshot is available yet.';
                     continue;
                 }
+                $unitPrice = (float) $unitPrice * $itemPriceMultiplier;
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
             }
 
@@ -406,8 +413,10 @@ final class AppraisalCalculator
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
 
-            $itemPayoutMultiplier = (float) $itemPayoutOverrides->get((int) $type->type_id, 1.0);
-            $payoutValue = round(($lineValue * $rate / 100) * $itemPayoutMultiplier, 2);
+            if ($valuationMode !== 'reprocessed') {
+                $priceMultiplierBaseValue = round(($lineValue / $itemPriceMultiplier) * $rate / 100, 2);
+            }
+            $payoutValue = round($lineValue * $rate / 100, 2);
             if ($oreJitaBuyPrice !== null && $oreJitaBuyPrice > 0 && $pricingQuantity > 0) {
                 $effectiveRatePercent = round(($payoutValue / ($pricingQuantity * $oreJitaBuyPrice)) * 100, 4);
             }
@@ -420,7 +429,9 @@ final class AppraisalCalculator
                 'unit_price' => round($lineValue / (int) $item['quantity'], 4),
                 'line_value' => $lineValue,
                 'payout_percent' => $rate,
-                'item_payout_multiplier' => $itemPayoutMultiplier,
+                'item_price_multiplier' => $itemPriceMultiplier,
+                'price_multiplier_base_value' => $priceMultiplierBaseValue,
+                'price_multiplier_fixed_cost' => $priceMultiplierFixedCost,
                 'payout_value' => $payoutValue,
                 'ore_jita_buy_price' => $oreJitaBuyPrice,
                 'effective_rate_percent' => $effectiveRatePercent,
