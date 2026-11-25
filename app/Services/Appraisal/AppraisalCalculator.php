@@ -30,7 +30,7 @@ final class AppraisalCalculator
         $types = DB::table('eve_item_types as t')
             ->leftJoin('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->whereIn('t.type_name', $names)
-            ->get(['t.type_id','t.type_name','t.group_id','t.portion_size','g.category_id','g.category_name','g.group_name'])
+            ->get(['t.type_id','t.type_name','t.group_id','t.meta_group_id','t.portion_size','g.category_id','g.category_name','g.group_name'])
             ->keyBy(fn ($type) => mb_strtolower($type->type_name));
 
         // Compressed ore is always valued from the mineral output of its
@@ -63,6 +63,7 @@ final class AppraisalCalculator
             ->get(['type_id', 'type_name', 'volume'])->keyBy('type_id');
 
                 $piBuyRules = DB::table('appraisal_pi_buy_rules')->get()->keyBy('type_id');
+        $itemPriceMultipliers = DB::table('appraisal_item_price_overrides')->pluck('price_multiplier', 'type_id');
         $mineralPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key');
         $icePricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'ice_%')->pluck('status_value', 'status_key');
         $gasPricingSettings = DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key');
@@ -83,8 +84,8 @@ final class AppraisalCalculator
         $appraisedTypeIds = $types->filter(fn ($type) => $requiredCategoryName === null
                 || mb_strtolower((string) $type->category_name) === mb_strtolower($requiredCategoryName))
             ->pluck('type_id');
-        $this->priceRefresher->ensureCurrentPrices($appraisedTypeIds->all(), $side);
-        $this->priceRefresher->ensureCurrentPrices($mineralIds->all(), 'buy');
+        $this->priceRefresher->registerForPriceRefresh($appraisedTypeIds->all());
+        $this->priceRefresher->registerForPriceRefresh($mineralIds->all());
 
         foreach ($parsedItems as $item) {
             $type = $types->get(mb_strtolower($item['name']));
@@ -92,6 +93,10 @@ final class AppraisalCalculator
                 if (!$ignoreNonMatching) $unresolvedTypes[] = $item['name'];
                 continue;
             }
+
+            $itemPriceMultiplier = (float) $itemPriceMultipliers->get((int) $type->type_id, 1.0);
+            $priceMultiplierBaseValue = 0.0;
+            $priceMultiplierFixedCost = 0.0;
 
             if ($requiredCategoryName !== null && mb_strtolower((string) $type->category_name) !== mb_strtolower($requiredCategoryName)) {
                 if (!$ignoreNonMatching) $unresolved[] = $item['name'] . ' (not in the ' . $requiredCategoryName . ' category)';
@@ -112,6 +117,7 @@ final class AppraisalCalculator
             $refinedMineralDetails = [];
             $customPayoutPercent = null;
             $customRateSource = null;
+            $depth = null;
             $isIce = in_array(mb_strtolower((string) ($type->group_name ?? '')), ['ice', 'compressed ice'], true);
             $baseTypeName = str_starts_with(mb_strtolower($type->type_name), 'compressed ')
                 ? trim(mb_substr($type->type_name, mb_strlen('Compressed ')))
@@ -152,13 +158,13 @@ final class AppraisalCalculator
             // between compressed and uncompressed inventory submissions.
             if ($isGas) {
                 $depth = max(1, (int) $gasPricingSettings->get('gas_buy_depth', 50000));
-                $marketPrice = $this->snapshotJitaPrice((int) $compressedGasType->type_id, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice((int) $compressedGasType->type_id, $regionId, 'buy', $depth);
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name'] . ' (no stored Jita buy-price snapshot for its compressed gas reference)';
                     $unpricedItemReasons[$item['name']] = 'No stored compressed-gas Jita buy-price snapshot is available yet.';
                     continue;
                 }
-                $unitPrice = $marketPrice['price'];
+                $unitPrice = $marketPrice['price'] * $itemPriceMultiplier;
                 $price = (object) [
                     'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-depth',
                     'observed_at' => $marketPrice['observed_at'],
@@ -182,7 +188,7 @@ final class AppraisalCalculator
                 // from its stored Jita buy-price snapshot, preserving its individual rate.
                 $typeId = (int) $type->type_id;
                 $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $typeId, 1000));
-                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy', $depth);
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
@@ -191,7 +197,7 @@ final class AppraisalCalculator
                     continue;
                 }
 
-                $unitPrice = $marketPrice['price'];
+                $unitPrice = $marketPrice['price'] * $itemPriceMultiplier;
                 $price = (object) [
                     'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-quantity',
                     'observed_at' => $marketPrice['observed_at'],
@@ -210,7 +216,7 @@ final class AppraisalCalculator
                     'ice_buy_depth_' . $typeId,
                     1000
                 ));
-                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy', $depth);
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
@@ -220,7 +226,7 @@ final class AppraisalCalculator
                     continue;
                 }
 
-                $unitPrice = $marketPrice['price'];
+                $unitPrice = $marketPrice['price'] * $itemPriceMultiplier;
                 $price = (object) [
                     'source' => 'database-snapshot-jita-buy-' . $depth . '-unit-quantity',
                     'observed_at' => $marketPrice['observed_at'],
@@ -294,17 +300,20 @@ final class AppraisalCalculator
                         $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
                     }
 
-                    $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy');
+                    $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy', $depth);
                     if ($mineralPrice === null) {
                         $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': no stored Jita buy-price snapshot)';
                         $unpricedItemReasons[$item['name']] = 'Missing Jita price for refined output ' . $mineral->type_name . '.';
                         continue 2;
                     }
-                    $grossMineralValue = round($yieldedQuantity * $mineralPrice['price'], 2);
+                    $priceMultiplierBaseValue += round($yieldedQuantity * $mineralPrice['price'] * $buyPercent / 100, 2);
+                    $grossMineralValue = round($yieldedQuantity * $mineralPrice['price'] * $itemPriceMultiplier, 2);
                     $mineralValue = round($grossMineralValue * $buyPercent / 100, 2);
                     $mineralVolume = (float) ($mineral->volume ?? 0);
                     $shippingVolume = $yieldedQuantity * $mineralVolume;
-                    $shippingCost = round($shippingVolume * 320, 2);
+                    $shippingCostPerM3 = max(0, (float) DB::table('buyback_system_status')->where('status_key', 'ore_shipping_cost_per_m3')->value('status_value', 350));
+                    $shippingCost = round($shippingVolume * $shippingCostPerM3, 2);
+                    $priceMultiplierFixedCost += $shippingCost;
                     $refinedLineValue += $mineralValue - $shippingCost;
                     $refinedMineralDetails[] = [
                         'type_id' => $mineralId,
@@ -328,13 +337,26 @@ final class AppraisalCalculator
                 $price = (object) ['source' => 'database-snapshot-refined-outputs', 'observed_at' => collect($refinedMineralDetails)->pluck('observed_at')->filter()->max()];
                 $lineValue = $refinedLineValue;
             } else {
+                $isDirectMineralForDepth = mb_strtolower((string) ($type->category_name ?? '')) === 'material'
+                    && mb_strtolower((string) ($type->group_name ?? '')) === 'mineral';
+                if ($isDirectMineralForDepth) {
+                    $defaultMineralDepths = [
+                        'Tritanium' => 150000000, 'Pyerite' => 30000000, 'Mexallon' => 3000000,
+                        'Isogen' => 2000000, 'Nocxium' => 1000000, 'Zydrine' => 500000,
+                        'Megacyte' => 500000, 'Morphite' => 45000,
+                    ];
+                    $depth = max(1, (int) $mineralPricingSettings->get(
+                        'mineral_buy_depth_' . (int) $type->type_id,
+                        $defaultMineralDepths[$type->type_name] ?? 50000
+                    ));
+                }
                 $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
                 if ($side === 'sell') {
-                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'sell');
+                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'sell', $depth);
                     $unitPrice = $marketPrice['price'] ?? null;
                     $price = $marketPrice ? (object) ['source' => 'database-snapshot-jita-sell', 'observed_at' => $marketPrice['observed_at']] : null;
                 } else {
-                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy');
+                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy', $depth);
                     $unitPrice = $marketPrice['price'] ?? null;
                     $price = $marketPrice ? (object) ['source' => 'database-snapshot-jita-buy', 'observed_at' => $marketPrice['observed_at']] : null;
                 }
@@ -343,6 +365,7 @@ final class AppraisalCalculator
                     $unpricedItemReasons[$item['name']] = 'No stored Jita market-price snapshot is available yet.';
                     continue;
                 }
+                $unitPrice = (float) $unitPrice * $itemPriceMultiplier;
                 $lineValue = round($unitPrice * $pricingQuantity, 2);
             }
 
@@ -377,11 +400,29 @@ final class AppraisalCalculator
                 && in_array((int) $type->group_id, [1042, 1034, 1040, 1041], true))
                 ? $piBuyRules->get($type->type_id)
                 : null;
-            $rate = $customPayoutPercent
-                ?? ($fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($piBuyRule->buy_percent ?? $defaultRate));
+            // Reprocessed ore/faction ice has already had each refined
+            // mineral's individual buyback percentage applied above. Applying
+            // the generic item payout rate again here double-discounts the
+            // entire refined basket (e.g. 87% × 87% = 75.69%).
+            // Its final rate must therefore be 100%; all pricing/rates are
+            // already reflected in $lineValue.
+            $isTechTwoShip = mb_strtolower((string) ($type->category_name ?? '')) === 'ship'
+                && (int) ($type->meta_group_id ?? 0) === 2;
+            if ($isTechTwoShip) {
+                $customRateSource = 'tech_ii_ship';
+            }
+            $rate = $valuationMode === 'reprocessed'
+                ? 100.0
+                : ($isTechTwoShip
+                    ? 91.5
+                    : ($customPayoutPercent
+                        ?? ($fixedPayoutPercent !== null ? $fixedPayoutPercent : (float) ($piBuyRule->buy_percent ?? $defaultRate))));
             $effectiveCategoryId = $pricingType->category_id;
             $effectiveCategoryName = $pricingType->category_name;
 
+            if ($valuationMode !== 'reprocessed') {
+                $priceMultiplierBaseValue = round(($lineValue / $itemPriceMultiplier) * $rate / 100, 2);
+            }
             $payoutValue = round($lineValue * $rate / 100, 2);
             if ($oreJitaBuyPrice !== null && $oreJitaBuyPrice > 0 && $pricingQuantity > 0) {
                 $effectiveRatePercent = round(($payoutValue / ($pricingQuantity * $oreJitaBuyPrice)) * 100, 4);
@@ -395,11 +436,15 @@ final class AppraisalCalculator
                 'unit_price' => round($lineValue / (int) $item['quantity'], 4),
                 'line_value' => $lineValue,
                 'payout_percent' => $rate,
+                'item_price_multiplier' => $itemPriceMultiplier,
+                'price_multiplier_base_value' => $priceMultiplierBaseValue,
+                'price_multiplier_fixed_cost' => $priceMultiplierFixedCost,
                 'payout_value' => $payoutValue,
                 'ore_jita_buy_price' => $oreJitaBuyPrice,
                 'effective_rate_percent' => $effectiveRatePercent,
                 'category_id' => $effectiveCategoryId,
                 'category_name' => $effectiveCategoryName,
+                'meta_group_id' => (int) ($type->meta_group_id ?? 0),
                 'rate_source' => $customRateSource ?? ($fixedPayoutPercent !== null ? 'fixed' : ($piBuyRule ? 'individual_pi' : 'default')),
                 'source' => $price->source,
                 'observed_at' => $price->observed_at,
@@ -476,9 +521,49 @@ final class AppraisalCalculator
         ];
     }
 
-    /** Read the latest usable value from the compact current-price table. */
-    private function snapshotJitaPrice(int $typeId, string $regionId, string $side): ?array
+    /** Read a best price or the marginal price at a configured Jita order-book depth. */
+    private function snapshotJitaPrice(int $typeId, string $regionId, string $side, ?int $depth = null): ?array
     {
+        // A configured depth means the marginal price at the Nth unit in the
+        // Jita IV - Moon 4 order book, not the best top-of-book price. This is
+        // what the per-mineral depth controls in the admin pricing panel mean.
+        if ($depth !== null && $depth > 1) {
+            $isBuy = $side !== 'sell';
+            $locationId = (int) config('buyback.jita_station_id', 60003760);
+            $latest = DB::table('market_order_book_snapshots')
+                ->where('type_id', $typeId)
+                ->where('region_id', $regionId)
+                ->where('location_id', $locationId)
+                ->where('is_buy_order', $isBuy)
+                ->max('observed_at');
+
+            if (!$latest) {
+                return null;
+            }
+
+            $orders = DB::table('market_order_book_snapshots')
+                ->where('type_id', $typeId)
+                ->where('region_id', $regionId)
+                ->where('location_id', $locationId)
+                ->where('is_buy_order', $isBuy)
+                ->where('observed_at', $latest)
+                ->orderBy('price', $isBuy ? 'desc' : 'asc')
+                ->get(['price', 'volume_remain']);
+
+            $remaining = $depth;
+            foreach ($orders as $order) {
+                $volume = (int) $order->volume_remain;
+                if ($volume >= $remaining) {
+                    return ['price' => (float) $order->price, 'observed_at' => $latest];
+                }
+                $remaining -= $volume;
+            }
+
+            // Never silently substitute the best order when the configured
+            // depth is unavailable; that would materially overstate value.
+            return null;
+        }
+
         $column = $side === 'sell' ? 'sell_price' : 'buy_price';
         $snapshotIdColumn = $side === 'sell' ? 'sell_snapshot_id' : 'buy_snapshot_id';
         $observedAtColumn = $side === 'sell' ? 'sell_observed_at' : 'buy_observed_at';

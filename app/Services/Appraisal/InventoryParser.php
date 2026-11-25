@@ -4,13 +4,6 @@ namespace App\Services\Appraisal;
 
 final class InventoryParser
 {
-    /**
-     * Accepts common EVE inventory exports:
-     * Item Name<TAB>Quantity, Item Name,Quantity, Quantity x Item Name,
-     * Quantity Item Name, and Item Name x Quantity / Item Name Quantity.
-     *
-     * @return array<int, array{name:string, quantity:int}>
-     */
     public function parse(string $input): array
     {
         $items = [];

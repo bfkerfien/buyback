@@ -46,8 +46,23 @@ class AppraisalController extends Controller
         }
 
         // EVE SDE category "Ship" is authoritative. Modules, rigs, cargo, and other
-        // non-hull entries are skipped; valid hulls are paid at a fixed 80% rate.
-        $result = $calculator->calculate($items, 'Ship', 80.0, true);
+        // non-hull entries are skipped. Tech I hulls pay 84% and Tech II hulls
+        // pay 91.5% of Jita buy value; both are less 250,000 ISK per hull.
+        $result = $calculator->calculate($items, 'Ship', 84.0, true);
+
+        foreach ($result['lines'] as &$line) {
+            $rate = (float) ($line['payout_percent'] ?? 84.0);
+            $perHullDeduction = 250000 * (int) $line['quantity'];
+            $line['payout_value'] = max(
+                0,
+                round(($line['line_value'] * $rate / 100) - $perHullDeduction, 2)
+            );
+        }
+        unset($line);
+
+        $result['payout_value'] = round(array_sum(array_column($result['lines'], 'payout_value')), 2);
+        $result['fees'] = round($result['gross_value'] - $result['payout_value'], 2);
+
         return $this->saveQuote($request, $validated, $result, 'ship');
     }
 
@@ -89,6 +104,9 @@ class AppraisalController extends Controller
                         'source' => $line['source'],
                         'observed_at' => $line['observed_at'],
                         'payout_percent' => $line['payout_percent'],
+                        'item_price_multiplier' => $line['item_price_multiplier'] ?? 1.0,
+                        'price_multiplier_base_value' => $line['price_multiplier_base_value'] ?? 0,
+                        'price_multiplier_fixed_cost' => $line['price_multiplier_fixed_cost'] ?? 0,
                         'payout_value' => $line['payout_value'],
                         'ore_jita_buy_price' => $line['ore_jita_buy_price'] ?? null,
                         'effective_rate_percent' => $line['effective_rate_percent'] ?? null,

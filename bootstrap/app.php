@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up'
     )
+    ->withCommands([__DIR__.'/../app/Console/Commands'])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
         // This app authenticates through EVE SSO and has no generic "login" route.
@@ -24,12 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withSchedule(function (Schedule $schedule): void {
-        // The frequent refresh is intentionally limited to PI materials,
+        // The five-minute refresh is intentionally limited to PI materials,
         // compressed asteroid ores (including bonus grades), compressed ice,
         // four requested ice products, and the eight standard minerals.
         $schedule->command('buyback:refresh-jita-prices --fast')
-            ->everyFifteenMinutes()
-            ->withoutOverlapping(20);
+            ->everyFiveMinutes()
+            ->withoutOverlapping(4);
 
         // Ship Buyback has its own slower refresh and never joins the 15-minute set.
         $schedule->command('buyback:refresh-jita-prices --ships')

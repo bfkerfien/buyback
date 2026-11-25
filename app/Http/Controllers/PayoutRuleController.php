@@ -58,6 +58,32 @@ class PayoutRuleController extends Controller
         return back()->with('status', $material->type_name . ' buy percentage and Jita depth saved.');
     }
 
+    public function storeOreShippingCost(Request $request): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $data = $request->validate([
+            'cost_per_m3' => ['required', 'numeric', 'min:0', 'max:1000000'],
+        ]);
+
+        DB::table('buyback_system_status')->updateOrInsert(
+            ['status_key' => 'ore_shipping_cost_per_m3'],
+            ['status_value' => (string) $data['cost_per_m3']]
+        );
+
+        DB::table('audit_logs')->insert([
+            'user_id' => $request->user()->id,
+            'action' => 'ore_shipping_cost.saved',
+            'subject_type' => 'ore_shipping',
+            'subject_id' => null,
+            'details' => json_encode(['cost_per_m3' => (float) $data['cost_per_m3']]),
+            'ip_address' => $request->ip(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return back()->with('status', 'Ore shipping cost saved.');
+    }
+
     public function storeGasPricing(Request $request): RedirectResponse
     {
         abort_unless($request->user()->isAdmin(), 403);

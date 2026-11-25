@@ -19,7 +19,7 @@ class DashboardController extends Controller
         // only the data required by the selected tab.
         $loadAdminQueue = $admin && $activeTab === 'tab-admin';
         $loadAdminTools = $admin && $activeTab === 'tab-admin-tools';
-        $loadMarketbaiters = $admin && $activeTab === 'tab-marketbaiters';
+        $loadAppraisalManifests = $admin && $activeTab === 'tab-appraisal-manifests';
         $characterIds = $user->characters()->pluck('id');
 
         $visibleQuotes = DB::table('appraisal_quotes')
@@ -125,7 +125,7 @@ class DashboardController extends Controller
         $lastJitaPriceRefreshAt = $loadAdminQueue ? $priceRefreshStatus->get('jita_full_refresh_at') : null;
         $lastJitaPriceRefreshCount = $loadAdminQueue ? (int) $priceRefreshStatus->get('jita_full_refresh_items', 0) : 0;
         $catalogPublishedTypeCount = $loadAdminQueue ? DB::table('eve_item_types')->where('published', true)->count() : 0;
-        $oreTypes = $loadMarketbaiters ? DB::table('eve_item_types as t')
+        $oreTypes = $loadAppraisalManifests ? DB::table('eve_item_types as t')
             ->join('eve_item_groups as g', 'g.group_id', '=', 't.group_id')
             ->where('t.published', true)->where('g.category_name', 'Asteroid')
             ->orderBy('t.type_name')->get(['t.type_id', 't.type_name']) : collect();
@@ -146,6 +146,9 @@ class DashboardController extends Controller
         $mineralPricingSettings = $loadAdminTools
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'mineral_buy_%')->pluck('status_value', 'status_key')
             : collect();
+        $oreShippingCostPerM3 = $loadAdminTools
+            ? (float) DB::table('buyback_system_status')->where('status_key', 'ore_shipping_cost_per_m3')->value('status_value', 350)
+            : 350.0;
         // Moon goo settings contain only the 20 published types in the
         // dedicated Moon Materials group. Do not infer moon materials from
         // every non-mineral output in a moon-ore recipe.
@@ -208,7 +211,7 @@ class DashboardController extends Controller
             ? DB::table('buyback_system_status')->where('status_key', 'like', 'gas_%')->pluck('status_value', 'status_key')
             : collect();
 
-        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'oreTypes', 'mineralTypes', 'mineralPricingSettings', 'moonMineralTypes', 'iceTypes', 'iceProductTypes', 'icePricingSettings', 'iceProductPrices', 'compressedGasTypes', 'gasPricingSettings'));
+        return view('dashboard', compact('user', 'accountAppraisals', 'contractCharacter', 'myEveContracts', 'contractBoardStatus', 'contractBoardMessage', 'quotes', 'expiredQuotes', 'archivedQuotes', 'adminQuotes', 'adminAppraisalItems', 'admin', 'adminMetrics', 'lastJitaPriceRefreshAt', 'lastJitaPriceRefreshCount', 'catalogPublishedTypeCount', 'oreTypes', 'mineralTypes', 'mineralPricingSettings', 'oreShippingCostPerM3', 'moonMineralTypes', 'iceTypes', 'iceProductTypes', 'icePricingSettings', 'iceProductPrices', 'compressedGasTypes', 'gasPricingSettings'));
     }
 
 

@@ -2,24 +2,24 @@
     $siteCharacter = auth()->check() ? auth()->user()->characters()->orderByDesc('last_authenticated_at')->first() : null;
 @endphp
 
-<div class="slyce-buying-banner" role="status" aria-label="Buying PI and exploration gear in all SLYCE systems">
+<div class="slyce-buying-banner" role="status" aria-label="Now serving Branch, Tenal, and Northern Deklein at any station. Join our Discord for help or comments.">
     <div class="slyce-buying-banner-track">
-        <span>BUYING PI AND EXPLORATION GEAR IN SLYCE SPACE — ALL SYSTEMS</span>
-        <span aria-hidden="true">BUYING PI AND EXPLORATION GEAR IN SLYCE SPACE — ALL SYSTEMS</span>
+        <span>NOW SERVING: Branch - Tenal - Northern Deklein Any Station || Join our Discord for help or comments.</span>
+        <span aria-hidden="true">NOW SERVING: Branch - Tenal - Northern Deklein Any Station || Join our Discord for help or comments.</span>
     </div>
 </div>
 
-<div class="acceptance-banner" role="status" aria-label="Current accepted items">
+<div class="acceptance-banner" role="status" aria-label="Accepting compressed ore, compressed ice, uncompressed gas, PI materials, and exploration loot; no uncompressed ore or raw minerals">
     <div class="acceptance-banner-track">
-        <span>NOW ACCEPTING: Compressed Asteriod Ore / PI / Compressed Ice / Uncompressed Gas from any BRANCH system. Other items are a work in progress.</span>
-        <span aria-hidden="true">NOW ACCEPTING: Compressed Asteriod Ore / PI / Compressed Ice / Uncompressed Gas from any BRANCH system. Other items are a work in progress.</span>
+        <span>ACCEPTING: Compressed Ore - Compressed Ice - Uncompressed Gas - PI Materials - Exploration Loot || NO UNCOMPRESSED ORE OR RAW MINERALS</span>
+        <span aria-hidden="true">ACCEPTING: Compressed Ore - Compressed Ice - Uncompressed Gas - PI Materials - Exploration Loot || NO UNCOMPRESSED ORE OR RAW MINERALS</span>
     </div>
 </div>
 
-<div class="evaluation-banner" role="status" aria-label="Evaluation mode notice">
+<div class="evaluation-banner" role="status" aria-label="Evaluation mode: if I cancel your contract, watch for EVE Mail. I verify to ensure the evaluation is fair to you and accurate for me.">
     <div class="evaluation-banner-track">
-        <span>EVALUATION MODE: SOME APPRAISALS MAY BE INCORRECT — WE WILL EMAIL YOU IF YOURS IS INCORRECT. SORRY FOR THE INCONVENIENCE.</span>
-        <span aria-hidden="true">EVALUATION MODE: SOME APPRAISALS MAY BE INCORRECT — WE WILL EMAIL YOU IF YOURS IS INCORRECT. SORRY FOR THE INCONVENIENCE.</span>
+        <span>EVALUATION MODE: IF I CANCEL YOUR CONTRACT, WATCH FOR EVE MAIL. I VERIFY TO ENSURE THE EVALUATION IS FAIR TO YOU AND ACCURATE FOR ME.</span>
+        <span aria-hidden="true">EVALUATION MODE: IF I CANCEL YOUR CONTRACT, WATCH FOR EVE MAIL. I VERIFY TO ENSURE THE EVALUATION IS FAIR TO YOU AND ACCURATE FOR ME.</span>
     </div>
 </div>
 
@@ -66,7 +66,7 @@
         <nav class="site-nav site-admin-nav" aria-label="Administration navigation">
             <a href="{{ route('pi-planner.index') }}" @if(request()->routeIs('pi-planner.*')) aria-current="page" @endif>Planetary Industry</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-ore-refining']) }}">Ore Refining</a>
-            <a href="{{ route('dashboard', ['tab' => 'tab-marketbaiters']) }}">Marketbaiters</a>
+            <a href="{{ route('dashboard', ['tab' => 'tab-appraisal-manifests']) }}" @if(request()->routeIs('dashboard') && request('tab') === 'tab-appraisal-manifests') aria-current="page" @endif>Appraisal Comparison</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-admin']) }}">Admin</a>
             <a href="{{ route('dashboard', ['tab' => 'tab-admin-tools']) }}">Admin Tools</a>
         </nav>
