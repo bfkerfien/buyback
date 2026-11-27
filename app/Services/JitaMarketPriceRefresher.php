@@ -8,15 +8,12 @@ use Throwable;
 
 final class JitaMarketPriceRefresher
 {
-    public function ensureCurrentPrices(array $typeIds, string $side = 'buy'): void
+    public function ensureCurrentPrices(array $typeIds): void
     {
         $typeIds = $this->normalizeTypeIds($typeIds);
         if (!$typeIds) {
             return;
         }
-        $side = $side === 'sell' ? 'sell' : 'buy';
-        $priceColumn = $side . '_price';
-        $snapshotColumn = $side . '_snapshot_id';
 
         $regionId = (string) config('buyback.region_id', '10000002');
         $now = now();
@@ -28,17 +25,17 @@ final class JitaMarketPriceRefresher
             'updated_at' => $now,
         ], $typeIds));
 
-        $pricedIds = DB::table('market_price_current')
-            ->where('region_id', $regionId)
-            ->whereIn('type_id', $typeIds)
-            ->whereNotNull($snapshotColumn)
-            ->where($priceColumn, '>', 0)
-            ->distinct()
-            ->pluck('type_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        $this->refreshTypes(array_values(array_diff($typeIds, $pricedIds)));
+        // Appraisals must never rely on a previously cached market price.
+        // Fetch a fresh Jita IV - Moon 4 order book for every required type
+        // before the calculator reads the current-price table.
+        $result = $this->refreshTypes($typeIds);
+        if ($result['saved'] !== count($typeIds) || $result['failed'] > 0) {
+            throw new \RuntimeException(
+                'Could not refresh current Jita market prices for every appraisal item. '
+                . $result['saved'] . ' of ' . count($typeIds) . ' item types refreshed; '
+                . $result['failed'] . ' ESI requests failed. Please retry the appraisal.'
+            );
+        }
     }
 
     /** @return array{saved:int,failed:int} */
