@@ -154,7 +154,7 @@ final class AppraisalCalculator
             // between compressed and uncompressed inventory submissions.
             if ($isGas) {
                 $depth = max(1, (int) $gasPricingSettings->get('gas_buy_depth', 50000));
-                $marketPrice = $this->snapshotJitaPrice((int) $compressedGasType->type_id, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice((int) $compressedGasType->type_id, $regionId);
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name'] . ' (no stored Jita buy-price snapshot for its compressed gas reference)';
                     $unpricedItemReasons[$item['name']] = 'No stored compressed-gas Jita buy-price snapshot is available yet.';
@@ -184,7 +184,7 @@ final class AppraisalCalculator
                 // from its stored Jita buy-price snapshot, preserving its individual rate.
                 $typeId = (int) $type->type_id;
                 $depth = max(1, (int) $icePricingSettings->get('ice_buy_depth_' . $typeId, 1000));
-                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId);
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
@@ -212,7 +212,7 @@ final class AppraisalCalculator
                     'ice_buy_depth_' . $typeId,
                     1000
                 ));
-                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId, 'buy');
+                $marketPrice = $this->snapshotJitaPrice($typeId, $regionId);
 
                 if ($marketPrice === null) {
                     $unpricedTypes[] = $item['name']
@@ -296,7 +296,7 @@ final class AppraisalCalculator
                         $buyPercent = (float) $mineralPricingSettings->get('mineral_buy_percent_' . $mineralId, 87);
                     }
 
-                    $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId, 'buy');
+                    $mineralPrice = $this->snapshotJitaPrice($mineralId, $regionId);
                     if ($mineralPrice === null) {
                         $unpricedTypes[] = $mineral->type_name . ' (refined output for ' . $item['name'] . ': no stored Jita buy-price snapshot)';
                         $unpricedItemReasons[$item['name']] = 'Missing Jita price for refined output ' . $mineral->type_name . '.';
@@ -330,16 +330,12 @@ final class AppraisalCalculator
                 $price = (object) ['source' => 'database-snapshot-refined-outputs', 'observed_at' => collect($refinedMineralDetails)->pluck('observed_at')->filter()->max()];
                 $lineValue = $refinedLineValue;
             } else {
-                $priceColumn = $side === 'sell' ? 'sell_price' : 'buy_price';
-                if ($side === 'sell') {
-                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'sell');
-                    $unitPrice = $marketPrice['price'] ?? null;
-                    $price = $marketPrice ? (object) ['source' => 'database-snapshot-jita-sell', 'observed_at' => $marketPrice['observed_at']] : null;
-                } else {
-                    $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy');
-                    $unitPrice = $marketPrice['price'] ?? null;
-                    $price = $marketPrice ? (object) ['source' => 'database-snapshot-jita-buy', 'observed_at' => $marketPrice['observed_at']] : null;
-                }
+                // Percentage-based buyback offers are always based on Jita Buy.
+                $marketPrice = $this->snapshotJitaPrice((int) $type->type_id, $regionId);
+                $unitPrice = $marketPrice['price'] ?? null;
+                $price = $marketPrice
+                    ? (object) ['source' => 'database-snapshot-jita-buy', 'observed_at' => $marketPrice['observed_at']]
+                    : null;
                 if ($unitPrice === null || $unitPrice <= 0 || !$price) {
                     $unpricedTypes[] = $item['name'] . ' (type ID ' . $type->type_id . ': no valid Jita price)';
                     $unpricedItemReasons[$item['name']] = 'No stored Jita market-price snapshot is available yet.';
@@ -356,7 +352,7 @@ final class AppraisalCalculator
             $effectiveRatePercent = null;
             if ((int) $type->category_id === 25 && !$isIce && $valuationMode === 'reprocessed') {
                 // Read the latest stored Jita buy snapshot for display metadata.
-                $oreMarket = $this->snapshotJitaPrice((int) $type->type_id, $regionId, 'buy');
+                $oreMarket = $this->snapshotJitaPrice((int) $type->type_id, $regionId);
                 $oreJitaBuyPrice = $oreMarket['price'] ?? null;
             }
 
@@ -479,11 +475,12 @@ final class AppraisalCalculator
     }
 
     /** Read the latest usable value from the compact current-price table. */
-    private function snapshotJitaPrice(int $typeId, string $regionId, string $side): ?array
+    private function snapshotJitaPrice(int $typeId, string $regionId): ?array
     {
-        $column = $side === 'sell' ? 'sell_price' : 'buy_price';
-        $snapshotIdColumn = $side === 'sell' ? 'sell_snapshot_id' : 'buy_snapshot_id';
-        $observedAtColumn = $side === 'sell' ? 'sell_observed_at' : 'buy_observed_at';
+        // Buyback valuation must never read Jita Sell columns.
+        $column = 'buy_price';
+        $snapshotIdColumn = 'buy_snapshot_id';
+        $observedAtColumn = 'buy_observed_at';
         $snapshot = DB::table('market_price_current')
             ->where('type_id', $typeId)
             ->where('region_id', $regionId)
