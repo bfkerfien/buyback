@@ -82,11 +82,26 @@ final class AppraisalCalculator
         $defaultRate = 87.0;
         $regionId = (string) config('buyback.region_id', '10000002');
 
-        $appraisedTypeIds = $types->filter(fn ($type) => $requiredCategoryName === null
-                || mb_strtolower((string) $type->category_name) === mb_strtolower($requiredCategoryName))
-            ->pluck('type_id');
-        $this->priceRefresher->ensureCurrentPrices($appraisedTypeIds->all(), $side);
-        $this->priceRefresher->ensureCurrentPrices($mineralIds->all(), 'buy');
+        $appraisedTypes = $types->filter(fn ($type) => $requiredCategoryName === null
+                || mb_strtolower((string) $type->category_name) === mb_strtolower($requiredCategoryName));
+        $appraisedTypeIds = $appraisedTypes->pluck('type_id')->all();
+
+        // Gas inventory is valued against its compressed counterpart, so refresh
+        // those reference types as part of this same appraisal price pull.
+        $compressedGasReferenceIds = $appraisedTypes->map(function ($type) use ($compressedGasTypes) {
+            $compressedName = str_starts_with(mb_strtolower($type->type_name), 'compressed ')
+                ? $type->type_name
+                : 'Compressed ' . $type->type_name;
+            return $compressedGasTypes->get(mb_strtolower($compressedName))?->type_id;
+        })->filter()->all();
+
+        // Pull every required direct-market, gas-reference, and refining-output
+        // price immediately before valuation. No cached price is accepted.
+        $this->priceRefresher->ensureCurrentPrices(array_merge(
+            $appraisedTypeIds,
+            $compressedGasReferenceIds,
+            $mineralIds->all()
+        ));
 
         foreach ($parsedItems as $item) {
             $type = $types->get(mb_strtolower($item['name']));
