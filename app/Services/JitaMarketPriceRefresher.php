@@ -70,7 +70,11 @@ final class JitaMarketPriceRefresher
                         'created_at' => $now,
                         'updated_at' => $now,
                     ]]);
-                    $saved++;
+                    // An appraisal requires a fresh Jita Buy value. A sell-only
+                    // order book must not count as a successful price refresh.
+                    if ($buy !== null && $buy > 0) {
+                        $saved++;
+                    }
                 }
             } catch (Throwable) {
                 $failed++;
