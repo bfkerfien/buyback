@@ -76,7 +76,9 @@ final class AppraisalCalculator
         $unpricedTypes = [];
         $unpricedItemReasons = [];
         $lines = [];
-        $side = config('buyback.price_side', 'buy');
+        // All percentage-based buyback offers are calculated from Jita Buy prices.
+        // Do not allow BUYBACK_PRICE_SIDE or a sell-side setting to inflate appraisal bases.
+        $side = 'buy';
         $defaultRate = 87.0;
         $regionId = (string) config('buyback.region_id', '10000002');
 
